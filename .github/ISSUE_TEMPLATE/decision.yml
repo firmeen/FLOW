@@ -1,0 +1,17 @@
+name: Decision
+description: Evaluate and record an important choice
+title: "[Decision]: "
+labels: ["type:decision", "flag:needs-decision"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options and trade-offs
+    validations:
+      required: true

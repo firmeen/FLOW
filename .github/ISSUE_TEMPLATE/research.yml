@@ -1,0 +1,16 @@
+name: Research
+description: Investigate a question or validate an assumption
+title: "[Research]: "
+labels: ["type:research"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence required
+      description: Sources, interviews, or data needed to reach a conclusion.
