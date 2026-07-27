@@ -1,0 +1,15 @@
+name: Risk
+description: Identify and manage a potential risk
+title: "[Risk]: "
+labels: ["type:risk"]
+body:
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk statement
+    validations:
+      required: true
+  - type: textarea
+    id: response
+    attributes:
+      label: Mitigation and owner
