@@ -1,26 +1,94 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f5ef;
+  --foreground: #17211b;
+  --surface: #fff;
+  --surface-muted: #efeee8;
+  --line: #deddd5;
+  --forest: #12372a;
+  --forest-strong: #0b291e;
+  --forest-soft: #dfe9e2;
+  --sage: #789582;
+  --lime: #dff07a;
+  --amber: #d58b24;
+  --red: #bd4a42;
+  --blue: #3d6f8f;
+}
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--background); scroll-behavior: smooth; }
+body { min-height: 100%; margin: 0; background: var(--background); color: var(--foreground); }
+body {
+  font-family: var(--font-foodflow, Arial), 'Noto Sans Thai', 'Leelawadee UI', system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+button, input, textarea, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: #dff07a; color: #0b291e; }
+:focus-visible { outline: 3px solid rgba(18, 55, 42, .28); outline-offset: 2px; }
+.ff-panel { border: 1px solid var(--line); background: var(--surface); }
+.ff-shadow { box-shadow: 0 18px 50px rgba(20, 48, 36, .08); }
+.ff-grid-fade {
+  background-image:
+    linear-gradient(rgba(18, 55, 42, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 55, 42, .035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.food-sprite {
+  background-color: #e8e2d5;
+  background-image: url('/assets/foodflow-menu-sprite.png');
+  background-repeat: no-repeat;
+  background-size: 300% 200%;
+}
+.food-sprite[data-image='matcha'] { background-position: 0 0; }
+.food-sprite[data-image='gyudon'] { background-position: 50% 0; }
+.food-sprite[data-image='tempura'] { background-position: 100% 0; }
+.food-sprite[data-image='salmon'] { background-position: 0 100%; }
+.food-sprite[data-image='sushi'] { background-position: 50% 100%; }
+.food-sprite[data-image='yuzu'] { background-position: 100% 100%; }
+.food-sprite[data-image='karaage'] { background-position: 92% 7%; }
+.food-sprite[data-image='rice'] { background-position: 52% 4%; }
+.food-sprite[data-image='salad'] { background-position: 4% 96%; }
+.food-sprite[data-image='drink'] { background-position: 96% 96%; }
+.animate-enter { animation: ff-enter 180ms ease-out both; }
+.animate-slide-up { animation: ff-slide-up 220ms cubic-bezier(.22, 1, .36, 1) both; }
+.animate-ticket { animation: ff-ticket 210ms ease-out both; }
+@keyframes ff-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ff-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ff-ticket {
+  from { opacity: 0; transform: scale(.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --color-forest: var(--forest);
+  --color-forest-strong: var(--forest-strong);
+  --color-forest-soft: var(--forest-soft);
+  --color-sage: var(--sage);
+  --color-lime: var(--lime);
+  --color-status-amber: var(--amber);
+  --color-status-red: var(--red);
+  --color-status-blue: var(--blue);
+  --font-sans: var(--font-foodflow);
 }
