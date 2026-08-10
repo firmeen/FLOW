@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   ArrowLeft,
   Bell,
@@ -167,13 +166,13 @@ export function CustomerExperience({ tableCode }: { tableCode: string }) {
             {view !== "landing" && (
               <button className="grid size-9 place-items-center rounded-md text-forest hover:bg-forest-soft" onClick={() => setView("landing")} aria-label="Back to table home"><ArrowLeft className="size-4" /></button>
             )}
-            <Link className="flex items-center gap-2.5" href="/">
+            <a className="flex items-center gap-2.5" href="/">
               <span className="grid size-8 place-items-center rounded-md bg-forest text-lime"><UtensilsCrossed className="size-4" /></span>
               <span>
                 <span className="block text-sm font-black tracking-[-0.03em] text-forest">{state.restaurant.name}</span>
                 <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-sage">Powered by FoodFlow</span>
               </span>
-            </Link>
+            </a>
           </div>
           <Badge tone="forest">Table {table.code.replace("T", "")}</Badge>
         </div>

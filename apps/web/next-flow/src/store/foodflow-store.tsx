@@ -42,6 +42,13 @@ import {
 
 export const FOODFLOW_STORAGE_KEY = "foodflow:mvp:state:v1";
 
+// Server-rendered client components need an identical first snapshot in the
+// browser. The live demo is rebased to the current time immediately after
+// hydration (or replaced by persisted state).
+const HYDRATION_REFERENCE_DATE = new Date("2026-08-10T04:30:00.000Z");
+
+const createHydrationState = () => createDemoState(HYDRATION_REFERENCE_DATE);
+
 export interface FoodFlowActions {
   setActiveRole(role: DemoRole): void;
   addCartItem(tableId: string, item: Omit<CartItem, "id">): void;
@@ -137,7 +144,7 @@ const restoreState = (raw: string | null): FoodFlowState | null => {
 };
 
 export function FoodFlowProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<FoodFlowState>(() => createDemoState());
+  const [state, setState] = useState<FoodFlowState>(createHydrationState);
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
 
@@ -163,11 +170,10 @@ export function FoodFlowProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const restored = restoreState(window.localStorage.getItem(FOODFLOW_STORAGE_KEY));
+    const initialState = restored ?? createDemoState();
     queueMicrotask(() => {
-      if (restored) {
-        stateRef.current = restored;
-        setState(restored);
-      }
+      stateRef.current = initialState;
+      setState(initialState);
       setHydrated(true);
     });
   }, []);
