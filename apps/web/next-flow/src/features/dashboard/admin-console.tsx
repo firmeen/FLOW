@@ -79,7 +79,7 @@ export function AdminConsole() {
             { value: "settings", label: "Settings" },
           ]}
         />
-        {view === "dashboard" && <OwnerDashboard state={state} />}
+        {view === "dashboard" && <OwnerDashboard state={state} hydrated={hydrated} />}
         {view === "orders" && <OrdersView state={state} />}
         {view === "tables" && <TablesView state={state} />}
         {view === "menu" && <MenuManagement />}

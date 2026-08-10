@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
@@ -174,7 +173,7 @@ export function DemoLauncher() {
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {experiences.map((experience, index) => (
-              <Link
+              <a
                 className={`group ff-panel flex min-h-[150px] flex-col justify-between rounded-lg p-4.5 transition duration-200 hover:-translate-y-0.5 hover:border-forest/30 hover:shadow-[0_12px_30px_rgba(22,55,43,0.08)] ${index === 0 ? "md:col-span-2 md:min-h-[128px] md:flex-row md:items-center" : ""}`}
                 href={experience.href}
                 key={experience.title}
@@ -192,7 +191,7 @@ export function DemoLauncher() {
                 <span className={`mt-4 grid size-8 shrink-0 place-items-center rounded-full border border-line text-forest transition group-hover:border-forest group-hover:bg-forest group-hover:text-white ${index === 0 ? "md:mt-0" : "self-end"}`}>
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </span>
-              </Link>
+              </a>
             ))}
           </div>
 

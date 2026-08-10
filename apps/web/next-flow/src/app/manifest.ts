@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
 
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",

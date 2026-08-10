@@ -16,14 +16,15 @@ import type { FoodFlowState } from "@/domain";
 import { formatTHB } from "@/lib/currency";
 import { formatBangkokTime, formatCompactDuration, getElapsedMilliseconds } from "@/lib/date";
 
-export function OwnerDashboard({ state }: { state: FoodFlowState }) {
+export function OwnerDashboard({ state, hydrated }: { state: FoodFlowState; hydrated: boolean }) {
   const bangkokDateKey = (timestamp: string | Date) => new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(timestamp));
-  const todayKey = bangkokDateKey(new Date());
+  const initialReference = state.orders[0]?.submittedAt ?? state.restaurant.createdAt;
+  const todayKey = bangkokDateKey(hydrated ? new Date() : initialReference);
   const todayOrders = state.orders.filter((order) => bangkokDateKey(order.submittedAt) === todayKey);
   const operationalOrdersToday = todayOrders.filter((order) => order.status !== "DRAFT" && order.status !== "VOIDED");
   const recordedPayments = state.payments.filter((payment) => payment.status === "RECORDED" && bangkokDateKey(payment.recordedAt) === todayKey);

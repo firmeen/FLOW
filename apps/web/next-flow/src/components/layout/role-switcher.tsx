@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   BarChart3,
   ChefHat,
@@ -52,7 +51,7 @@ export function RoleSwitcher({
           const active = item.id === currentRole;
 
           return (
-            <Link
+            <a
               key={item.id}
               href={item.href}
               aria-label={compact ? item.label : undefined}
@@ -73,7 +72,7 @@ export function RoleSwitcher({
             >
               <Icon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
               {!compact && <span className="truncate">{item.shortLabel}</span>}
-            </Link>
+            </a>
           );
         })}
       </div>

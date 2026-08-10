@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
 import { Badge } from "../ui/badge";
 import { FoodFlowLogo, FoodFlowMark } from "./foodflow-logo";
 import { RoleSwitcher, type DemoRole } from "./role-switcher";
@@ -43,13 +42,13 @@ export function OperationalShell({
     <div className="min-h-screen bg-[#f5f4ee] text-[#1b2b24]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-white/10 bg-[#14382f] text-white lg:flex">
         <div className="border-b border-white/10 px-5 py-5">
-          <Link
+          <a
             href="/"
             aria-label="FoodFlow demo home"
             className="inline-flex rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4a152] focus-visible:ring-offset-2 focus-visible:ring-offset-[#14382f]"
           >
             <FoodFlowLogo inverted showTagline />
-          </Link>
+          </a>
         </div>
 
         <div className="mx-4 mt-4 border border-white/10 bg-white/[0.06] px-3.5 py-3">
@@ -68,7 +67,7 @@ export function OperationalShell({
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
+                <a
                   key={`${item.href}-${item.label}`}
                   href={item.href}
                   onClick={item.onClick}
@@ -88,7 +87,7 @@ export function OperationalShell({
                       {item.badge}
                     </span>
                   )}
-                </Link>
+                </a>
               );
             })}
           </div>
@@ -105,13 +104,13 @@ export function OperationalShell({
       <div className="min-h-screen lg:pl-64">
         <header className="sticky top-0 z-20 border-b border-[#dde1da] bg-[#f9f8f3]/95 backdrop-blur-sm">
           <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <Link
+            <a
               href="/"
               aria-label="FoodFlow demo home"
               className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6a59]/45 lg:hidden"
             >
               <FoodFlowMark className="size-8" />
-            </Link>
+            </a>
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -143,7 +142,7 @@ export function OperationalShell({
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Link
+            <a
               key={`${item.href}-${item.label}`}
               href={item.href}
               onClick={item.onClick}
@@ -164,7 +163,7 @@ export function OperationalShell({
                 )}
               </span>
               <span className="max-w-20 truncate">{item.label}</span>
-            </Link>
+            </a>
           );
         })}
       </nav>
