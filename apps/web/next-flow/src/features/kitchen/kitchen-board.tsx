@@ -58,24 +58,24 @@ const laneDefinitions: readonly {
     label: "New",
     helper: "Waiting to start",
     icon: Flame,
-    accentClassName: "bg-[#e4a443]",
-    countClassName: "bg-[#e4a443] text-[#281b08]",
+    accentClassName: "bg-primary",
+    countClassName: "bg-primary text-primary-foreground",
   },
   {
     id: "PREPARING",
     label: "Preparing",
     helper: "On the make-line",
     icon: CookingPot,
-    accentClassName: "bg-[#5e9ec3]",
-    countClassName: "bg-[#5e9ec3] text-[#071c28]",
+    accentClassName: "bg-ring",
+    countClassName: "bg-ring text-accent-foreground",
   },
   {
     id: "READY",
     label: "Ready",
     helper: "Waiting for pickup",
     icon: CheckCircle2,
-    accentClassName: "bg-lime",
-    countClassName: "bg-lime text-forest-strong",
+    accentClassName: "bg-primary",
+    countClassName: "bg-primary text-primary-foreground",
   },
 ] as const;
 
@@ -255,16 +255,16 @@ export function KitchenBoard() {
           Live
         </Badge>
       }
-      contentClassName="!min-h-[calc(100vh-4rem)] !bg-[#0d1b17] !px-3 !py-3 !pb-24 sm:!px-4 sm:!py-4 lg:!px-5 lg:!pb-5"
+      contentClassName="!min-h-[calc(100vh-4rem)] !bg-foreground !px-3 !py-3 !pb-24 sm:!px-4 sm:!py-4 lg:!px-5 lg:!pb-5"
     >
       <div className="mx-auto max-w-[1800px]">
         <section
           aria-label="Kitchen display controls"
-          className="mb-3 overflow-hidden rounded-lg border border-white/10 bg-[#152721] shadow-[0_10px_30px_rgba(0,0,0,0.16)]"
+          className="mb-3 overflow-hidden rounded-lg border border-white/10 bg-foreground shadow-lg"
         >
           <div className="flex flex-col gap-3 px-3 py-3 sm:px-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-lime text-forest-strong">
+              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
                 <Utensils className="size-5" aria-hidden="true" />
               </span>
               <div className="min-w-0">
@@ -273,9 +273,9 @@ export function KitchenBoard() {
                 </p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="font-semibold text-white">All active orders</p>
-                  <span className="hidden h-4 w-px bg-white/12 sm:block" aria-hidden="true" />
+                  <span className="hidden h-4 w-px bg-card/12 sm:block" aria-hidden="true" />
                   <p
-                    className="font-mono text-sm font-bold tabular-nums text-lime"
+                    className="font-mono text-sm font-bold tabular-nums text-primary"
                     aria-label={hydrated ? "Current restaurant time" : "Kitchen clock loading"}
                   >
                     {hydrated ? formatBangkokTime(now, { second: "2-digit" }) : "--:--:--"}
@@ -312,8 +312,8 @@ export function KitchenBoard() {
               aria-live="polite"
               className={`flex items-center gap-2 border-t px-4 py-2.5 text-xs font-semibold ${
                 actionError
-                  ? "border-[#7d3532] bg-[#4b2422] text-[#ffd7d3]"
-                  : "border-white/10 bg-white/[0.04] text-[#dff07a]"
+                  ? "border-destructive/30 bg-destructive/25 text-destructive/80"
+                  : "border-white/10 bg-card/[0.04] text-primary"
               }`}
             >
               {actionError ? (
@@ -324,7 +324,7 @@ export function KitchenBoard() {
               <span className="min-w-0 flex-1">{actionError ?? feedback}</span>
               <button
                 type="button"
-                className="rounded px-2 py-1 text-[10px] uppercase tracking-wide text-current/70 hover:bg-white/10 hover:text-current"
+                className="rounded px-2 py-1 text-[10px] uppercase tracking-wide text-current/70 hover:bg-card/10 hover:text-current"
                 onClick={() => {
                   setFeedback(null);
                   setActionError(null);
@@ -345,7 +345,7 @@ export function KitchenBoard() {
               <section
                 key={lane.id}
                 aria-labelledby={`kitchen-lane-${lane.id.toLocaleLowerCase()}`}
-                className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-[#13231e]"
+                className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-foreground"
               >
                 <div className={`h-1.5 w-full ${lane.accentClassName}`} aria-hidden="true" />
                 <header className="flex min-h-16 items-center gap-3 border-b border-white/10 px-3.5 py-3">
@@ -371,7 +371,7 @@ export function KitchenBoard() {
                   {tickets.length === 0 ? (
                     <EmptyState
                       compact
-                      className="min-h-52 border-white/10 bg-[#f3f4ef]"
+                      className="min-h-52 border-white/10 bg-muted"
                       icon={<Icon className="size-5" />}
                       title={`No ${lane.label.toLocaleLowerCase()} tickets`}
                       description={emptyLaneMessage(lane.id, station)}
@@ -457,7 +457,7 @@ export function KitchenBoard() {
           </>
         }
       >
-        <label className="block text-sm font-semibold text-forest" htmlFor="kitchen-action-note">
+        <label className="block text-sm font-semibold text-foreground" htmlFor="kitchen-action-note">
           {noteDialog?.action === "remake" ? "Reason for remake" : "What is blocking this ticket?"}
         </label>
         <textarea
@@ -470,7 +470,7 @@ export function KitchenBoard() {
               ? "Example: Steak overcooked - remake medium rare"
               : "Example: Waiting for replacement ingredient"
           }
-          className="mt-2 min-h-28 w-full resize-y rounded-md border border-line bg-white p-3 text-sm leading-6 text-foreground placeholder:text-foreground/35 focus:border-forest focus:outline-none focus:ring-2 focus:ring-forest/15"
+          className="mt-2 min-h-28 w-full resize-y rounded-md border border-border bg-card p-3 text-sm leading-6 text-foreground placeholder:text-foreground/35 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/15"
         />
         <p className="mt-2 text-xs text-foreground/45">
           Required for shift handover and audit history.
@@ -535,20 +535,20 @@ export function KitchenBoard() {
                   }
                   className={`flex min-h-16 w-full items-center gap-3 rounded-md border px-4 py-3 text-left transition ${
                     selected
-                      ? "border-status-red bg-[#fff0ee] ring-1 ring-status-red"
-                      : "border-line bg-white hover:border-[#b9c3bc]"
+                      ? "border-destructive bg-destructive/10 ring-1 ring-destructive"
+                      : "border-border bg-card hover:border-border"
                   } disabled:cursor-not-allowed disabled:opacity-55`}
                 >
                   <span
                     className={`grid size-5 shrink-0 place-items-center rounded-full border ${
-                      selected ? "border-status-red" : "border-[#aeb8b1]"
+                      selected ? "border-destructive" : "border-border"
                     }`}
                     aria-hidden="true"
                   >
-                    {selected && <span className="size-2.5 rounded-full bg-status-red" />}
+                    {selected && <span className="size-2.5 rounded-full bg-destructive" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-semibold text-forest">{menuItem.name}</span>
+                    <span className="block font-semibold text-foreground">{menuItem.name}</span>
                     <span className="mt-0.5 block text-xs text-foreground/45">
                       {formatStation(menuItem.preparationStation)}
                     </span>
@@ -599,29 +599,29 @@ function KitchenTicketCard({
   const timerText = now === null ? "--:--" : formatElapsed(timerStart, now);
   const timerTone =
     now === null
-      ? "border-[#c7d3cc] bg-[#edf1ee] text-[#60716a]"
+      ? "border-border bg-chart-1/20 text-muted-foreground"
       : getTimerTone(getElapsedMilliseconds(timerStart, now), lane);
   const tableCode = getTableCode(ticket, tables);
   const statusLabel = getStatusLabel(ticket.status);
 
   return (
     <article
-      className={`animate-ticket overflow-hidden rounded-lg border bg-[#fbfaf5] shadow-[0_8px_22px_rgba(0,0,0,0.2)] ${
+      className={`animate-ticket overflow-hidden rounded-lg border bg-muted shadow-lg ${
         ticket.status === "PROBLEM"
-          ? "border-[#d36a61] ring-2 ring-[#d36a61]/30"
+          ? "border-destructive/30 ring-2 ring-destructive/30/30"
           : ticket.status === "REMAKE"
-            ? "border-[#d69a46] ring-2 ring-[#d69a46]/25"
+            ? "border-primary/60 ring-2 ring-primary/40/25"
             : "border-black/15"
       }`}
       aria-label={`${ticket.orderNumber}, table ${tableCode}, ${statusLabel}`}
     >
       <div className={`h-1.5 ${ticketAccent(ticket.status)}`} aria-hidden="true" />
-      <header className="flex items-start justify-between gap-3 border-b border-[#d9d9d1] px-4 py-3.5">
+      <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3.5">
         <div className="min-w-0">
           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-foreground/40">
             Table
           </p>
-          <p className="mt-0.5 text-[2rem] font-black leading-none tracking-[-0.055em] text-forest">
+          <p className="mt-0.5 text-[2rem] font-black leading-none tracking-[-0.055em] text-foreground">
             {tableCode}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -633,7 +633,7 @@ function KitchenTicketCard({
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="text-sm font-black tracking-[-0.02em] text-forest">{ticket.orderNumber}</p>
+          <p className="text-sm font-black tracking-[-0.02em] text-foreground">{ticket.orderNumber}</p>
           <div
             className={`mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 font-mono text-base font-black tabular-nums ${timerTone}`}
             aria-label={
@@ -651,8 +651,8 @@ function KitchenTicketCard({
         </div>
       </header>
 
-      <div className="flex items-center justify-between gap-2 border-b border-[#dfdfd7] bg-[#f0f0e9] px-4 py-2">
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-forest/65">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-muted px-4 py-2">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-foreground/65">
           <ChefHat className="size-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">{formatStation(ticket.station)}</span>
         </span>
@@ -661,7 +661,7 @@ function KitchenTicketCard({
         </span>
       </div>
 
-      <div className="divide-y divide-[#deded5] px-4">
+      <div className="divide-y divide-border px-4">
         {ticket.items.map((item) => {
           const linkedMenuItem = getLinkedMenuItem(item, ticket, order, menuItems);
           const soldOut = linkedMenuItem?.status === "SOLD_OUT";
@@ -669,12 +669,12 @@ function KitchenTicketCard({
           return (
             <div key={item.id} className="py-3.5">
               <div className="flex items-start gap-3">
-                <span className="grid min-h-9 min-w-9 shrink-0 place-items-center rounded-md bg-forest px-1 text-base font-black text-white">
+                <span className="grid min-h-9 min-w-9 shrink-0 place-items-center rounded-md bg-foreground px-1 text-base font-black text-white">
                   {item.quantity}x
                 </span>
                 <div className="min-w-0 flex-1 pt-0.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-[15px] font-extrabold leading-5 tracking-[-0.015em] text-forest">
+                    <p className="text-[15px] font-extrabold leading-5 tracking-[-0.015em] text-foreground">
                       {item.menuItemName}
                     </p>
                     {soldOut && <Badge tone="danger">Sold out</Badge>}
@@ -684,7 +684,7 @@ function KitchenTicketCard({
                       {item.modifiers.map((modifier, index) => (
                         <li
                           key={`${modifier}-${index}`}
-                          className="before:mr-1.5 before:text-sage before:content-['+']"
+                          className="before:mr-1.5 before:text-muted-foreground before:content-['+']"
                         >
                           {modifier}
                         </li>
@@ -695,7 +695,7 @@ function KitchenTicketCard({
               </div>
 
               {item.specialRequest && (
-                <div className="mt-2.5 flex items-start gap-2 rounded-md border border-[#e5c77f] bg-[#fff3d5] px-3 py-2.5 text-xs font-bold leading-5 text-[#654712]">
+                <div className="mt-2.5 flex items-start gap-2 rounded-md border border-primary/60 bg-primary/15 px-3 py-2.5 text-xs font-bold leading-5 text-primary-foreground">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{item.specialRequest}</span>
                 </div>
@@ -721,13 +721,13 @@ function KitchenTicketCard({
         </TicketNotice>
       )}
 
-      <footer className="grid grid-cols-2 gap-2 border-t border-[#d8d8d0] bg-[#efefe8] p-3">
+      <footer className="grid grid-cols-2 gap-2 border-t border-border bg-muted p-3">
         {lane === "NEW" && (
           <Button
             size="lg"
             fullWidth
             isLoading={working}
-            className="col-span-2 !min-h-14 !border-lime !bg-lime !text-forest-strong hover:!border-[#e8f68f] hover:!bg-[#e8f68f]"
+            className="col-span-2 !min-h-14 !border-primary !bg-primary !text-primary-foreground hover:!border-primary/60 hover:!bg-primary"
             leftIcon={<Play className="size-5 fill-current" />}
             onClick={onStart}
           >
@@ -740,7 +740,7 @@ function KitchenTicketCard({
             size="lg"
             fullWidth
             isLoading={working}
-            className="col-span-2 !min-h-14 !border-lime !bg-lime !text-forest-strong hover:!border-[#e8f68f] hover:!bg-[#e8f68f]"
+            className="col-span-2 !min-h-14 !border-primary !bg-primary !text-primary-foreground hover:!border-primary/60 hover:!bg-primary"
             leftIcon={<Play className="size-5 fill-current" />}
             onClick={onStart}
           >
@@ -753,7 +753,7 @@ function KitchenTicketCard({
             size="lg"
             fullWidth
             isLoading={working}
-            className="col-span-2 !min-h-14 !border-lime !bg-lime !text-forest-strong hover:!border-[#e8f68f] hover:!bg-[#e8f68f]"
+            className="col-span-2 !min-h-14 !border-primary !bg-primary !text-primary-foreground hover:!border-primary/60 hover:!bg-primary"
             leftIcon={<CheckCircle2 className="size-5" />}
             onClick={onReady}
           >
@@ -767,7 +767,7 @@ function KitchenTicketCard({
             fullWidth
             variant="outline"
             disabled={working}
-            className="col-span-2 !min-h-14 !border-[#b8675f] !bg-[#fff5f3] !text-[#8d3731] hover:!bg-[#f9e4e1]"
+            className="col-span-2 !min-h-14 !border-destructive/30 !bg-destructive/10 !text-destructive hover:!bg-destructive/10"
             leftIcon={<RotateCcw className="size-5" />}
             onClick={onRemake}
           >
@@ -781,7 +781,7 @@ function KitchenTicketCard({
             fullWidth
             variant="outline"
             disabled={working}
-            className="!min-h-12 !border-[#c89241] !bg-[#fff8e9] !text-[#725019] hover:!bg-[#ffefcb]"
+            className="!min-h-12 !border-primary/60 !bg-primary/15 !text-primary-foreground hover:!bg-primary/15"
             leftIcon={<AlertTriangle className="size-4" />}
             onClick={onProblem}
           >
@@ -794,7 +794,7 @@ function KitchenTicketCard({
           fullWidth
           variant="outline"
           disabled={working || ticketMenuItems.length === 0}
-          className={`!min-h-12 !border-[#c7736c] !bg-[#fff6f4] !text-[#8c3d37] hover:!bg-[#f9e4e1] ${
+          className={`!min-h-12 !border-destructive/30 !bg-destructive/10 !text-destructive hover:!bg-destructive/10 ${
             lane === "READY" ? "col-span-2" : ""
           }`}
           leftIcon={<Ban className="size-4" />}
@@ -822,8 +822,8 @@ function TicketNotice({
     <div
       className={`mx-4 mb-3 rounded-md border px-3 py-2.5 ${
         danger
-          ? "border-[#d98780] bg-[#fff0ee] text-[#78312c]"
-          : "border-[#c9d4ce] bg-[#eaf0ec] text-[#29483e]"
+          ? "border-destructive/30 bg-destructive/10 text-destructive"
+          : "border-border bg-chart-1/20 text-foreground"
       }`}
     >
       <p className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.13em] opacity-65">
@@ -853,14 +853,14 @@ function StationButton({
       onClick={onClick}
       className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-xs font-bold transition ${
         active
-          ? "border-lime bg-lime text-forest-strong"
-          : "border-white/12 bg-white/[0.04] text-white/65 hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-white/12 bg-card/[0.04] text-white/65 hover:border-white/25 hover:bg-card/[0.08] hover:text-white"
       }`}
     >
       {label}
       <span
         className={`min-w-5 rounded px-1.5 py-0.5 text-[10px] tabular-nums ${
-          active ? "bg-forest/12" : "bg-white/10"
+          active ? "bg-foreground/12" : "bg-card/10"
         }`}
       >
         {count}
@@ -907,25 +907,25 @@ function ticketStatusTone(
 }
 
 function ticketAccent(status: KitchenTicket["status"]): string {
-  if (status === "PROBLEM") return "bg-[#c64e46]";
-  if (status === "REMAKE" || status === "NEW") return "bg-[#dda047]";
-  if (status === "READY") return "bg-[#79ad6a]";
-  return "bg-[#5e9ec3]";
+  if (status === "PROBLEM") return "bg-destructive";
+  if (status === "REMAKE" || status === "NEW") return "bg-primary";
+  if (status === "READY") return "bg-chart-3";
+  return "bg-ring";
 }
 
 function getTimerTone(elapsedMs: number, lane: KitchenLane): string {
   if (lane === "READY") {
     return elapsedMs >= 5 * 60_000
-      ? "border-[#d26a62] bg-[#fff0ee] text-[#9b3932]"
-      : "border-[#b9d8bd] bg-[#e9f4e7] text-[#356a3e]";
+      ? "border-destructive/30 bg-destructive/10 text-destructive"
+      : "border-chart-3/50 bg-chart-1/20 text-chart-5";
   }
   if (elapsedMs >= 15 * 60_000) {
-    return "border-[#d26a62] bg-[#fff0ee] text-[#9b3932]";
+    return "border-destructive/30 bg-destructive/10 text-destructive";
   }
   if (elapsedMs >= 8 * 60_000) {
-    return "border-[#e2c075] bg-[#fff4d9] text-[#765317]";
+    return "border-primary/60 bg-primary/15 text-primary-foreground";
   }
-  return "border-[#c7d3cc] bg-[#edf1ee] text-[#355147]";
+  return "border-border bg-chart-1/20 text-muted-foreground";
 }
 
 function getLinkedMenuItem(

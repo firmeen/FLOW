@@ -41,7 +41,7 @@ export function RoleSwitcher({
   return (
     <nav aria-label="Switch demo experience" className={className}>
       {!compact && (
-        <p className={`mb-2 text-[10px] font-bold uppercase tracking-[0.14em] ${inverted ? "text-white/50" : "text-[#75817b]"}`}>
+        <p className={`mb-2 font-heading text-[10px] font-semibold uppercase tracking-[0.14em] ${inverted ? "text-sidebar-foreground/60" : "text-muted-foreground"}`}>
           Switch experience
         </p>
       )}
@@ -58,16 +58,16 @@ export function RoleSwitcher({
               aria-current={active ? "page" : undefined}
               title={compact ? item.label : undefined}
               className={[
-                "group inline-flex items-center rounded-md border text-xs font-semibold transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4a152] focus-visible:ring-offset-2",
+                "group inline-flex items-center rounded-none border text-xs font-semibold transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2",
                 compact ? "size-8 justify-center" : "min-h-9 gap-2 px-2.5",
                 inverted
                   ? active
-                    ? "border-white/25 bg-white/16 text-white"
-                    : "border-transparent text-white/62 hover:bg-white/10 hover:text-white"
+                    ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "border-transparent text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   : active
-                    ? "border-[#b9ccc4] bg-[#e4eee9] text-[#173f35]"
-                    : "border-transparent text-[#68766f] hover:bg-[#ebeee9] hover:text-[#29483e]",
+                    ? "border-border bg-accent text-accent-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
               ].filter(Boolean).join(" ")}
             >
               <Icon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />

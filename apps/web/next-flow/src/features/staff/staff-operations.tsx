@@ -284,14 +284,14 @@ export function StaffOperations() {
 }
 
 function QueueMetric({ label, value, helper, icon, tone }: { label: string; value: string | number; helper: string; icon: React.ReactNode; tone: "forest" | "amber" | "red" | "green" }) {
-  const tones = { forest: "bg-[#e5eee9] text-[#255d4c]", amber: "bg-[#fbedd4] text-[#94641a]", red: "bg-[#f8e5e2] text-[#a4473e]", green: "bg-[#e4f2e8] text-[#2d724a]" } as const;
+  const tones = { forest: "bg-chart-1/20 text-chart-5", amber: "bg-primary/15 text-primary-foreground", red: "bg-destructive/10 text-destructive", green: "bg-chart-1/20 text-chart-5" } as const;
   return (
     <Card className="flex min-h-28 items-start gap-3 p-4 sm:min-h-0 sm:items-center">
       <span className={`grid size-10 shrink-0 place-items-center rounded-md ${tones[tone]}`} aria-hidden="true">{icon}</span>
       <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-[0.11em] text-[#78847e]">{label}</p>
-        <p className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] text-[#193229]">{value}</p>
-        <p className="truncate text-[11px] text-[#7b8781]">{helper}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.11em] text-muted-foreground">{label}</p>
+        <p className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] text-foreground">{value}</p>
+        <p className="truncate text-[11px] text-muted-foreground">{helper}</p>
       </div>
     </Card>
   );
@@ -314,7 +314,7 @@ function OrdersPanel({
     <section id={id} role="tabpanel" aria-label="Incoming orders">
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-forest">Incoming orders</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Incoming orders</h2>
           <p className="mt-1 text-sm text-foreground/50">Oldest submissions are shown first.</p>
         </div>
         {orders.length > 0 && <Badge tone="warning" dot>{orders.length} waiting</Badge>}
@@ -338,16 +338,16 @@ function IncomingOrderCard({ order, state, now, onReview }: { order: Order; stat
     order.customerNote,
     ...order.items.flatMap((item) => item.specialRequest ? [`${item.menuItemName}: ${item.specialRequest}`] : []),
   ].filter((note): note is string => Boolean(note));
-  const urgencyClasses = { normal: "border-t-[#4f806f]", warning: "border-t-[#d19437]", critical: "border-t-[#b84b43]" } as const;
-  const timerClasses = { normal: "bg-[#e8f1ec] text-[#285d4d]", warning: "bg-[#fff1d8] text-[#8c601b]", critical: "bg-[#fbe7e4] text-[#a33f37]" } as const;
+  const urgencyClasses = { normal: "border-t-chart-3", warning: "border-t-primary", critical: "border-t-destructive" } as const;
+  const timerClasses = { normal: "bg-chart-1/20 text-chart-5", warning: "bg-primary/15 text-primary-foreground", critical: "bg-destructive/10 text-destructive" } as const;
 
   return (
     <Card className={`animate-ticket overflow-hidden border-t-4 ${urgencyClasses[urgency]}`}>
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#839089]">Table</p>
-            <h3 className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] text-forest">{tableLabel(state, order.tableId)}</h3>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Table</p>
+            <h3 className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] text-foreground">{tableLabel(state, order.tableId)}</h3>
             <p className="mt-1 text-xs font-semibold text-foreground/45">{order.number}</p>
             {order.modifiedByStaff && <Badge className="mt-2" tone="info" icon={<ClipboardCheck className="size-3" />}>Staff changed</Badge>}
           </div>
@@ -356,29 +356,29 @@ function IncomingOrderCard({ order, state, now, onReview }: { order: Order; stat
             <p className="mt-0.5 font-mono text-base font-bold tabular-nums">{formatElapsed(order.submittedAt, now)}</p>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between border-y border-line py-3 text-xs">
+        <div className="mt-4 flex items-center justify-between border-y border-border py-3 text-xs">
           <span className="inline-flex items-center gap-1.5 font-semibold text-foreground/55"><Utensils className="size-3.5" aria-hidden="true" />{itemCount} item{itemCount === 1 ? "" : "s"}</span>
-          <span className="font-bold text-forest">{formatTHB(order.subtotal)}</span>
+          <span className="font-bold text-foreground">{formatTHB(order.subtotal)}</span>
         </div>
         <ul className="mt-4 space-y-2.5" aria-label={`Items in ${order.number}`}>
           {order.items.map((item) => (
             <li className="flex items-start gap-3 text-sm" key={item.id}>
-              <span className="mt-0.5 min-w-6 rounded bg-[#edf0eb] px-1.5 py-0.5 text-center text-[11px] font-bold text-forest">{item.quantity}x</span>
+              <span className="mt-0.5 min-w-6 rounded bg-muted px-1.5 py-0.5 text-center text-[11px] font-bold text-foreground">{item.quantity}x</span>
               <span className="min-w-0 flex-1 leading-5 text-foreground/72">{item.menuItemName}</span>
             </li>
           ))}
         </ul>
-        <div className={`mt-4 rounded-md border px-3 py-2.5 ${notes.length ? "border-[#ead9b8] bg-[#fff9eb]" : "border-line bg-[#f7f7f3]"}`}>
+        <div className={`mt-4 rounded-md border px-3 py-2.5 ${notes.length ? "border-primary/60 bg-primary/15" : "border-border bg-muted"}`}>
           <div className="flex items-start gap-2">
-            <MessageSquareText className={`mt-0.5 size-3.5 shrink-0 ${notes.length ? "text-[#a2732d]" : "text-foreground/30"}`} aria-hidden="true" />
+            <MessageSquareText className={`mt-0.5 size-3.5 shrink-0 ${notes.length ? "text-primary-foreground" : "text-foreground/30"}`} aria-hidden="true" />
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.09em] text-foreground/40">Notes</p>
-              {notes.length ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#684d25]">{notes.join(" - ")}</p> : <p className="mt-1 text-xs text-foreground/38">No special notes</p>}
+              {notes.length ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-primary-foreground">{notes.join(" - ")}</p> : <p className="mt-1 text-xs text-foreground/38">No special notes</p>}
             </div>
           </div>
         </div>
       </div>
-      <div className="border-t border-line bg-[#fafaf6] p-4">
+      <div className="border-t border-border bg-muted p-4">
         <Button fullWidth onClick={onReview} rightIcon={<ChevronRight className="size-4" />}>Review order</Button>
       </div>
     </Card>
@@ -398,18 +398,18 @@ function OrderSummary({ order, state, now }: { order: Order; state: FoodFlowStat
       </div>
       <section>
         <h3 className="text-xs font-bold uppercase tracking-[0.11em] text-foreground/45">Order items</h3>
-        <div className="mt-2 overflow-hidden rounded-md border border-line bg-white">
+        <div className="mt-2 overflow-hidden rounded-md border border-border bg-card">
           {order.items.map((item, index) => (
-            <div className={`px-4 py-3.5 ${index ? "border-t border-line" : ""}`} key={item.id}>
+            <div className={`px-4 py-3.5 ${index ? "border-t border-border" : ""}`} key={item.id}>
               <div className="flex items-start gap-3">
-                <span className="mt-0.5 min-w-7 rounded bg-forest-soft px-1.5 py-1 text-center text-xs font-bold text-forest">{item.quantity}x</span>
+                <span className="mt-0.5 min-w-7 rounded bg-muted px-1.5 py-1 text-center text-xs font-bold text-foreground">{item.quantity}x</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-4">
-                    <p className="font-semibold leading-5 text-forest">{item.menuItemName}</p>
-                    <p className="shrink-0 text-sm font-semibold text-forest">{formatTHB(item.lineTotal)}</p>
+                    <p className="font-semibold leading-5 text-foreground">{item.menuItemName}</p>
+                    <p className="shrink-0 text-sm font-semibold text-foreground">{formatTHB(item.lineTotal)}</p>
                   </div>
                   {item.modifiers.length > 0 && <p className="mt-1 text-xs text-foreground/48">{item.modifiers.map((modifier) => modifier.modifierChoiceName).join(" - ")}</p>}
-                  {item.specialRequest && <p className="mt-2 rounded bg-[#fff4df] px-2.5 py-2 text-xs leading-5 text-[#755422]"><strong>Request:</strong> {item.specialRequest}</p>}
+                  {item.specialRequest && <p className="mt-2 rounded bg-primary/15 px-2.5 py-2 text-xs leading-5 text-primary-foreground"><strong>Request:</strong> {item.specialRequest}</p>}
                 </div>
               </div>
             </div>
@@ -417,16 +417,16 @@ function OrderSummary({ order, state, now }: { order: Order; state: FoodFlowStat
         </div>
       </section>
       {order.customerNote && (
-        <section className="rounded-md border border-[#e8d3aa] bg-[#fff8e8] p-4">
+        <section className="rounded-md border border-primary/60 bg-primary/15 p-4">
           <div className="flex gap-3">
-            <MessageSquareText className="mt-0.5 size-4 shrink-0 text-[#9a6b24]" aria-hidden="true" />
-            <div><h3 className="text-xs font-bold uppercase tracking-[0.1em] text-[#835e25]">Customer note</h3><p className="mt-1.5 text-sm leading-6 text-[#5f492a]">{order.customerNote}</p></div>
+            <MessageSquareText className="mt-0.5 size-4 shrink-0 text-primary-foreground" aria-hidden="true" />
+            <div><h3 className="text-xs font-bold uppercase tracking-[0.1em] text-primary-foreground">Customer note</h3><p className="mt-1.5 text-sm leading-6 text-primary-foreground">{order.customerNote}</p></div>
           </div>
         </section>
       )}
-      {!order.customerNote && specialNotes.length === 0 && <p className="rounded-md border border-line bg-[#f6f6f2] px-4 py-3 text-sm text-foreground/45">No special requests were added to this order.</p>}
+      {!order.customerNote && specialNotes.length === 0 && <p className="rounded-md border border-border bg-muted px-4 py-3 text-sm text-foreground/45">No special requests were added to this order.</p>}
       {order.modifiedByStaff && (
-        <div className="flex gap-3 rounded-md border border-[#c5d9e8] bg-[#edf6fb] p-4 text-[#315f7a]">
+        <div className="flex gap-3 rounded-md border border-ring/40 bg-accent p-4 text-accent-foreground">
           <ClipboardCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p className="text-sm leading-5"><strong>Staff-modified order.</strong> The change is retained in the audit log.</p>
         </div>
@@ -454,7 +454,7 @@ function OrderChangeForm({
 }) {
   return (
     <div className="space-y-5">
-      <div className="flex gap-3 rounded-md border border-[#c5d9e8] bg-[#edf6fb] p-4 text-[#315f7a]">
+      <div className="flex gap-3 rounded-md border border-ring/40 bg-accent p-4 text-accent-foreground">
         <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <p className="text-sm leading-5">Changes are visible to the customer and permanently attributed to staff. Update at least one item and explain why.</p>
       </div>
@@ -467,24 +467,24 @@ function OrderChangeForm({
           {items.map((item) => (
             <Card muted className="p-4" key={item.sourceId}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0"><p className="font-semibold leading-5 text-forest">{item.name}</p><p className="mt-1 text-xs text-foreground/42">{formatTHB(item.unitPrice)} each</p></div>
+                <div className="min-w-0"><p className="font-semibold leading-5 text-foreground">{item.name}</p><p className="mt-1 text-xs text-foreground/42">{formatTHB(item.unitPrice)} each</p></div>
                 <IconButton label={`Remove ${item.name}`} variant="danger" size="sm" disabled={items.length === 1} onClick={() => onItemRemove(item.sourceId)}><Trash2 className="size-3.5" aria-hidden="true" /></IconButton>
               </div>
               <div className="mt-4 flex flex-wrap items-end gap-4">
                 <div>
                   <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-foreground/40">Quantity</p>
-                  <div className="inline-flex items-center rounded-md border border-line bg-white p-1">
+                  <div className="inline-flex items-center rounded-md border border-border bg-card p-1">
                     <IconButton label={`Decrease ${item.name} quantity`} variant="ghost" size="sm" disabled={item.quantity <= 1} onClick={() => onItemChange(item.sourceId, { quantity: item.quantity - 1 })}><Minus className="size-3.5" aria-hidden="true" /></IconButton>
-                    <span className="min-w-10 text-center text-sm font-bold tabular-nums text-forest">{item.quantity}</span>
+                    <span className="min-w-10 text-center text-sm font-bold tabular-nums text-foreground">{item.quantity}</span>
                     <IconButton label={`Increase ${item.name} quantity`} variant="ghost" size="sm" onClick={() => onItemChange(item.sourceId, { quantity: item.quantity + 1 })}><Plus className="size-3.5" aria-hidden="true" /></IconButton>
                   </div>
                 </div>
-                <p className="ml-auto pb-2 text-sm font-bold text-forest">{formatTHB(item.unitPrice * item.quantity)}</p>
+                <p className="ml-auto pb-2 text-sm font-bold text-foreground">{formatTHB(item.unitPrice * item.quantity)}</p>
               </div>
               <label className="mt-4 block text-xs font-semibold text-foreground/58">
                 Item request
                 <input
-                  className="mt-1.5 h-10 w-full rounded-md border border-line bg-white px-3 text-sm font-normal text-foreground outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10"
+                  className="mt-1.5 h-10 w-full rounded-md border border-border bg-card px-3 text-sm font-normal text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/10"
                   value={item.specialRequest}
                   onChange={(event) => onItemChange(item.sourceId, { specialRequest: event.target.value })}
                   placeholder="e.g. no onion, sauce on the side"
@@ -494,10 +494,10 @@ function OrderChangeForm({
           ))}
         </div>
       </section>
-      <label className="block text-sm font-semibold text-forest">
-        Reason for change <span className="text-status-red">*</span>
+      <label className="block text-sm font-semibold text-foreground">
+        Reason for change <span className="text-destructive">*</span>
         <textarea
-          className="mt-2 min-h-24 w-full resize-y rounded-md border border-line bg-white p-3 text-sm font-normal leading-6 text-foreground outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10"
+          className="mt-2 min-h-24 w-full resize-y rounded-md border border-border bg-card p-3 text-sm font-normal leading-6 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/10"
           value={reason}
           onChange={(event) => onReasonChange(event.target.value)}
           placeholder="Required for audit, e.g. Guest confirmed one bowl without onion by phone."
@@ -510,15 +510,15 @@ function OrderChangeForm({
 function RejectOrderForm({ order, reason, onReasonChange }: { order: Order; reason: string; onReasonChange: (value: string) => void }) {
   return (
     <div className="space-y-5">
-      <div className="flex gap-3 rounded-md border border-[#edcbc7] bg-[#fff0ee] p-4 text-[#923d36]">
+      <div className="flex gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-destructive">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <p className="text-sm leading-5">Rejecting {order.number} removes it from the live kitchen flow. The customer will see the rejection and its reason.</p>
       </div>
-      <label className="block text-sm font-semibold text-forest">
-        Rejection reason <span className="text-status-red">*</span>
+      <label className="block text-sm font-semibold text-foreground">
+        Rejection reason <span className="text-destructive">*</span>
         <textarea
           autoFocus
-          className="mt-2 min-h-28 w-full resize-y rounded-md border border-line bg-white p-3 text-sm font-normal leading-6 text-foreground outline-none transition focus:border-status-red focus:ring-2 focus:ring-status-red/10"
+          className="mt-2 min-h-28 w-full resize-y rounded-md border border-border bg-card p-3 text-sm font-normal leading-6 text-foreground outline-none transition focus:border-destructive focus:ring-2 focus:ring-destructive/10"
           value={reason}
           onChange={(event) => onReasonChange(event.target.value)}
           placeholder="Required, e.g. Item unavailable; staff spoke with the table."
@@ -534,12 +534,12 @@ function TablesPanel({ id, state, onOpenTable }: { id: string; state: FoodFlowSt
   return (
     <section id={id} role="tabpanel" aria-label="Restaurant tables">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div><h2 className="text-lg font-semibold tracking-[-0.02em] text-forest">Restaurant tables</h2><p className="mt-1 text-sm text-foreground/50">Open any table for its complete live session.</p></div>
+        <div><h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Restaurant tables</h2><p className="mt-1 text-sm text-foreground/50">Open any table for its complete live session.</p></div>
         <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-foreground/48">
-          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#3b8a5d]" />Available</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#d39a3d]" />Waiting</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#3e7896]" />In service</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#9a5146]" />Bill</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-chart-3" />Available</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />Waiting</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-ring" />In service</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-destructive" />Bill</span>
         </div>
       </div>
       {tables.length === 0 ? (
@@ -554,19 +554,19 @@ function TablesPanel({ id, state, onOpenTable }: { id: string; state: FoodFlowSt
             const status = TABLE_STATUS_PRESENTATIONS[table.status];
             return (
               <Card key={table.id} interactive className={`relative overflow-hidden ${tableBorderClass(table.status)}`}>
-                <button type="button" className="block min-h-48 w-full p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-forest/35 sm:p-5" onClick={() => onOpenTable(table)} aria-label={`Open ${table.label}, ${status.label}`}>
+                <button type="button" className="block min-h-48 w-full p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35 sm:p-5" onClick={() => onOpenTable(table)} aria-label={`Open ${table.label}, ${status.label}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <div><p className="text-2xl font-semibold tracking-[-0.045em] text-forest">{table.code}</p><p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-foreground/38"><UsersRound className="size-3" aria-hidden="true" /> {table.seats} seats</p></div>
+                    <div><p className="text-2xl font-semibold tracking-[-0.045em] text-foreground">{table.code}</p><p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-foreground/38"><UsersRound className="size-3" aria-hidden="true" /> {table.seats} seats</p></div>
                     <ChevronRight className="mt-1 size-4 text-foreground/25" aria-hidden="true" />
                   </div>
                   <StatusPill className="mt-3 max-w-full" tone={statusTone(table.status)}>{status.label}</StatusPill>
                   {session ? (
-                    <div className="mt-5 grid grid-cols-2 gap-2 border-t border-line pt-3">
-                      <div><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-foreground/35">Orders</p><p className="mt-1 text-sm font-bold text-forest">{orders.length}</p></div>
-                      <div><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-foreground/35">Total</p><p className="mt-1 truncate text-sm font-bold text-forest">{formatTHB(total)}</p></div>
-                      {readyCount > 0 && <p className="col-span-2 mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[#2c764c]"><Sparkles className="size-3" aria-hidden="true" /> {readyCount} ready to serve</p>}
+                    <div className="mt-5 grid grid-cols-2 gap-2 border-t border-border pt-3">
+                      <div><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-foreground/35">Orders</p><p className="mt-1 text-sm font-bold text-foreground">{orders.length}</p></div>
+                      <div><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-foreground/35">Total</p><p className="mt-1 truncate text-sm font-bold text-foreground">{formatTHB(total)}</p></div>
+                      {readyCount > 0 && <p className="col-span-2 mt-1 flex items-center gap-1.5 text-[11px] font-bold text-chart-5"><Sparkles className="size-3" aria-hidden="true" /> {readyCount} ready to serve</p>}
                     </div>
-                  ) : <p className="mt-5 border-t border-line pt-3 text-xs leading-5 text-foreground/40">Ready for the next guest</p>}
+                  ) : <p className="mt-5 border-t border-border pt-3 text-xs leading-5 text-foreground/40">Ready for the next guest</p>}
                 </button>
               </Card>
             );
@@ -586,9 +586,9 @@ function TableSessionDrawer({ table, state, now, onClose }: { table: Table | nul
   return (
     <Drawer open onClose={onClose} size="lg" title={`${table.code} session`} description={`${table.label} - ${table.seats} seats`} footer={<Button variant="outline" onClick={onClose}>Close</Button>}>
       <div className="space-y-5">
-        <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-white p-4">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-foreground/38">Current status</p><StatusPill className="mt-2" tone={statusTone(table.status)}>{TABLE_STATUS_PRESENTATIONS[table.status].label}</StatusPill></div>
-          <Armchair className="size-8 text-forest/18" aria-hidden="true" />
+          <Armchair className="size-8 text-foreground/18" aria-hidden="true" />
         </div>
         {!session ? (
           <EmptyState compact icon={<CheckCircle2 className="size-5" />} title="Table is available" description="There is no open dining session at this table." />
@@ -609,13 +609,13 @@ function TableSessionDrawer({ table, state, now, onClose }: { table: Table | nul
                   {orders.map((order) => (
                     <Card className="p-4" key={order.id}>
                       <div className="flex items-start justify-between gap-3">
-                        <div><p className="font-semibold text-forest">{order.number}</p><p className="mt-1 text-xs text-foreground/40">Sent {formatBangkokTime(order.submittedAt)}</p></div>
+                        <div><p className="font-semibold text-foreground">{order.number}</p><p className="mt-1 text-xs text-foreground/40">Sent {formatBangkokTime(order.submittedAt)}</p></div>
                         <StatusPill tone={statusTone(order.status)}>{getStatusPresentation(order.status).label}</StatusPill>
                       </div>
-                      <ul className="mt-3 border-t border-line pt-3">
-                        {order.items.map((item) => <li className="flex justify-between gap-3 py-1 text-xs" key={item.id}><span className="text-foreground/60"><strong className="mr-1.5 text-forest">{item.quantity}x</strong>{item.menuItemName}</span><span className="shrink-0 font-semibold text-forest">{formatTHB(item.lineTotal)}</span></li>)}
+                      <ul className="mt-3 border-t border-border pt-3">
+                        {order.items.map((item) => <li className="flex justify-between gap-3 py-1 text-xs" key={item.id}><span className="text-foreground/60"><strong className="mr-1.5 text-foreground">{item.quantity}x</strong>{item.menuItemName}</span><span className="shrink-0 font-semibold text-foreground">{formatTHB(item.lineTotal)}</span></li>)}
                       </ul>
-                      {order.customerNote && <p className="mt-3 rounded bg-[#fff6e4] px-3 py-2 text-xs leading-5 text-[#725226]">{order.customerNote}</p>}
+                      {order.customerNote && <p className="mt-3 rounded bg-primary/15 px-3 py-2 text-xs leading-5 text-primary-foreground">{order.customerNote}</p>}
                     </Card>
                   ))}
                 </div>
@@ -623,12 +623,12 @@ function TableSessionDrawer({ table, state, now, onClose }: { table: Table | nul
             </section>
             <section>
               <h3 className="text-xs font-bold uppercase tracking-[0.11em] text-foreground/45">Service history</h3>
-              {serviceRequests.length === 0 ? <p className="mt-2 rounded-md border border-line bg-[#f7f7f3] px-4 py-3 text-sm text-foreground/40">No service requests in this session.</p> : (
-                <div className="mt-2 overflow-hidden rounded-md border border-line bg-white">
+              {serviceRequests.length === 0 ? <p className="mt-2 rounded-md border border-border bg-muted px-4 py-3 text-sm text-foreground/40">No service requests in this session.</p> : (
+                <div className="mt-2 overflow-hidden rounded-md border border-border bg-card">
                   {serviceRequests.map((request, index) => (
-                    <div className={`flex items-center gap-3 px-4 py-3 ${index ? "border-t border-line" : ""}`} key={request.id}>
-                      {request.type === "REQUEST_BILL" ? <ReceiptText className="size-4 text-[#8f6220]" /> : <BellRing className="size-4 text-[#3d6f8f]" />}
-                      <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-forest">{serviceRequestLabel(request)}</p><p className="mt-0.5 text-[10px] text-foreground/38">{formatBangkokTime(request.requestedAt)}</p></div>
+                    <div className={`flex items-center gap-3 px-4 py-3 ${index ? "border-t border-border" : ""}`} key={request.id}>
+                      {request.type === "REQUEST_BILL" ? <ReceiptText className="size-4 text-primary-foreground" /> : <BellRing className="size-4 text-accent-foreground" />}
+                      <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">{serviceRequestLabel(request)}</p><p className="mt-0.5 text-[10px] text-foreground/38">{formatBangkokTime(request.requestedAt)}</p></div>
                       <StatusPill tone={statusTone(request.status)}>{getStatusPresentation(request.status).label}</StatusPill>
                     </div>
                   ))}
@@ -660,7 +660,7 @@ function ServicePanel({
   return (
     <section id={id} role="tabpanel" aria-label="Service queue">
       <div className="mb-4 flex items-end justify-between gap-4">
-        <div><h2 className="text-lg font-semibold tracking-[-0.02em] text-forest">Service queue</h2><p className="mt-1 text-sm text-foreground/50">Acknowledge quickly, then resolve once the guest is helped.</p></div>
+        <div><h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Service queue</h2><p className="mt-1 text-sm text-foreground/50">Acknowledge quickly, then resolve once the guest is helped.</p></div>
         {requests.length > 0 && <Badge tone="warning" dot>{requests.length} open</Badge>}
       </div>
       {requests.length === 0 ? (
@@ -671,24 +671,24 @@ function ServicePanel({
             const isBill = request.type === "REQUEST_BILL";
             const isOpen = request.status === "OPEN";
             return (
-              <Card className={`overflow-hidden border-l-4 ${request.priority === "HIGH" ? "border-l-[#ba554a]" : "border-l-[#497b91]"}`} key={request.id}>
+              <Card className={`overflow-hidden border-l-4 ${request.priority === "HIGH" ? "border-l-destructive" : "border-l-ring"}`} key={request.id}>
                 <div className="p-5">
                   <div className="flex items-start gap-4">
-                    <span className={`grid size-11 shrink-0 place-items-center rounded-md ${isBill ? "bg-[#fff0d8] text-[#94641b]" : "bg-[#e8f1f5] text-[#3c7188]"}`}>
+                    <span className={`grid size-11 shrink-0 place-items-center rounded-md ${isBill ? "bg-primary/15 text-primary-foreground" : "bg-accent text-accent-foreground"}`}>
                       {isBill ? <ReceiptText className="size-5" /> : <BellRing className="size-5" />}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-foreground/38">{tableLabel(state, request.tableId)}</p><h3 className="mt-1 text-base font-semibold text-forest">{serviceRequestLabel(request)}</h3></div>
+                        <div><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-foreground/38">{tableLabel(state, request.tableId)}</p><h3 className="mt-1 text-base font-semibold text-foreground">{serviceRequestLabel(request)}</h3></div>
                         <StatusPill tone={isOpen ? "warning" : "info"}>{isOpen ? "Open" : "Acknowledged"}</StatusPill>
                       </div>
                       <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/48"><Clock3 className="size-3.5" aria-hidden="true" /> {formatTimeAgo(request.requestedAt, now)}</p>
                     </div>
                   </div>
-                  {request.note && <p className="mt-4 rounded-md border border-line bg-[#f7f7f3] px-3 py-2.5 text-sm leading-6 text-foreground/62">&ldquo;{request.note}&rdquo;</p>}
-                  {request.acknowledgedAt && <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-[#397159]"><Check className="size-3.5" aria-hidden="true" /> Acknowledged {formatTimeAgo(request.acknowledgedAt, now)}</p>}
+                  {request.note && <p className="mt-4 rounded-md border border-border bg-muted px-3 py-2.5 text-sm leading-6 text-foreground/62">&ldquo;{request.note}&rdquo;</p>}
+                  {request.acknowledgedAt && <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-chart-5"><Check className="size-3.5" aria-hidden="true" /> Acknowledged {formatTimeAgo(request.acknowledgedAt, now)}</p>}
                 </div>
-                <div className="flex flex-col gap-2 border-t border-line bg-[#fafaf6] p-4 sm:flex-row">
+                <div className="flex flex-col gap-2 border-t border-border bg-muted p-4 sm:flex-row">
                   {isOpen && <Button className="sm:flex-1" onClick={() => onAcknowledge(request.id)} leftIcon={<Check className="size-4" />}>Acknowledge</Button>}
                   <Button className="sm:flex-1" variant={isOpen ? "outline" : "primary"} onClick={() => onResolve(request.id)} leftIcon={<CheckCircle2 className="size-4" />}>Resolve{isOpen ? " now" : ""}</Button>
                 </div>
@@ -717,7 +717,7 @@ function ReadyPanel({
   return (
     <section id={id} role="tabpanel" aria-label="Ready to serve queue">
       <div className="mb-4 flex items-end justify-between gap-4">
-        <div><h2 className="text-lg font-semibold tracking-[-0.02em] text-forest">Ready to serve</h2><p className="mt-1 text-sm text-foreground/50">Run the oldest finished order first and confirm delivery.</p></div>
+        <div><h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Ready to serve</h2><p className="mt-1 text-sm text-foreground/50">Run the oldest finished order first and confirm delivery.</p></div>
         {orders.length > 0 && <Badge tone="success" dot>{orders.length} ready</Badge>}
       </div>
       {orders.length === 0 ? (
@@ -729,11 +729,11 @@ function ReadyPanel({
             const readyAt = order.readyAt ?? ticket?.readyAt ?? ticket?.createdAt ?? order.submittedAt;
             const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
             return (
-              <Card className="animate-ticket overflow-hidden border-t-4 border-t-[#3a8658]" key={order.id}>
-                <div className="bg-[#eaf5ed] px-5 py-4">
+              <Card className="animate-ticket overflow-hidden border-t-4 border-t-chart-3" key={order.id}>
+                <div className="bg-chart-1/20 px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#548066]">Ready for</p><h3 className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] text-forest">{tableLabel(state, order.tableId)}</h3></div>
-                    <div className="rounded-md bg-white/80 px-3 py-2 text-right text-[#2f6e49]"><p className="text-[9px] font-bold uppercase tracking-[0.1em] opacity-65">At pass</p><p className="mt-0.5 font-mono text-sm font-bold tabular-nums">{formatElapsed(readyAt, now)}</p></div>
+                    <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-chart-5">Ready for</p><h3 className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] text-foreground">{tableLabel(state, order.tableId)}</h3></div>
+                    <div className="rounded-md bg-card/80 px-3 py-2 text-right text-chart-5"><p className="text-[9px] font-bold uppercase tracking-[0.1em] opacity-65">At pass</p><p className="mt-0.5 font-mono text-sm font-bold tabular-nums">{formatElapsed(readyAt, now)}</p></div>
                   </div>
                 </div>
                 <div className="p-5">
@@ -741,13 +741,13 @@ function ReadyPanel({
                   <ul className="mt-4 space-y-3">
                     {order.items.map((item) => (
                       <li className="flex items-start gap-3 text-sm" key={item.id}>
-                        <span className="min-w-7 rounded bg-[#edf0eb] px-1.5 py-0.5 text-center text-xs font-bold text-forest">{item.quantity}x</span>
-                        <div className="min-w-0 flex-1"><p className="font-medium leading-5 text-foreground/72">{item.menuItemName}</p>{item.specialRequest && <p className="mt-1 text-xs leading-5 text-[#94621d]">{item.specialRequest}</p>}</div>
+                        <span className="min-w-7 rounded bg-muted px-1.5 py-0.5 text-center text-xs font-bold text-foreground">{item.quantity}x</span>
+                        <div className="min-w-0 flex-1"><p className="font-medium leading-5 text-foreground/72">{item.menuItemName}</p>{item.specialRequest && <p className="mt-1 text-xs leading-5 text-primary-foreground">{item.specialRequest}</p>}</div>
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div className="border-t border-line bg-[#fafaf6] p-4"><Button fullWidth onClick={() => onServed(order.id)} leftIcon={<HandPlatter className="size-4" />}>Mark served</Button></div>
+                <div className="border-t border-border bg-muted p-4"><Button fullWidth onClick={() => onServed(order.id)} leftIcon={<HandPlatter className="size-4" />}>Mark served</Button></div>
               </Card>
             );
           })}
@@ -805,7 +805,7 @@ function MenuAvailabilityPanel({
     <section id={id} role="tabpanel" aria-label="Menu availability">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-forest">Menu availability</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Menu availability</h2>
           <p className="mt-1 text-sm text-foreground/50">Keep the customer menu accurate during service.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -822,11 +822,11 @@ function MenuAvailabilityPanel({
         />
       ) : (
         <>
-          <div className="rounded-lg border border-line bg-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <div className="rounded-lg border border-border bg-card p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div className="flex gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-forest-soft text-forest"><Utensils className="size-4" aria-hidden="true" /></span>
+              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-muted text-foreground"><Utensils className="size-4" aria-hidden="true" /></span>
               <div>
-                <p className="text-sm font-semibold text-forest">Customer-visible menu</p>
+                <p className="text-sm font-semibold text-foreground">Customer-visible menu</p>
                 <p className="mt-1 text-xs leading-5 text-foreground/45">Sold-out items stay visible but cannot be added to an order.</p>
               </div>
             </div>
@@ -838,7 +838,7 @@ function MenuAvailabilityPanel({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search menu..."
-                className="h-10 w-full rounded-md border border-line bg-[#fafaf6] pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10"
+                className="h-10 w-full rounded-md border border-border bg-muted pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/10"
               />
             </label>
           </div>
@@ -857,26 +857,26 @@ function MenuAvailabilityPanel({
                 const soldOut = item.status === "SOLD_OUT";
                 const category = categoriesById.get(item.categoryId);
                 return (
-                  <Card className={`flex flex-col overflow-hidden ${soldOut ? "border-[#e3c793] bg-[#fffbf2]" : ""}`} key={item.id}>
+                  <Card className={`flex flex-col overflow-hidden ${soldOut ? "border-primary/60 bg-primary/15" : ""}`} key={item.id}>
                     <div className="flex flex-1 items-start gap-3 p-4 sm:p-5">
-                      <span className={`grid size-10 shrink-0 place-items-center rounded-md ${soldOut ? "bg-[#f8e8ca] text-[#95651d]" : "bg-[#e6efe9] text-[#2c6853]"}`}>
+                      <span className={`grid size-10 shrink-0 place-items-center rounded-md ${soldOut ? "bg-primary/15 text-primary-foreground" : "bg-chart-1/20 text-chart-5"}`}>
                         {soldOut ? <CircleAlert className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate font-semibold text-forest">{safeDisplayName(item.name)}</p>
+                            <p className="truncate font-semibold text-foreground">{safeDisplayName(item.name)}</p>
                             <p className="mt-1 truncate text-[11px] text-foreground/42">{category?.name ?? "Menu"} - {item.preparationStation.replaceAll("_", " ").toLocaleLowerCase()}</p>
                           </div>
                           <StatusPill tone={soldOut ? "warning" : "success"}>{soldOut ? "Sold out" : "Available"}</StatusPill>
                         </div>
-                        <div className="mt-3 flex items-center justify-between border-t border-line/75 pt-3 text-xs">
+                        <div className="mt-3 flex items-center justify-between border-t border-border/75 pt-3 text-xs">
                           <span className="text-foreground/42">Prep {item.estimatedPreparationMinutes} min</span>
-                          <span className="font-bold text-forest">{formatTHB(item.basePrice)}</span>
+                          <span className="font-bold text-foreground">{formatTHB(item.basePrice)}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="border-t border-line bg-white/65 p-3">
+                    <div className="border-t border-border bg-card/65 p-3">
                       {soldOut ? (
                         <Button fullWidth variant="secondary" leftIcon={<RefreshCcw className="size-4" />} onClick={() => restoreItem(item)}>Restore availability</Button>
                       ) : (
@@ -904,18 +904,18 @@ function MenuAvailabilityPanel({
           </>
         }
       >
-        <div className="flex gap-3 rounded-md border border-[#ead2a5] bg-[#fff7e7] p-4 text-[#78551f]">
+        <div className="flex gap-3 rounded-md border border-primary/60 bg-primary/15 p-4 text-primary-foreground">
           <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p className="text-sm leading-5">This availability change is immediate and recorded in the audit history.</p>
         </div>
-        <label className="mt-5 block text-sm font-semibold text-forest">
-          Sold-out reason <span className="text-status-red">*</span>
+        <label className="mt-5 block text-sm font-semibold text-foreground">
+          Sold-out reason <span className="text-destructive">*</span>
           <textarea
             autoFocus
             value={soldOutReason}
             onChange={(event) => setSoldOutReason(event.target.value)}
             placeholder="Required, e.g. Awaiting today's ingredient delivery."
-            className="mt-2 min-h-24 w-full resize-y rounded-md border border-line bg-white p-3 text-sm font-normal leading-6 text-foreground outline-none transition focus:border-status-red focus:ring-2 focus:ring-status-red/10"
+            className="mt-2 min-h-24 w-full resize-y rounded-md border border-border bg-card p-3 text-sm font-normal leading-6 text-foreground outline-none transition focus:border-destructive focus:ring-2 focus:ring-destructive/10"
           />
         </label>
       </Modal>
@@ -925,9 +925,9 @@ function MenuAvailabilityPanel({
 
 function DetailMetric({ label, value, mono = false }: { label: string; value: string | number; mono?: boolean }) {
   return (
-    <div className="rounded-md border border-line bg-white px-3.5 py-3">
+    <div className="rounded-md border border-border bg-card px-3.5 py-3">
       <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-foreground/38">{label}</p>
-      <p className={`mt-1.5 truncate text-sm font-bold text-forest ${mono ? "font-mono tabular-nums" : ""}`}>{value}</p>
+      <p className={`mt-1.5 truncate text-sm font-bold text-foreground ${mono ? "font-mono tabular-nums" : ""}`}>{value}</p>
     </div>
   );
 }
@@ -970,13 +970,13 @@ function waitUrgency(elapsed: number): "normal" | "warning" | "critical" {
 
 function tableBorderClass(status: Table["status"]): string {
   switch (status) {
-    case "AVAILABLE": return "border-l-4 border-l-[#3d8b5e]";
-    case "WAITING": return "border-l-4 border-l-[#d39839]";
-    case "READY": return "border-l-4 border-l-[#3b8758]";
-    case "BILL_REQUESTED": return "border-l-4 border-l-[#9a5146]";
-    case "PAYMENT_PENDING": return "border-l-4 border-l-[#b5792e]";
-    case "PREPARING": return "border-l-4 border-l-[#477b92]";
-    case "OCCUPIED": return "border-l-4 border-l-[#55786b]";
+    case "AVAILABLE": return "border-l-4 border-l-chart-3";
+    case "WAITING": return "border-l-4 border-l-primary";
+    case "READY": return "border-l-4 border-l-chart-3";
+    case "BILL_REQUESTED": return "border-l-4 border-l-destructive";
+    case "PAYMENT_PENDING": return "border-l-4 border-l-primary";
+    case "PREPARING": return "border-l-4 border-l-ring";
+    case "OCCUPIED": return "border-l-4 border-l-chart-3";
   }
 }
 
