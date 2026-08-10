@@ -7,8 +7,8 @@ export function FoodFlowMark({ className = "", inverted = false }: FoodFlowMarkP
   return (
     <span
       className={[
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-md",
-        inverted ? "bg-[#f5f1e5] text-[#173f35]" : "bg-[#173f35] text-[#f8f5ea]",
+        "inline-flex size-9 shrink-0 items-center justify-center",
+        inverted ? "bg-sidebar-foreground text-sidebar" : "bg-foreground text-background",
         className,
       ].filter(Boolean).join(" ")}
       aria-hidden="true"
@@ -22,7 +22,7 @@ export function FoodFlowMark({ className = "", inverted = false }: FoodFlowMarkP
         />
         <path d="M10.5 9v18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         <path d="M10.5 17.5h9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="26.5" cy="26.5" r="2" fill="#d29a4a" />
+        <circle cx="26.5" cy="26.5" r="2" className="fill-primary" />
       </svg>
     </span>
   );
@@ -47,13 +47,13 @@ export function FoodFlowLogo({
           className={[
             "block font-bold uppercase tracking-[0.14em]",
             compact ? "text-xs" : "text-sm",
-            inverted ? "text-white" : "text-[#173f35]",
+            inverted ? "text-sidebar-foreground" : "text-foreground",
           ].join(" ")}
         >
           FoodFlow
         </span>
         {showTagline && (
-          <span className={`mt-1 block text-[10px] tracking-wide ${inverted ? "text-white/58" : "text-[#738079]"}`}>
+          <span className={`mt-1 block text-[10px] tracking-wide ${inverted ? "text-sidebar-foreground/60" : "text-muted-foreground"}`}>
             Restaurant operations
           </span>
         )}

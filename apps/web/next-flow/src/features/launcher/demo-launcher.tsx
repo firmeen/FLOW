@@ -27,7 +27,7 @@ const experiences = [
     description: "Browse, customize, order, and follow the live table session.",
     href: "/r/demo/table/T05",
     icon: QrCode,
-    accent: "bg-[#dff07a] text-[#173f35]",
+    accent: "bg-primary text-foreground",
   },
   {
     title: "Staff operations",
@@ -35,7 +35,7 @@ const experiences = [
     description: "Confirm orders, answer service calls, and serve ready items.",
     href: "/staff",
     icon: ClipboardCheck,
-    accent: "bg-[#e4eee8] text-[#245849]",
+    accent: "bg-chart-1/20 text-chart-5",
   },
   {
     title: "Kitchen display",
@@ -43,7 +43,7 @@ const experiences = [
     description: "Move tickets from new to preparing and ready for service.",
     href: "/kitchen",
     icon: ChefHat,
-    accent: "bg-[#f7e9cf] text-[#815d21]",
+    accent: "bg-primary/15 text-primary-foreground",
   },
   {
     title: "Cashier",
@@ -51,7 +51,7 @@ const experiences = [
     description: "Review combined table bills, apply adjustments, and record payment.",
     href: "/cashier",
     icon: CircleDollarSign,
-    accent: "bg-[#e8eef4] text-[#355f79]",
+    accent: "bg-accent text-accent-foreground",
   },
   {
     title: "Owner / Admin",
@@ -59,7 +59,7 @@ const experiences = [
     description: "Watch live performance and manage the restaurant menu.",
     href: "/admin",
     icon: BarChart3,
-    accent: "bg-[#eee9f2] text-[#644d70]",
+    accent: "bg-accent text-accent-foreground",
   },
 ] as const;
 
@@ -81,15 +81,15 @@ export function DemoLauncher() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#f4f2eb] lg:grid lg:grid-cols-[minmax(320px,0.78fr)_minmax(620px,1.22fr)]">
-      <section className="relative flex min-h-[38vh] flex-col overflow-hidden bg-forest px-6 py-7 text-white sm:px-10 lg:min-h-screen lg:px-12 lg:py-10">
+    <main className="min-h-screen bg-muted lg:grid lg:grid-cols-[minmax(320px,0.78fr)_minmax(620px,1.22fr)]">
+      <section className="relative flex min-h-[38vh] flex-col overflow-hidden bg-foreground px-6 py-7 text-white sm:px-10 lg:min-h-screen lg:px-12 lg:py-10">
         <div className="ff-grid-fade absolute inset-0 opacity-30" />
         <div className="absolute -bottom-28 -right-24 size-96 rounded-full border border-white/10" />
-        <div className="absolute -bottom-16 -right-8 size-64 rounded-full border border-lime/30" />
+        <div className="absolute -bottom-16 -right-8 size-64 rounded-full border border-primary/30" />
 
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg bg-lime text-forest">
+            <span className="grid size-10 place-items-center rounded-lg bg-primary text-foreground">
               <UtensilsCrossed className="size-5" aria-hidden="true" />
             </span>
             <div>
@@ -97,13 +97,13 @@ export function DemoLauncher() {
               <p className="text-[9px] font-bold uppercase tracking-[0.23em] text-white/50">by Fimin Flow</p>
             </div>
           </div>
-          <Badge className="border-white/15 bg-white/10 text-white" dot>
+          <Badge className="border-white/15 bg-card/10 text-white" dot>
             Live demo
           </Badge>
         </div>
 
         <div className="relative my-auto max-w-xl py-12 lg:py-20">
-          <div className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-lime">
+          <div className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-primary">
             <Sparkles className="size-4" aria-hidden="true" />
             Restaurant operations platform
           </div>
@@ -115,10 +115,10 @@ export function DemoLauncher() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.09em] text-white/70">
-            <span>Table</span><ArrowRight className="size-3 text-lime" />
-            <span>Staff</span><ArrowRight className="size-3 text-lime" />
-            <span>Kitchen</span><ArrowRight className="size-3 text-lime" />
-            <span>Serve</span><ArrowRight className="size-3 text-lime" />
+            <span>Table</span><ArrowRight className="size-3 text-primary" />
+            <span>Staff</span><ArrowRight className="size-3 text-primary" />
+            <span>Kitchen</span><ArrowRight className="size-3 text-primary" />
+            <span>Serve</span><ArrowRight className="size-3 text-primary" />
             <span>Pay</span>
           </div>
         </div>
@@ -133,8 +133,8 @@ export function DemoLauncher() {
         <div className="mx-auto max-w-4xl">
           <div className="flex items-start justify-between gap-5">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-sage">Demo restaurant</p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.035em] text-forest sm:text-3xl">Melbourne House</h2>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Demo restaurant</p>
+              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.035em] text-foreground sm:text-3xl">Melbourne House</h2>
               <p className="mt-1 text-sm text-foreground/55">Choose an experience to enter the live operation.</p>
             </div>
             <Button
@@ -152,10 +152,10 @@ export function DemoLauncher() {
             {summary.map((item) => (
               <div className="ff-panel rounded-lg p-3.5" key={item.label}>
                 <div className="flex items-center justify-between">
-                  <item.icon className="size-4 text-sage" aria-hidden="true" />
-                  <span className={`size-1.5 rounded-full ${hydrated ? "bg-[#4e956b]" : "bg-line"}`} />
+                  <item.icon className="size-4 text-muted-foreground" aria-hidden="true" />
+                  <span className={`size-1.5 rounded-full ${hydrated ? "bg-chart-3" : "bg-border"}`} />
                 </div>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-forest">{hydrated ? item.value : "--"}</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-foreground">{hydrated ? item.value : "--"}</p>
                 <p className="mt-0.5 text-[11px] font-medium text-foreground/50">{item.label}</p>
               </div>
             ))}
@@ -163,7 +163,7 @@ export function DemoLauncher() {
 
           <div className="mt-9 flex items-end justify-between gap-4">
             <div>
-              <p className="text-lg font-semibold tracking-[-0.02em] text-forest">Choose experience</p>
+              <p className="text-lg font-semibold tracking-[-0.02em] text-foreground">Choose experience</p>
               <p className="mt-1 text-xs text-foreground/48">All roles share one persistent demo state.</p>
             </div>
             {waitingOrders > 0 && (
@@ -174,7 +174,7 @@ export function DemoLauncher() {
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {experiences.map((experience, index) => (
               <a
-                className={`group ff-panel flex min-h-[150px] flex-col justify-between rounded-lg p-4.5 transition duration-200 hover:-translate-y-0.5 hover:border-forest/30 hover:shadow-[0_12px_30px_rgba(22,55,43,0.08)] ${index === 0 ? "md:col-span-2 md:min-h-[128px] md:flex-row md:items-center" : ""}`}
+                className={`group ff-panel flex min-h-[150px] flex-col justify-between rounded-lg p-4.5 transition duration-200 hover:-translate-y-0.5 hover:border-foreground/30 hover:shadow-lg ${index === 0 ? "md:col-span-2 md:min-h-[128px] md:flex-row md:items-center" : ""}`}
                 href={experience.href}
                 key={experience.title}
               >
@@ -183,12 +183,12 @@ export function DemoLauncher() {
                 </div>
                 <div className={index === 0 ? "mt-4 min-w-0 md:mx-5 md:mt-0 md:flex-1" : "mt-4"}>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold tracking-[-0.02em] text-forest">{experience.title}</h3>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.11em] text-sage">{experience.subtitle}</span>
+                    <h3 className="font-semibold tracking-[-0.02em] text-foreground">{experience.title}</h3>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.11em] text-muted-foreground">{experience.subtitle}</span>
                   </div>
                   <p className="mt-1.5 max-w-lg text-xs leading-5 text-foreground/55">{experience.description}</p>
                 </div>
-                <span className={`mt-4 grid size-8 shrink-0 place-items-center rounded-full border border-line text-forest transition group-hover:border-forest group-hover:bg-forest group-hover:text-white ${index === 0 ? "md:mt-0" : "self-end"}`}>
+                <span className={`mt-4 grid size-8 shrink-0 place-items-center rounded-full border border-border text-foreground transition group-hover:border-foreground group-hover:bg-foreground group-hover:text-white ${index === 0 ? "md:mt-0" : "self-end"}`}>
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </span>
               </a>

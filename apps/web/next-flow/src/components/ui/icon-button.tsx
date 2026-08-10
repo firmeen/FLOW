@@ -1,54 +1,49 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
+
+import { cn } from "@/lib/utils";
+import { Button, type ButtonProps, type ButtonVariant } from "./button";
 
 export type IconButtonVariant = "default" | "ghost" | "inverted" | "danger";
 export type IconButtonSize = "sm" | "md" | "lg";
 
-export interface IconButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> {
+export interface IconButtonProps extends Omit<ButtonProps, "aria-label" | "children" | "size" | "variant"> {
   label: string;
   variant?: IconButtonVariant;
   size?: IconButtonSize;
   children: ReactNode;
 }
 
-const variants: Record<IconButtonVariant, string> = {
-  default: "border-[#d8ddd5] bg-white text-[#29483e] hover:bg-[#f0f2ed]",
-  ghost: "border-transparent bg-transparent text-[#5d6f68] hover:bg-[#e8ece7] hover:text-[#173f35]",
-  inverted: "border-white/15 bg-white/10 text-white hover:bg-white/18",
-  danger: "border-[#eed2cf] bg-[#fff8f7] text-[#9a3932] hover:bg-[#f8e5e2]",
+const variants: Record<IconButtonVariant, ButtonVariant> = {
+  default: "outline",
+  ghost: "ghost",
+  inverted: "secondary",
+  danger: "danger",
 };
 
-const sizes: Record<IconButtonSize, string> = {
-  sm: "size-8",
-  md: "size-10",
-  lg: "size-11",
+const sizes: Record<IconButtonSize, "icon-sm" | "icon" | "icon-lg"> = {
+  sm: "icon-sm",
+  md: "icon",
+  lg: "icon-lg",
 };
 
 export function IconButton({
   label,
   variant = "default",
   size = "md",
-  className = "",
-  type = "button",
+  className,
   children,
   ...props
 }: IconButtonProps) {
   return (
-    <button
-      type={type}
+    <Button
       aria-label={label}
       title={props.title ?? label}
-      className={[
-        "inline-flex shrink-0 items-center justify-center rounded-md border transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6a59]/45 focus-visible:ring-offset-2",
-        "disabled:pointer-events-none disabled:opacity-50",
-        variants[variant],
-        sizes[size],
-        className,
-      ].filter(Boolean).join(" ")}
+      variant={variants[variant]}
+      size={sizes[size]}
+      className={cn(variant === "inverted" && "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground", className)}
       {...props}
     >
       {children}
-    </button>
+    </Button>
   );
 }
