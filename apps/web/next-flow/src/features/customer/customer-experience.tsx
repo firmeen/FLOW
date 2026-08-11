@@ -166,13 +166,18 @@ export function CustomerExperience({ tableCode }: { tableCode: string }) {
             {view !== "landing" && (
               <button className="grid size-9 place-items-center rounded-md text-foreground hover:bg-muted" onClick={() => setView("landing")} aria-label="Back to table home"><ArrowLeft className="size-4" /></button>
             )}
-            <a className="flex items-center gap-2.5" href="/">
+            <button
+              type="button"
+              className="flex items-center gap-2.5 text-left"
+              onClick={() => setView("landing")}
+              aria-label="Return to table home"
+            >
               <span className="grid size-8 place-items-center rounded-md bg-foreground text-primary"><UtensilsCrossed className="size-4" /></span>
               <span>
                 <span className="block text-sm font-black tracking-[-0.03em] text-foreground">{state.restaurant.name}</span>
                 <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Powered by FoodFlow</span>
               </span>
-            </a>
+            </button>
           </div>
           <Badge tone="forest">Table {table.code.replace("T", "")}</Badge>
         </div>
