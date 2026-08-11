@@ -8,6 +8,8 @@ import {
   CircleDollarSign,
   ClipboardCheck,
   Clock3,
+  Globe2,
+  Lock,
   QrCode,
   RefreshCcw,
   Sparkles,
@@ -28,6 +30,8 @@ const experiences = [
     href: "/r/demo/table/T05",
     icon: QrCode,
     accent: "bg-primary text-foreground",
+    access: "Public - no login",
+    accessIcon: Globe2,
   },
   {
     title: "Staff operations",
@@ -36,6 +40,8 @@ const experiences = [
     href: "/staff",
     icon: ClipboardCheck,
     accent: "bg-chart-1/20 text-chart-5",
+    access: "Login required",
+    accessIcon: Lock,
   },
   {
     title: "Kitchen display",
@@ -44,6 +50,8 @@ const experiences = [
     href: "/kitchen",
     icon: ChefHat,
     accent: "bg-primary/15 text-primary-foreground",
+    access: "Login required",
+    accessIcon: Lock,
   },
   {
     title: "Cashier",
@@ -52,6 +60,8 @@ const experiences = [
     href: "/cashier",
     icon: CircleDollarSign,
     accent: "bg-accent text-accent-foreground",
+    access: "Login required",
+    accessIcon: Lock,
   },
   {
     title: "Owner / Admin",
@@ -60,6 +70,8 @@ const experiences = [
     href: "/admin",
     icon: BarChart3,
     accent: "bg-accent text-accent-foreground",
+    access: "Login required",
+    accessIcon: Lock,
   },
 ] as const;
 
@@ -187,6 +199,10 @@ export function DemoLauncher() {
                     <span className="text-[10px] font-bold uppercase tracking-[0.11em] text-muted-foreground">{experience.subtitle}</span>
                   </div>
                   <p className="mt-1.5 max-w-lg text-xs leading-5 text-foreground/55">{experience.description}</p>
+                  <span className="mt-3 inline-flex items-center gap-1.5 font-heading text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <experience.accessIcon className="size-3" aria-hidden="true" />
+                    {experience.access}
+                  </span>
                 </div>
                 <span className={`mt-4 grid size-8 shrink-0 place-items-center rounded-full border border-border text-foreground transition group-hover:border-foreground group-hover:bg-foreground group-hover:text-white ${index === 0 ? "md:mt-0" : "self-end"}`}>
                   <ArrowRight className="size-4" aria-hidden="true" />

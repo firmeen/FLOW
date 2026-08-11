@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { FoodFlowLogo, FoodFlowMark } from "./foodflow-logo";
 import { RoleSwitcher, type DemoRole } from "./role-switcher";
+import { SignOutButton } from "./sign-out-button";
 
 export interface OperationalNavItem {
   label: string;
@@ -124,9 +125,13 @@ export function OperationalShell({
 
             <div className="hidden shrink-0 items-center gap-3 sm:flex">
               <RoleSwitcher currentRole={currentRole} />
+              <SignOutButton compact />
               {headerActions && <div className="flex items-center gap-2 border-l border-border pl-3">{headerActions}</div>}
             </div>
-            {headerActions && <div className="flex shrink-0 items-center gap-2 sm:hidden">{headerActions}</div>}
+            <div className="flex shrink-0 items-center gap-2 sm:hidden">
+              {headerActions}
+              <SignOutButton compact />
+            </div>
           </div>
         </header>
 
