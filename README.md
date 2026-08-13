@@ -27,9 +27,9 @@ FLOW Platform
 - [Product documentation hub](docs/04-product/README.md)
 - [Platform overview](docs/04-product/platform-overview.md)
 - [FLOW Shared Foundation catalog](docs/04-product/flow-core/feature-catalog.md)
-- [FoodFlow feature catalog](docs/04-product/foodflow/feature-catalog.md)
-- [CareFlow feature catalog](docs/04-product/careflow/feature-catalog.md)
-- [JobFlow feature catalog](docs/04-product/jobflow/feature-catalog.md)
+- [FoodFlow Product Hub](docs/04-product/foodflow/README.md) — overview, catalog, 5 bundles, comparison และ dependencies
+- [CareFlow Product Hub](docs/04-product/careflow/README.md) — overview, catalog, 5 bundles, comparison และ sensitive-data gates
+- [JobFlow Product Hub](docs/04-product/jobflow/README.md) — overview, catalog, 5 bundles, comparison และ workflow dependencies
 - [Cross-product shared engines](docs/04-product/cross-product-shared-engines.md)
 - [Product development strategy](docs/01-strategy/product-development-strategy.md)
 - [Feature market-pattern validation](docs/03-research/validation-results/feature-market-validation.md)

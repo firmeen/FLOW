@@ -12,15 +12,25 @@ source_of_truth: true
 
 ## Document map
 
-| ขอบเขต | Source of truth | เอกสารประกอบ |
+| ขอบเขต | Entry point / Source of truth | เอกสารประกอบ |
 |---|---|---|
 | Platform | [Platform overview](platform-overview.md) | [Cross-product shared engines](cross-product-shared-engines.md) |
 | Shared Foundation | [FLOW Core feature catalog](flow-core/feature-catalog.md) | [Catalog governance](catalog-governance.md) |
-| FoodFlow | [Feature catalog](foodflow/feature-catalog.md) | [Recommended bundles](foodflow/feature-bundles.md) |
-| CareFlow | [Feature catalog](careflow/feature-catalog.md) | [Recommended bundles](careflow/feature-bundles.md) |
-| JobFlow | [Feature catalog](jobflow/feature-catalog.md) | [Recommended bundles](jobflow/feature-bundles.md) |
+| FoodFlow | [Product Hub](foodflow/README.md) | [Feature catalog](foodflow/feature-catalog.md) · [5 Recommended bundles](foodflow/feature-bundles.md) |
+| CareFlow | [Product Hub](careflow/README.md) | [Feature catalog](careflow/feature-catalog.md) · [5 Recommended bundles](careflow/feature-bundles.md) |
+| JobFlow | [Product Hub](jobflow/README.md) | [Feature catalog](jobflow/feature-catalog.md) · [5 Recommended bundles](jobflow/feature-bundles.md) |
 | Product delivery | [Product requirement process](product-requirements/README.md) | [Feature Topic template](product-requirements/feature-topic-template.md) · [Workflow guide](workflows/README.md) |
 | Strategy | [Product development strategy](../01-strategy/product-development-strategy.md) | [Market-pattern validation](../03-research/validation-results/feature-market-validation.md) |
+
+## เริ่มต้นเลือก Product และ Bundle
+
+| Product | Operating model | Recommended Bundles |
+|---|---|---|
+| [FoodFlow](foodflow/README.md) | Order → Kitchen/Service → Payment | Starter · Dine-in · Kitchen · Full Restaurant · Café |
+| [CareFlow](careflow/README.md) | Booking/Queue → Staff/Resource → Service | Solo · Team · Spa · Clinic · Full Business |
+| [JobFlow](jobflow/README.md) | Intake → Work Order → Execution → Handover | Starter · Repair · Workshop · Field Service · Full Operation |
+
+แต่ละ Product Hub รวม Product overview, Catalog map, Bundle comparison matrix, วิธีเลือก Bundle, วิธีเพิ่ม–ลด Topic และ Dependency ที่ต้องเปิดอัตโนมัติไว้ในหน้าเดียว ส่วนรายละเอียด Feature และ Bundle ที่เป็นทางการยังคงอยู่ในไฟล์ Source of truth ที่ Hub เชื่อมไปหา
 
 ## Catalog coverage baseline
 
