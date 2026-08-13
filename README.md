@@ -24,6 +24,11 @@ FLOW Platform
 
 ## Documentation
 
+- [Architecture hub](docs/06-architecture/README.md)
+- [Technology and application architecture](docs/06-architecture/application-architecture.md)
+- [Payment architecture](docs/06-architecture/payment-architecture.md)
+- [Data model and tenant isolation](docs/06-architecture/data-model.md)
+- [Architecture security](docs/06-architecture/security.md)
 - [Product documentation hub](docs/04-product/README.md)
 - [Platform overview](docs/04-product/platform-overview.md)
 - [FLOW Shared Foundation catalog](docs/04-product/flow-core/feature-catalog.md)
@@ -36,6 +41,26 @@ FLOW Platform
 - [Roadmap](ROADMAP.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
+
+## Target technology stack
+
+ตารางนี้เป็น **Target Architecture** ไม่ใช่คำยืนยันว่าทุกส่วนติดตั้งใน Production แล้ว สถานะการนำไปใช้และ Migration gate อยู่ใน [Application Architecture](docs/06-architecture/application-architecture.md)
+
+| Layer | Technology | หน้าที่ |
+|---|---|---|
+| Web application | Next.js App Router + React | Customer, Staff, Owner และ Platform surfaces |
+| Language | TypeScript | Contract ร่วมของ UI, Domain, API และ Integration |
+| Authentication | Auth.js | Identity และ Session ของ Owner/Staff/Platform Admin |
+| Database | Supabase Postgres | Multi-tenant operational data, billing state และ audit |
+| Deployment | Vercel | Next.js runtime, preview และ production deployment |
+| Styling | Tailwind CSS | Design token และ responsive layout |
+| Components | shadcn/ui | Accessible component primitives ที่ปรับตาม FLOW Design System |
+| SaaS billing | Stripe Billing | Subscription และ Invoice ที่ร้านจ่ายให้ FLOW |
+| Merchant payment | Omise (Opn Payments) | เงินที่ลูกค้าจ่ายให้ร้านผ่านช่องทางในประเทศไทย |
+| Analytics | Vercel Analytics + FLOW operational metrics | Web analytics แยกจาก Business/KPI data |
+| Formatting | Prettier | รูปแบบ Source code และ Markdown ที่สม่ำเสมอ |
+
+หลักการสำคัญคือแยก **FLOW SaaS Billing** ออกจาก **Merchant Payments** ทั้ง Account, Credential, Webhook, Ledger, Refund และ Reconciliation เพื่อไม่ให้เงินของ FLOW ปะปนกับเงินของร้านค้า
 
 ## Repository structure
 
