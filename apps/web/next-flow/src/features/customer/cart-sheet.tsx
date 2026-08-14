@@ -3,8 +3,7 @@
 import { Minus, Plus, Send, ShoppingBag, Trash2, X } from "lucide-react";
 
 import { FoodImage } from "@/components/menu/food-image";
-import { Button } from "@/components/ui/button";
-import { useDialogFocus } from "@/components/ui/dialog";
+import { Button, useDialogFocus } from "@/components/foodflow-ui";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import type { MenuItem, ModifierGroup } from "@/domain";
@@ -100,7 +99,7 @@ export function CartSheet({
                           <p className="shrink-0 text-sm font-bold text-foreground">{formatTHB(getCartLineTotal(line, menuItems, modifierGroups))}</p>
                         </div>
                         {choices.length > 0 && <p className="mt-1 text-[11px] leading-4 text-foreground/45">{choices.join(" / ")}</p>}
-                        {line.specialRequest && <p className="mt-1 text-[11px] italic leading-4 text-primary-foreground">&ldquo;{line.specialRequest}&rdquo;</p>}
+                        {line.specialRequest && <p className="mt-1 text-[11px] italic leading-4 text-amber-700 dark:text-amber-300">&ldquo;{line.specialRequest}&rdquo;</p>}
                       </div>
                     </div>
                     <div className="mt-3 flex items-center justify-between border-t border-border pt-3">

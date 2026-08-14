@@ -13,13 +13,12 @@ import {
   Plus,
   ReceiptText,
   Search,
-  UtensilsCrossed,
 } from "lucide-react";
 
+import { FlowLogo } from "@/components/shared/flow-logo";
 import { FoodImage } from "@/components/menu/food-image";
 import { OrderStatusTimeline } from "@/components/orders/order-status-timeline";
-import { Badge, StatusPill } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge, Button, StatusPill } from "@/components/foodflow-ui";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { MenuItem } from "@/domain";
 import { formatTHB } from "@/lib/currency";
@@ -156,7 +155,7 @@ export function CustomerExperience({ tableCode }: { tableCode: string }) {
     <main className="min-h-screen bg-muted pb-24 text-foreground">
       {serviceMessage && (
         <div className="fixed left-1/2 top-4 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-xs font-semibold text-white shadow-xl" role="status">
-          <CheckCircle2 className="size-4 text-primary" /> {serviceMessage}
+          <CheckCircle2 className="size-4 text-chart-1" /> {serviceMessage}
         </div>
       )}
 
@@ -172,10 +171,15 @@ export function CustomerExperience({ tableCode }: { tableCode: string }) {
               onClick={() => setView("landing")}
               aria-label="Return to table home"
             >
-              <span className="grid size-8 place-items-center rounded-md bg-foreground text-primary"><UtensilsCrossed className="size-4" /></span>
+              <span className="grid size-8 place-items-center rounded-md bg-foreground text-background">
+                <span className="text-xs font-black" aria-hidden="true">M</span>
+              </span>
               <span>
                 <span className="block text-sm font-black tracking-[-0.03em] text-foreground">{state.restaurant.name}</span>
-                <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Powered by FoodFlow</span>
+                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
+                  Powered by
+                  <FlowLogo variant="wordmark" decorative className="w-10" sizes="40px" />
+                </span>
               </span>
             </button>
           </div>
@@ -194,12 +198,12 @@ export function CustomerExperience({ tableCode }: { tableCode: string }) {
               </div>
               <h1 className="mt-6 text-3xl font-semibold tracking-[-0.045em]">Welcome to {state.restaurant.name}</h1>
               <p className="mt-3 text-sm leading-6 text-white/65">Order at your own pace. Everything you send stays connected to this table until the bill is paid.</p>
-              <Button className="mt-7 bg-primary text-foreground hover:bg-primary" size="lg" fullWidth onClick={() => setView("menu")} rightIcon={<ChevronRight className="size-4" />}>View menu</Button>
+              <Button className="mt-7 bg-primary text-primary-foreground hover:bg-primary/90" size="lg" fullWidth onClick={() => setView("menu")} rightIcon={<ChevronRight className="size-4" />}>View menu</Button>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <button className="ff-panel rounded-lg p-4 text-left transition hover:border-foreground/35" onClick={() => sendService("CALL_STAFF")}>
-              <Bell className="size-5 text-primary-foreground" />
+              <Bell className="size-5 text-foreground" />
               <p className="mt-3 text-sm font-semibold text-foreground">Call staff</p>
               <p className="mt-1 text-[11px] leading-4 text-foreground/45">Send a request to the floor team.</p>
             </button>
@@ -305,7 +309,7 @@ export function CustomerExperience({ tableCode }: { tableCode: string }) {
 
       {view === "menu" && cartCount > 0 && (
         <button className="fixed bottom-24 left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between rounded-xl bg-foreground px-4 py-3.5 text-white shadow-lg" onClick={() => setCartOpen(true)}>
-          <span className="flex items-center gap-3"><span className="grid size-7 place-items-center rounded-full bg-primary text-xs font-black text-foreground">{cartCount}</span><span className="text-sm font-semibold">View cart</span></span>
+          <span className="flex items-center gap-3"><span className="grid size-7 place-items-center rounded-full bg-primary text-xs font-black text-primary-foreground">{cartCount}</span><span className="text-sm font-semibold">View cart</span></span>
           <span className="text-sm font-bold">{formatTHB(cartSubtotal)}</span>
         </button>
       )}

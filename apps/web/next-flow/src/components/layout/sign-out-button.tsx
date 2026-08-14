@@ -4,7 +4,7 @@ import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/foodflow-ui/button";
 import { cn } from "@/lib/utils";
 
 export function SignOutButton({

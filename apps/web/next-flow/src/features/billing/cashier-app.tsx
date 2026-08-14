@@ -27,7 +27,7 @@ import {
   SegmentedControl,
   StatusPill,
   Tabs,
-} from "@/components/ui";
+} from "@/components/foodflow-ui";
 import type { DiscountType, PaymentMethod, TableSession } from "@/domain";
 import { formatTHB } from "@/lib/currency";
 import { formatBangkokTime } from "@/lib/date";
@@ -314,7 +314,7 @@ function BillDrawer(props: BillDrawerProps) {
           <BillRow label="Discount" value={-bill.discountAmount} muted />
           <BillRow label={`Service charge (${state.settings.serviceChargePercent}%)`} value={bill.serviceChargeAmount} muted />
           <BillRow label={`VAT (${state.settings.vatPercent}%)`} value={bill.vatAmount} muted />
-          <div className="mt-4 flex items-end justify-between border-t border-white/15 pt-4"><span className="text-sm font-semibold">Total</span><span className="text-3xl font-bold tracking-[-0.04em] text-primary">{formatTHB(bill.total)}</span></div>
+          <div className="mt-4 flex items-end justify-between border-t border-white/15 pt-4"><span className="text-sm font-semibold">Total</span><span className="text-3xl font-bold tracking-[-0.04em] text-chart-1">{formatTHB(bill.total)}</span></div>
         </section>
 
         <section><h3 className="text-sm font-semibold text-foreground">Payment method</h3><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{paymentMethods.map((method) => <button className={`flex min-h-20 flex-col items-center justify-center gap-2 rounded-md border p-2 text-xs font-semibold transition ${props.paymentMethod === method.value ? "border-foreground bg-muted text-foreground ring-1 ring-ring" : "border-border bg-card text-foreground/55 hover:border-foreground/35"}`} key={method.value} onClick={() => props.onPaymentMethod(method.value)}><method.icon className="size-5" />{method.label}</button>)}</div></section>

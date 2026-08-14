@@ -11,7 +11,14 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { Badge, Card, EmptyState, MetricCard, SectionHeading, StatusPill } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  MetricCard,
+  SectionHeading,
+  StatusPill,
+} from "@/components/foodflow-ui";
 import type { FoodFlowState } from "@/domain";
 import { formatTHB } from "@/lib/currency";
 import { formatBangkokTime, formatCompactDuration, getElapsedMilliseconds } from "@/lib/date";
@@ -78,7 +85,7 @@ export function OwnerDashboard({ state, hydrated }: { state: FoodFlowState; hydr
           <div className="mt-5">
             {waiting.length === 0 ? <EmptyState compact icon={<ChefHat className="size-5" />} title="Nothing waiting" description="All incoming orders are confirmed." /> : waiting.map((order, index) => {
               const table = state.tables.find((candidate) => candidate.id === order.tableId);
-              return <div className={`flex items-center gap-4 py-3 ${index ? "border-t border-border" : ""}`} key={order.id}><span className="grid size-10 place-items-center rounded-md bg-primary/15 text-xs font-black text-primary-foreground">{table?.code}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">Order {order.number}</p><p className="mt-0.5 truncate text-xs text-foreground/45">{order.items.map((item) => `${item.quantity}x ${item.menuItemName}`).join(" / ")}</p></div><div className="text-right"><StatusPill tone="warning">Waiting</StatusPill><p className="mt-1 text-[10px] text-foreground/35">{formatBangkokTime(order.submittedAt)}</p></div></div>;
+              return <div className={`flex items-center gap-4 py-3 ${index ? "border-t border-border" : ""}`} key={order.id}><span className="grid size-10 place-items-center rounded-md bg-amber-500/15 text-xs font-black text-amber-800 dark:text-amber-300">{table?.code}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">Order {order.number}</p><p className="mt-0.5 truncate text-xs text-foreground/45">{order.items.map((item) => `${item.quantity}x ${item.menuItemName}`).join(" / ")}</p></div><div className="text-right"><StatusPill tone="warning">Waiting</StatusPill><p className="mt-1 text-[10px] text-foreground/35">{formatBangkokTime(order.submittedAt)}</p></div></div>;
             })}
           </div>
         </Card>
@@ -103,8 +110,8 @@ export function OwnerDashboard({ state, hydrated }: { state: FoodFlowState; hydr
         </Card>
 
         <Card className="p-5 sm:p-6">
-          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><RotateCcw className="size-5 text-primary-foreground" /><div><p className="font-semibold text-foreground">Remake orders</p><p className="text-xs text-foreground/42">Kitchen remake activity today</p></div></div><Badge tone={remakeTickets.length ? "warning" : "neutral"}>{remakeTickets.length}</Badge></div>
-          {remakeTickets.length === 0 ? <div className="mt-5"><EmptyState compact title="No remakes today" /></div> : <div className="mt-5 space-y-1">{remakeTickets.map((ticket, index) => <div className={`flex items-center gap-3 py-2.5 ${index ? "border-t border-border" : ""}`} key={ticket.id}><span className="grid size-8 place-items-center rounded-md bg-primary/15 text-[10px] font-black text-primary-foreground">{state.tables.find((table) => table.id === ticket.tableId)?.code}</span><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-foreground">{ticket.orderNumber}</p><p className="truncate text-[10px] text-foreground/42">{ticket.problemNote ?? "Returned to the kitchen"}</p></div><Badge tone="warning">{ticket.remakeCount}x</Badge></div>)}</div>}
+          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><RotateCcw className="size-5 text-amber-700 dark:text-amber-300" /><div><p className="font-semibold text-foreground">Remake orders</p><p className="text-xs text-foreground/42">Kitchen remake activity today</p></div></div><Badge tone={remakeTickets.length ? "warning" : "neutral"}>{remakeTickets.length}</Badge></div>
+          {remakeTickets.length === 0 ? <div className="mt-5"><EmptyState compact title="No remakes today" /></div> : <div className="mt-5 space-y-1">{remakeTickets.map((ticket, index) => <div className={`flex items-center gap-3 py-2.5 ${index ? "border-t border-border" : ""}`} key={ticket.id}><span className="grid size-8 place-items-center rounded-md bg-amber-500/15 text-[10px] font-black text-amber-800 dark:text-amber-300">{state.tables.find((table) => table.id === ticket.tableId)?.code}</span><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-foreground">{ticket.orderNumber}</p><p className="truncate text-[10px] text-foreground/42">{ticket.problemNote ?? "Returned to the kitchen"}</p></div><Badge tone="warning">{ticket.remakeCount}x</Badge></div>)}</div>}
         </Card>
       </div>
 

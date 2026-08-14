@@ -4,9 +4,7 @@ import { useMemo, useState } from "react";
 import { Check, Minus, Plus, X } from "lucide-react";
 
 import { FoodImage } from "@/components/menu/food-image";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useDialogFocus } from "@/components/ui/dialog";
+import { Badge, Button, useDialogFocus } from "@/components/foodflow-ui";
 import { IconButton } from "@/components/ui/icon-button";
 import type { MenuBadge, MenuItem, ModifierGroup } from "@/domain";
 import { formatTHB, formatTHBAdjustment } from "@/lib/currency";

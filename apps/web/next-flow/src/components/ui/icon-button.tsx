@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { Button, type ButtonProps, type ButtonVariant } from "./button";
+import {
+  Button,
+  type ButtonProps,
+  type ButtonVariant,
+} from "@/components/foodflow-ui/button";
 
 export type IconButtonVariant = "default" | "ghost" | "inverted" | "danger";
 export type IconButtonSize = "sm" | "md" | "lg";

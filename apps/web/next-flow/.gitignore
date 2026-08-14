@@ -17,9 +17,16 @@
 /.next/
 /dist/
 /out/
+/.vinext/
 
 # production
 /build
+/flow-ui
+/playwright-report/
+/test-results/
+/.qa-edge-profile/
+/.qa-edge-width/
+/.qa-screenshots/
 
 # misc
 .DS_Store

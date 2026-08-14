@@ -1,116 +1,82 @@
-"use client";
+"use client"
 
-import type { ReactNode } from "react";
-import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
+import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
+import { cva, type VariantProps } from "class-variance-authority"
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
-export interface TabItem<Value extends string = string> {
-  value: Value;
-  label: string;
-  icon?: ReactNode;
-  count?: number;
-  disabled?: boolean;
-  panelId?: string;
-}
-
-export interface TabsProps<Value extends string = string> {
-  value: Value;
-  items: readonly TabItem<Value>[];
-  onChange: (value: Value) => void;
-  label: string;
-  size?: "sm" | "md";
-  stretch?: boolean;
-  className?: string;
-}
-
-export function Tabs<Value extends string>({
-  value,
-  items,
-  onChange,
-  label,
-  size = "md",
-  stretch = false,
+function Tabs({
   className,
-}: TabsProps<Value>) {
+  orientation = "horizontal",
+  ...props
+}: TabsPrimitive.Root.Props) {
   return (
-    <TabsPrimitive.Root value={value} onValueChange={(next) => onChange(next as Value)}>
-      <TabsPrimitive.List
-        aria-label={label}
-        className={cn("flex gap-0 overflow-x-auto border-b border-border", stretch && "w-full", className)}
-      >
-        {items.map((item) => (
-          <TabsPrimitive.Tab
-            key={item.value}
-            value={item.value}
-            aria-controls={item.panelId}
-            disabled={item.disabled}
-            className={cn(
-              "relative inline-flex shrink-0 items-center justify-center gap-2 border-b-2 border-transparent font-heading font-semibold uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 data-active:border-foreground data-active:text-foreground disabled:pointer-events-none disabled:opacity-45",
-              size === "sm" ? "min-h-9 px-3 text-[10px]" : "min-h-11 px-4 text-xs",
-              stretch && "flex-1",
-            )}
-          >
-            {item.icon && <span aria-hidden="true">{item.icon}</span>}
-            <span>{item.label}</span>
-            {typeof item.count === "number" && (
-              <span className="min-w-5 bg-muted px-1.5 py-0.5 text-[10px] leading-4 text-muted-foreground data-active:bg-primary">
-                {item.count}
-              </span>
-            )}
-          </TabsPrimitive.Tab>
-        ))}
-      </TabsPrimitive.List>
-    </TabsPrimitive.Root>
-  );
+    <TabsPrimitive.Root
+      data-slot="tabs"
+      data-orientation={orientation}
+      className={cn(
+        "group/tabs flex gap-2 data-horizontal:flex-col",
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
-export interface SegmentedControlProps<Value extends string = string> {
-  value: Value;
-  items: readonly Omit<TabItem<Value>, "panelId">[];
-  onChange: (value: Value) => void;
-  label: string;
-  size?: "sm" | "md";
-  fullWidth?: boolean;
-  className?: string;
-}
+const tabsListVariants = cva(
+  "group/tabs-list inline-flex w-fit items-center justify-center rounded-2xl p-[3px] text-muted-foreground group-data-horizontal/tabs:h-8 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col group-data-vertical/tabs:p-1 data-[variant=line]:rounded-none",
+  {
+    variants: {
+      variant: {
+        default: "bg-muted",
+        line: "gap-1 bg-transparent",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
 
-export function SegmentedControl<Value extends string>({
-  value,
-  items,
-  onChange,
-  label,
-  size = "md",
-  fullWidth = false,
+function TabsList({
   className,
-}: SegmentedControlProps<Value>) {
+  variant = "default",
+  ...props
+}: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
   return (
-    <TabsPrimitive.Root value={value} onValueChange={(next) => onChange(next as Value)}>
-      <TabsPrimitive.List
-        aria-label={label}
-        className={cn(
-          "inline-flex items-center border border-border bg-muted p-1",
-          fullWidth && "flex w-full",
-          className,
-        )}
-      >
-        {items.map((item) => (
-          <TabsPrimitive.Tab
-            key={item.value}
-            value={item.value}
-            disabled={item.disabled}
-            className={cn(
-              "inline-flex items-center justify-center gap-1.5 rounded-none border border-transparent font-heading font-semibold uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring/40 data-active:border-border data-active:bg-background data-active:text-foreground disabled:pointer-events-none disabled:opacity-45",
-              size === "sm" ? "min-h-7 px-2.5 text-[10px]" : "min-h-9 px-3.5 text-xs",
-              fullWidth && "flex-1",
-            )}
-          >
-            {item.icon && <span aria-hidden="true">{item.icon}</span>}
-            <span>{item.label}</span>
-            {typeof item.count === "number" && <span className="text-[10px] opacity-70">{item.count}</span>}
-          </TabsPrimitive.Tab>
-        ))}
-      </TabsPrimitive.List>
-    </TabsPrimitive.Root>
-  );
+    <TabsPrimitive.List
+      data-slot="tabs-list"
+      data-variant={variant}
+      className={cn(tabsListVariants({ variant }), className)}
+      {...props}
+    />
+  )
 }
+
+function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
+  return (
+    <TabsPrimitive.Tab
+      data-slot="tabs-trigger"
+      className={cn(
+        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-2xl border border-transparent! px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start group-data-vertical/tabs:px-3 group-data-vertical/tabs:py-0.5 hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
+        "data-active:bg-background data-active:text-foreground dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground",
+        "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
+  return (
+    <TabsPrimitive.Panel
+      data-slot="tabs-content"
+      className={cn("flex-1 text-sm outline-none", className)}
+      {...props}
+    />
+  )
+}
+
+export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }

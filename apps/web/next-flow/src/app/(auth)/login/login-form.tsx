@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { LockKeyhole, LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { Button, Input, Label } from "@/components/ui";
+import { Button, Input, Label } from "@/components/foodflow-ui";
 
 interface LoginFormProps {
   nextPath: string;

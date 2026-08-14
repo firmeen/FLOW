@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LockKeyhole } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { FoodFlowLogo } from "@/components/layout/foodflow-logo";
+import { FlowLogo } from "@/components/shared/flow-logo";
 import { Card } from "@/components/ui/card";
 import {
   getInternalExperienceLabel,
@@ -35,9 +35,9 @@ export default async function LoginPage({
         <a
           href="/"
           className="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          aria-label="Back to FoodFlow experience hub"
+          aria-label="FLOW home"
         >
-          <FoodFlowLogo showTagline />
+          <FlowLogo variant="primary" preload className="w-48 sm:w-56" />
         </a>
 
         <Card className="mt-6 p-6 sm:p-8">

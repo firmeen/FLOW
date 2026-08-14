@@ -43,7 +43,7 @@ import {
   StatusPill,
   Tabs,
   type BadgeTone,
-} from "@/components/ui";
+} from "@/components/foodflow-ui";
 import type {
   FoodFlowState,
   MenuItem,
@@ -284,7 +284,7 @@ export function StaffOperations() {
 }
 
 function QueueMetric({ label, value, helper, icon, tone }: { label: string; value: string | number; helper: string; icon: React.ReactNode; tone: "forest" | "amber" | "red" | "green" }) {
-  const tones = { forest: "bg-chart-1/20 text-chart-5", amber: "bg-primary/15 text-primary-foreground", red: "bg-destructive/10 text-destructive", green: "bg-chart-1/20 text-chart-5" } as const;
+  const tones = { forest: "bg-chart-1/20 text-chart-5", amber: "bg-amber-500/15 text-amber-800 dark:text-amber-300", red: "bg-destructive/10 text-destructive", green: "bg-chart-1/20 text-chart-5" } as const;
   return (
     <Card className="flex min-h-28 items-start gap-3 p-4 sm:min-h-0 sm:items-center">
       <span className={`grid size-10 shrink-0 place-items-center rounded-md ${tones[tone]}`} aria-hidden="true">{icon}</span>
@@ -338,8 +338,8 @@ function IncomingOrderCard({ order, state, now, onReview }: { order: Order; stat
     order.customerNote,
     ...order.items.flatMap((item) => item.specialRequest ? [`${item.menuItemName}: ${item.specialRequest}`] : []),
   ].filter((note): note is string => Boolean(note));
-  const urgencyClasses = { normal: "border-t-chart-3", warning: "border-t-primary", critical: "border-t-destructive" } as const;
-  const timerClasses = { normal: "bg-chart-1/20 text-chart-5", warning: "bg-primary/15 text-primary-foreground", critical: "bg-destructive/10 text-destructive" } as const;
+  const urgencyClasses = { normal: "border-t-chart-3", warning: "border-t-amber-500", critical: "border-t-destructive" } as const;
+  const timerClasses = { normal: "bg-chart-1/20 text-chart-5", warning: "bg-amber-500/15 text-amber-800 dark:text-amber-300", critical: "bg-destructive/10 text-destructive" } as const;
 
   return (
     <Card className={`animate-ticket overflow-hidden border-t-4 ${urgencyClasses[urgency]}`}>
@@ -368,12 +368,12 @@ function IncomingOrderCard({ order, state, now, onReview }: { order: Order; stat
             </li>
           ))}
         </ul>
-        <div className={`mt-4 rounded-md border px-3 py-2.5 ${notes.length ? "border-primary/60 bg-primary/15" : "border-border bg-muted"}`}>
+        <div className={`mt-4 rounded-md border px-3 py-2.5 ${notes.length ? "border-amber-500/40 bg-amber-500/15" : "border-border bg-muted"}`}>
           <div className="flex items-start gap-2">
-            <MessageSquareText className={`mt-0.5 size-3.5 shrink-0 ${notes.length ? "text-primary-foreground" : "text-foreground/30"}`} aria-hidden="true" />
+            <MessageSquareText className={`mt-0.5 size-3.5 shrink-0 ${notes.length ? "text-amber-700 dark:text-amber-300" : "text-foreground/30"}`} aria-hidden="true" />
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.09em] text-foreground/40">Notes</p>
-              {notes.length ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-primary-foreground">{notes.join(" - ")}</p> : <p className="mt-1 text-xs text-foreground/38">No special notes</p>}
+              {notes.length ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-amber-800 dark:text-amber-300">{notes.join(" - ")}</p> : <p className="mt-1 text-xs text-foreground/38">No special notes</p>}
             </div>
           </div>
         </div>
@@ -409,7 +409,7 @@ function OrderSummary({ order, state, now }: { order: Order; state: FoodFlowStat
                     <p className="shrink-0 text-sm font-semibold text-foreground">{formatTHB(item.lineTotal)}</p>
                   </div>
                   {item.modifiers.length > 0 && <p className="mt-1 text-xs text-foreground/48">{item.modifiers.map((modifier) => modifier.modifierChoiceName).join(" - ")}</p>}
-                  {item.specialRequest && <p className="mt-2 rounded bg-primary/15 px-2.5 py-2 text-xs leading-5 text-primary-foreground"><strong>Request:</strong> {item.specialRequest}</p>}
+                  {item.specialRequest && <p className="mt-2 rounded bg-amber-500/15 px-2.5 py-2 text-xs leading-5 text-amber-800 dark:text-amber-300"><strong>Request:</strong> {item.specialRequest}</p>}
                 </div>
               </div>
             </div>
@@ -417,10 +417,10 @@ function OrderSummary({ order, state, now }: { order: Order; state: FoodFlowStat
         </div>
       </section>
       {order.customerNote && (
-        <section className="rounded-md border border-primary/60 bg-primary/15 p-4">
+        <section className="rounded-md border border-amber-500/40 bg-amber-500/15 p-4">
           <div className="flex gap-3">
-            <MessageSquareText className="mt-0.5 size-4 shrink-0 text-primary-foreground" aria-hidden="true" />
-            <div><h3 className="text-xs font-bold uppercase tracking-[0.1em] text-primary-foreground">Customer note</h3><p className="mt-1.5 text-sm leading-6 text-primary-foreground">{order.customerNote}</p></div>
+            <MessageSquareText className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+            <div><h3 className="text-xs font-bold uppercase tracking-[0.1em] text-amber-800 dark:text-amber-300">Customer note</h3><p className="mt-1.5 text-sm leading-6 text-amber-800 dark:text-amber-300">{order.customerNote}</p></div>
           </div>
         </section>
       )}
@@ -537,7 +537,7 @@ function TablesPanel({ id, state, onOpenTable }: { id: string; state: FoodFlowSt
         <div><h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Restaurant tables</h2><p className="mt-1 text-sm text-foreground/50">Open any table for its complete live session.</p></div>
         <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-foreground/48">
           <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-chart-3" />Available</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />Waiting</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500" />Waiting</span>
           <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-ring" />In service</span>
           <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-destructive" />Bill</span>
         </div>
@@ -615,7 +615,7 @@ function TableSessionDrawer({ table, state, now, onClose }: { table: Table | nul
                       <ul className="mt-3 border-t border-border pt-3">
                         {order.items.map((item) => <li className="flex justify-between gap-3 py-1 text-xs" key={item.id}><span className="text-foreground/60"><strong className="mr-1.5 text-foreground">{item.quantity}x</strong>{item.menuItemName}</span><span className="shrink-0 font-semibold text-foreground">{formatTHB(item.lineTotal)}</span></li>)}
                       </ul>
-                      {order.customerNote && <p className="mt-3 rounded bg-primary/15 px-3 py-2 text-xs leading-5 text-primary-foreground">{order.customerNote}</p>}
+                      {order.customerNote && <p className="mt-3 rounded bg-amber-500/15 px-3 py-2 text-xs leading-5 text-amber-800 dark:text-amber-300">{order.customerNote}</p>}
                     </Card>
                   ))}
                 </div>
@@ -627,7 +627,7 @@ function TableSessionDrawer({ table, state, now, onClose }: { table: Table | nul
                 <div className="mt-2 overflow-hidden rounded-md border border-border bg-card">
                   {serviceRequests.map((request, index) => (
                     <div className={`flex items-center gap-3 px-4 py-3 ${index ? "border-t border-border" : ""}`} key={request.id}>
-                      {request.type === "REQUEST_BILL" ? <ReceiptText className="size-4 text-primary-foreground" /> : <BellRing className="size-4 text-accent-foreground" />}
+                      {request.type === "REQUEST_BILL" ? <ReceiptText className="size-4 text-amber-700 dark:text-amber-300" /> : <BellRing className="size-4 text-accent-foreground" />}
                       <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">{serviceRequestLabel(request)}</p><p className="mt-0.5 text-[10px] text-foreground/38">{formatBangkokTime(request.requestedAt)}</p></div>
                       <StatusPill tone={statusTone(request.status)}>{getStatusPresentation(request.status).label}</StatusPill>
                     </div>
@@ -674,7 +674,7 @@ function ServicePanel({
               <Card className={`overflow-hidden border-l-4 ${request.priority === "HIGH" ? "border-l-destructive" : "border-l-ring"}`} key={request.id}>
                 <div className="p-5">
                   <div className="flex items-start gap-4">
-                    <span className={`grid size-11 shrink-0 place-items-center rounded-md ${isBill ? "bg-primary/15 text-primary-foreground" : "bg-accent text-accent-foreground"}`}>
+                    <span className={`grid size-11 shrink-0 place-items-center rounded-md ${isBill ? "bg-amber-500/15 text-amber-800 dark:text-amber-300" : "bg-accent text-accent-foreground"}`}>
                       {isBill ? <ReceiptText className="size-5" /> : <BellRing className="size-5" />}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -742,7 +742,7 @@ function ReadyPanel({
                     {order.items.map((item) => (
                       <li className="flex items-start gap-3 text-sm" key={item.id}>
                         <span className="min-w-7 rounded bg-muted px-1.5 py-0.5 text-center text-xs font-bold text-foreground">{item.quantity}x</span>
-                        <div className="min-w-0 flex-1"><p className="font-medium leading-5 text-foreground/72">{item.menuItemName}</p>{item.specialRequest && <p className="mt-1 text-xs leading-5 text-primary-foreground">{item.specialRequest}</p>}</div>
+                        <div className="min-w-0 flex-1"><p className="font-medium leading-5 text-foreground/72">{item.menuItemName}</p>{item.specialRequest && <p className="mt-1 text-xs leading-5 text-amber-700 dark:text-amber-300">{item.specialRequest}</p>}</div>
                       </li>
                     ))}
                   </ul>
@@ -857,9 +857,9 @@ function MenuAvailabilityPanel({
                 const soldOut = item.status === "SOLD_OUT";
                 const category = categoriesById.get(item.categoryId);
                 return (
-                  <Card className={`flex flex-col overflow-hidden ${soldOut ? "border-primary/60 bg-primary/15" : ""}`} key={item.id}>
+                  <Card className={`flex flex-col overflow-hidden ${soldOut ? "border-amber-500/40 bg-amber-500/15" : ""}`} key={item.id}>
                     <div className="flex flex-1 items-start gap-3 p-4 sm:p-5">
-                      <span className={`grid size-10 shrink-0 place-items-center rounded-md ${soldOut ? "bg-primary/15 text-primary-foreground" : "bg-chart-1/20 text-chart-5"}`}>
+                      <span className={`grid size-10 shrink-0 place-items-center rounded-md ${soldOut ? "bg-amber-500/15 text-amber-800 dark:text-amber-300" : "bg-chart-1/20 text-chart-5"}`}>
                         {soldOut ? <CircleAlert className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -904,7 +904,7 @@ function MenuAvailabilityPanel({
           </>
         }
       >
-        <div className="flex gap-3 rounded-md border border-primary/60 bg-primary/15 p-4 text-primary-foreground">
+        <div className="flex gap-3 rounded-md border border-amber-500/40 bg-amber-500/15 p-4 text-amber-800 dark:text-amber-300">
           <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p className="text-sm leading-5">This availability change is immediate and recorded in the audit history.</p>
         </div>

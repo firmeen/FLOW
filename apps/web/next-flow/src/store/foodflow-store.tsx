@@ -21,6 +21,7 @@ import type {
   SubmitOrderItemInput,
 } from "@/domain";
 import { createDemoState } from "@/data/demo";
+import { STORAGE_KEYS } from "@/lib/constants";
 import {
   foodFlowRepository,
   type AvailabilityPatch,
@@ -40,7 +41,7 @@ import {
   type SubmitOrderResult,
 } from "@/services/repositories";
 
-export const FOODFLOW_STORAGE_KEY = "foodflow:mvp:state:v1";
+export const FOODFLOW_STORAGE_KEY = STORAGE_KEYS.demoState;
 
 // Server-rendered client components need an identical first snapshot in the
 // browser. The live demo is rebased to the current time immediately after

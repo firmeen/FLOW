@@ -15,11 +15,10 @@ import {
   Sparkles,
   Store,
   Users,
-  UtensilsCrossed,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge, Button } from "@/components/foodflow-ui";
+import { FlowLogo } from "@/components/shared/flow-logo";
 import { useFoodFlow } from "@/store";
 
 const experiences = [
@@ -29,7 +28,7 @@ const experiences = [
     description: "Browse, customize, order, and follow the live table session.",
     href: "/r/demo/table/T05",
     icon: QrCode,
-    accent: "bg-primary text-foreground",
+    accent: "bg-primary text-primary-foreground",
     access: "Public - no login",
     accessIcon: Globe2,
   },
@@ -49,7 +48,7 @@ const experiences = [
     description: "Move tickets from new to preparing and ready for service.",
     href: "/kitchen",
     icon: ChefHat,
-    accent: "bg-primary/15 text-primary-foreground",
+    accent: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
     access: "Login required",
     accessIcon: Lock,
   },
@@ -97,17 +96,19 @@ export function DemoLauncher() {
       <section className="relative flex min-h-[38vh] flex-col overflow-hidden bg-foreground px-6 py-7 text-white sm:px-10 lg:min-h-screen lg:px-12 lg:py-10">
         <div className="ff-grid-fade absolute inset-0 opacity-30" />
         <div className="absolute -bottom-28 -right-24 size-96 rounded-full border border-white/10" />
-        <div className="absolute -bottom-16 -right-8 size-64 rounded-full border border-primary/30" />
+        <div className="absolute -bottom-16 -right-8 size-64 rounded-full border border-white/15" />
 
         <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg bg-primary text-foreground">
-              <UtensilsCrossed className="size-5" aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-lg font-black tracking-[-0.035em]">FOODFLOW</p>
-              <p className="text-[9px] font-bold uppercase tracking-[0.23em] text-white/50">by Fimin Flow</p>
-            </div>
+          <div>
+            <FlowLogo
+              variant="reverse"
+              preload
+              className="w-36 sm:w-44"
+              sizes="(min-width: 640px) 176px, 144px"
+            />
+            <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/50">
+              FoodFlow dine-in operations
+            </p>
           </div>
           <Badge className="border-white/15 bg-card/10 text-white" dot>
             Live demo
@@ -115,7 +116,7 @@ export function DemoLauncher() {
         </div>
 
         <div className="relative my-auto max-w-xl py-12 lg:py-20">
-          <div className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-primary">
+          <div className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-chart-1">
             <Sparkles className="size-4" aria-hidden="true" />
             Restaurant operations platform
           </div>
@@ -127,10 +128,10 @@ export function DemoLauncher() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.09em] text-white/70">
-            <span>Table</span><ArrowRight className="size-3 text-primary" />
-            <span>Staff</span><ArrowRight className="size-3 text-primary" />
-            <span>Kitchen</span><ArrowRight className="size-3 text-primary" />
-            <span>Serve</span><ArrowRight className="size-3 text-primary" />
+            <span>Table</span><ArrowRight className="size-3 text-chart-1" />
+            <span>Staff</span><ArrowRight className="size-3 text-chart-1" />
+            <span>Kitchen</span><ArrowRight className="size-3 text-chart-1" />
+            <span>Serve</span><ArrowRight className="size-3 text-chart-1" />
             <span>Pay</span>
           </div>
         </div>

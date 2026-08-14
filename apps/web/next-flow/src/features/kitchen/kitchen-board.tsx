@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { OperationalShell } from "@/components/layout";
-import { Badge, Button, EmptyState, Modal } from "@/components/ui";
+import { Badge, Button, EmptyState, Modal } from "@/components/foodflow-ui";
 import type {
   KitchenTicket,
   KitchenTicketItem,
@@ -58,8 +58,8 @@ const laneDefinitions: readonly {
     label: "New",
     helper: "Waiting to start",
     icon: Flame,
-    accentClassName: "bg-primary",
-    countClassName: "bg-primary text-primary-foreground",
+    accentClassName: "bg-amber-500",
+    countClassName: "bg-amber-500 text-zinc-950",
   },
   {
     id: "PREPARING",
@@ -74,8 +74,8 @@ const laneDefinitions: readonly {
     label: "Ready",
     helper: "Waiting for pickup",
     icon: CheckCircle2,
-    accentClassName: "bg-primary",
-    countClassName: "bg-primary text-primary-foreground",
+    accentClassName: "bg-chart-3",
+    countClassName: "bg-chart-3 text-zinc-950",
   },
 ] as const;
 
@@ -264,7 +264,7 @@ export function KitchenBoard() {
         >
           <div className="flex flex-col gap-3 px-3 py-3 sm:px-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
+              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-chart-3 text-zinc-950">
                 <Utensils className="size-5" aria-hidden="true" />
               </span>
               <div className="min-w-0">
@@ -275,7 +275,7 @@ export function KitchenBoard() {
                   <p className="font-semibold text-white">All active orders</p>
                   <span className="hidden h-4 w-px bg-card/12 sm:block" aria-hidden="true" />
                   <p
-                    className="font-mono text-sm font-bold tabular-nums text-primary"
+                    className="font-mono text-sm font-bold tabular-nums text-chart-1"
                     aria-label={hydrated ? "Current restaurant time" : "Kitchen clock loading"}
                   >
                     {hydrated ? formatBangkokTime(now, { second: "2-digit" }) : "--:--:--"}
@@ -313,7 +313,7 @@ export function KitchenBoard() {
               className={`flex items-center gap-2 border-t px-4 py-2.5 text-xs font-semibold ${
                 actionError
                   ? "border-destructive/30 bg-destructive/25 text-destructive/80"
-                  : "border-white/10 bg-card/[0.04] text-primary"
+                  : "border-white/10 bg-card/[0.04] text-chart-1"
               }`}
             >
               {actionError ? (
@@ -610,7 +610,7 @@ function KitchenTicketCard({
         ticket.status === "PROBLEM"
           ? "border-destructive/30 ring-2 ring-destructive/30/30"
           : ticket.status === "REMAKE"
-            ? "border-primary/60 ring-2 ring-primary/40/25"
+            ? "border-amber-500/50 ring-2 ring-amber-500/25"
             : "border-black/15"
       }`}
       aria-label={`${ticket.orderNumber}, table ${tableCode}, ${statusLabel}`}
@@ -695,7 +695,7 @@ function KitchenTicketCard({
               </div>
 
               {item.specialRequest && (
-                <div className="mt-2.5 flex items-start gap-2 rounded-md border border-primary/60 bg-primary/15 px-3 py-2.5 text-xs font-bold leading-5 text-primary-foreground">
+                <div className="mt-2.5 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/15 px-3 py-2.5 text-xs font-bold leading-5 text-amber-800 dark:text-amber-300">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{item.specialRequest}</span>
                 </div>
@@ -781,7 +781,7 @@ function KitchenTicketCard({
             fullWidth
             variant="outline"
             disabled={working}
-            className="!min-h-12 !border-primary/60 !bg-primary/15 !text-primary-foreground hover:!bg-primary/15"
+            className="!min-h-12 !border-destructive/30 !bg-destructive/10 !text-destructive hover:!bg-destructive/15"
             leftIcon={<AlertTriangle className="size-4" />}
             onClick={onProblem}
           >
@@ -908,7 +908,7 @@ function ticketStatusTone(
 
 function ticketAccent(status: KitchenTicket["status"]): string {
   if (status === "PROBLEM") return "bg-destructive";
-  if (status === "REMAKE" || status === "NEW") return "bg-primary";
+  if (status === "REMAKE" || status === "NEW") return "bg-amber-500";
   if (status === "READY") return "bg-chart-3";
   return "bg-ring";
 }
@@ -923,7 +923,7 @@ function getTimerTone(elapsedMs: number, lane: KitchenLane): string {
     return "border-destructive/30 bg-destructive/10 text-destructive";
   }
   if (elapsedMs >= 8 * 60_000) {
-    return "border-primary/60 bg-primary/15 text-primary-foreground";
+    return "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300";
   }
   return "border-border bg-chart-1/20 text-muted-foreground";
 }

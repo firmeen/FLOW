@@ -37,7 +37,7 @@ export const WAIT_TIME_THRESHOLDS_MS = {
 } as const;
 
 export const STORAGE_KEYS = {
-  demoState: "foodflow:demo-state:v1",
+  demoState: "foodflow:mvp:state:v1",
 } as const;
 
 export const APP_ROUTES = {

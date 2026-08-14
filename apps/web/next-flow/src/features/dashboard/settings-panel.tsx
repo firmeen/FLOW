@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { CheckCircle2, Clock3, Percent, Save, Store, WalletCards } from "lucide-react";
 
-import { Badge, Button, Card, Input, Label, SectionHeading, Switch } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  Label,
+  SectionHeading,
+  Switch,
+} from "@/components/foodflow-ui";
 import type { OpeningHours } from "@/domain";
 import { useFoodFlow } from "@/store";
 
@@ -54,7 +62,7 @@ export function SettingsPanel() {
           <Card className="p-5 sm:p-6">
             <SettingHeader icon={<Store className="size-5" />} title="Restaurant identity" description="Shown to guests and staff across FoodFlow." />
             <div className="mt-5 grid gap-4 sm:grid-cols-[96px_1fr] sm:items-end">
-              <div className="grid size-24 place-items-center bg-foreground bg-cover bg-center bg-no-repeat text-2xl font-black text-primary" style={logoUrl ? { backgroundImage: `url(${logoUrl})` } : undefined} role="img" aria-label="Restaurant logo preview">{logoUrl ? "" : "MH"}</div>
+              <div className="grid size-24 place-items-center bg-foreground bg-cover bg-center bg-no-repeat text-2xl font-black text-background" style={logoUrl ? { backgroundImage: `url(${logoUrl})` } : undefined} role="img" aria-label="Restaurant logo preview">{logoUrl ? "" : "MH"}</div>
               <div className="grid gap-3"><Label className="block">Restaurant name<Input className="mt-2 font-normal normal-case tracking-normal" value={restaurantName} onChange={(event) => setRestaurantName(event.target.value)} /></Label><Label className="block">Logo URL<Input className="mt-2 font-normal normal-case tracking-normal" placeholder="https://..." value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} /></Label></div>
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2"><ReadOnly label="Currency" value="THB - Thai Baht" /><ReadOnly label="Timezone" value="Asia/Bangkok" /></div>

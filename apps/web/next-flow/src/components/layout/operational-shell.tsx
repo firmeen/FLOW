@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Badge } from "../ui/badge";
-import { FoodFlowLogo, FoodFlowMark } from "./foodflow-logo";
+import { Badge } from "@/components/foodflow-ui/badge";
+import { FlowLogo } from "@/components/shared/flow-logo";
 import { RoleSwitcher, type DemoRole } from "./role-switcher";
 import { SignOutButton } from "./sign-out-button";
 
@@ -45,10 +45,10 @@ export function OperationalShell({
         <div className="border-b border-sidebar-border px-5 py-5">
           <a
             href="/"
-            aria-label="FoodFlow demo home"
+            aria-label="FLOW home"
             className="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
           >
-            <FoodFlowLogo showTagline />
+            <FlowLogo variant="compact" className="w-36" sizes="144px" />
           </a>
         </div>
 
@@ -107,10 +107,10 @@ export function OperationalShell({
           <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
             <a
               href="/"
-              aria-label="FoodFlow demo home"
+              aria-label="FLOW home"
               className="shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
             >
-              <FoodFlowMark className="size-8" />
+              <FlowLogo variant="icon" className="size-9" sizes="36px" />
             </a>
 
             <div className="min-w-0 flex-1">

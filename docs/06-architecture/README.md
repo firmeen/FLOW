@@ -24,6 +24,9 @@ source_of_truth: true
 | [Architecture Security](security.md) | Authentication, Authorization, Secret, PCI scope, Privacy และ incident control | Security + Architecture |
 | [ADR-001: Technology Stack](technical-decisions/ADR-001-technology-stack.md) | เหตุผลและผลกระทบของ Stack ที่เลือก | Architecture |
 | [ADR-002: Payment Separation](technical-decisions/ADR-002-payment-provider-separation.md) | การแยก FLOW Billing ออกจากเงินของร้าน | Finance + Architecture + Legal |
+| [ADR-003: Typed Query Layer](technical-decisions/ADR-003-typed-query-layer.md) | แนวทาง query/transaction สำหรับ Supabase Postgres ที่เสนอไว้สำหรับ pilot | Architecture + Data |
+| [ADR-004: Password Hashing](technical-decisions/ADR-004-password-hashing.md) | อัลกอริทึมและ runtime gate สำหรับ internal credentials | Architecture + Security |
+| [ADR-005: Outbox Worker Strategy](technical-decisions/ADR-005-outbox-worker-strategy.md) | รูปแบบ durable outbox runner, retry และ idempotency ที่เสนอไว้ | Architecture + Operations |
 
 ## Architecture principles
 

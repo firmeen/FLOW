@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { FLOW_BRAND_ASSETS } from "@/config/brand-assets";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
 
 export const dynamic = "force-static";
@@ -19,13 +20,19 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["business", "food", "productivity"],
     icons: [
       {
-        src: "/icon",
+        src: FLOW_BRAND_ASSETS.appIcon192,
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: FLOW_BRAND_ASSETS.appIcon512,
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon",
+        src: FLOW_BRAND_ASSETS.appIconMaskable512,
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

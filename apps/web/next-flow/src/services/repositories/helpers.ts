@@ -230,7 +230,17 @@ export const makeOrderItems = (
         `${menuItem?.name ?? "This item"} is not currently orderable.`,
       );
     }
+    const allowedModifierGroupIds = new Set(menuItem.modifierGroupIds);
+    const selectedModifierChoices = new Set<string>();
     const modifiers = (input.modifiers ?? []).map((selection) => {
+      if (!allowedModifierGroupIds.has(selection.modifierGroupId)) {
+        throw new Error("A selected modifier does not belong to this item.");
+      }
+      const selectionKey = `${selection.modifierGroupId}\u0000${selection.modifierChoiceId}`;
+      if (selectedModifierChoices.has(selectionKey)) {
+        throw new Error("The same modifier choice cannot be selected twice.");
+      }
+      selectedModifierChoices.add(selectionKey);
       const group = state.modifierGroups.find(
         (candidate) => candidate.id === selection.modifierGroupId,
       );

@@ -12,7 +12,14 @@ import {
 } from "lucide-react";
 
 import { OperationalShell } from "@/components/layout";
-import { Badge, Card, EmptyState, SectionHeading, StatusPill, Tabs } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  SectionHeading,
+  StatusPill,
+  Tabs,
+} from "@/components/foodflow-ui";
 import { formatTHB } from "@/lib/currency";
 import { formatBangkokDateTime, formatBangkokTime } from "@/lib/date";
 import { getStatusPresentation } from "@/lib/constants";
@@ -100,5 +107,5 @@ function TablesView({ state }: { state: ReturnType<typeof useFoodFlow>["state"] 
 
 function ActivityView({ state }: { state: ReturnType<typeof useFoodFlow>["state"] }) {
   const events = [...state.auditEvents].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  return <div><SectionHeading eyebrow="Audit trail" title="Recent activity" description="Important operational and management actions include their actor, entity, timestamp, and reason." action={<Badge>{events.length} events</Badge>} />{events.length === 0 ? <div className="mt-6"><EmptyState icon={<ListChecks className="size-5" />} title="No activity yet" /></div> : <div className="mt-6 overflow-hidden rounded-lg border border-border bg-card">{events.map((event, index) => <div className={`grid gap-3 px-4 py-4 sm:grid-cols-[44px_minmax(0,1fr)_160px_170px] sm:items-center ${index ? "border-t border-border" : ""}`} key={event.id}><span className="grid size-9 place-items-center rounded-md bg-muted text-foreground"><Activity className="size-4" /></span><div><p className="text-sm font-semibold text-foreground">{event.summary}</p><p className="mt-1 text-[10px] text-foreground/38">{event.entityType} - {event.entityId}</p></div><div><p className="text-xs font-semibold text-foreground/58">{event.actorName}</p>{event.reason && <p className="mt-1 truncate text-[10px] italic text-primary-foreground">{event.reason}</p>}</div><time className="text-xs text-foreground/42">{formatBangkokDateTime(event.timestamp)}</time></div>)}</div>}</div>;
+  return <div><SectionHeading eyebrow="Audit trail" title="Recent activity" description="Important operational and management actions include their actor, entity, timestamp, and reason." action={<Badge>{events.length} events</Badge>} />{events.length === 0 ? <div className="mt-6"><EmptyState icon={<ListChecks className="size-5" />} title="No activity yet" /></div> : <div className="mt-6 overflow-hidden rounded-lg border border-border bg-card">{events.map((event, index) => <div className={`grid gap-3 px-4 py-4 sm:grid-cols-[44px_minmax(0,1fr)_160px_170px] sm:items-center ${index ? "border-t border-border" : ""}`} key={event.id}><span className="grid size-9 place-items-center rounded-md bg-muted text-foreground"><Activity className="size-4" /></span><div><p className="text-sm font-semibold text-foreground">{event.summary}</p><p className="mt-1 text-[10px] text-foreground/38">{event.entityType} - {event.entityId}</p></div><div><p className="text-xs font-semibold text-foreground/58">{event.actorName}</p>{event.reason && <p className="mt-1 truncate text-[10px] italic text-amber-700 dark:text-amber-300">{event.reason}</p>}</div><time className="text-xs text-foreground/42">{formatBangkokDateTime(event.timestamp)}</time></div>)}</div>}</div>;
 }

@@ -16,7 +16,20 @@ import {
 } from "lucide-react";
 
 import { FoodImage } from "@/components/menu/food-image";
-import { Badge, Button, Card, EmptyState, Input, Label, Modal, SectionHeading, StatusPill, Switch, Tabs, Textarea } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Label,
+  Modal,
+  SectionHeading,
+  StatusPill,
+  Switch,
+  Tabs,
+  Textarea,
+} from "@/components/foodflow-ui";
 import type { Category, DayOfWeek, MenuAvailability, MenuBadge, MenuImageKey, MenuItem, MenuItemStatus, ModifierChoice, ModifierGroup } from "@/domain";
 import { formatTHB } from "@/lib/currency";
 import { useFoodFlow } from "@/store";
