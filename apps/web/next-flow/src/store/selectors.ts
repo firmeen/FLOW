@@ -1,62 +1,11 @@
 import type {
-  DayOfWeek,
   FoodFlowState,
   KitchenTicketStatus,
-  MenuAvailability,
   Order,
   PaymentMethod,
   Table,
 } from "@/domain";
-
-const dayNames: DayOfWeek[] = [
-  "SUNDAY",
-  "MONDAY",
-  "TUESDAY",
-  "WEDNESDAY",
-  "THURSDAY",
-  "FRIDAY",
-  "SATURDAY",
-];
-
-const timeInTimezone = (date: Date, timezone: string) =>
-  new Intl.DateTimeFormat("en-GB", {
-    timeZone: timezone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(date);
-
-export const isMenuAvailabilityActive = (
-  availability: MenuAvailability,
-  date = new Date(),
-): boolean => {
-  if (!availability.active) return false;
-  if (availability.type === "ALWAYS") return true;
-  const weekdayIndex = Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: availability.timezone,
-      weekday: "short",
-    })
-      .formatToParts(date)
-      .find((part) => part.type === "weekday")
-      ?.value
-      .replace(
-        /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/,
-        (short) =>
-          String(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(short)),
-      ),
-  );
-  const day = dayNames[Number.isFinite(weekdayIndex) ? weekdayIndex : date.getDay()];
-  if (
-    availability.daysOfWeek.length > 0 &&
-    !availability.daysOfWeek.includes(day)
-  ) {
-    return false;
-  }
-  if (!availability.startTime || !availability.endTime) return true;
-  const time = timeInTimezone(date, availability.timezone);
-  return time >= availability.startTime && time <= availability.endTime;
-};
+import { isMenuAvailabilityActive } from "@/domain";
 
 export const selectTableByCode = (
   state: FoodFlowState,
@@ -95,7 +44,9 @@ export const selectCustomerMenuItems = (
   date = new Date(),
 ) => {
   const activeCategoryIds = new Set(
-    state.categories.filter((category) => category.active).map(({ id }) => id),
+    state.categories
+      .filter((category) => category.active && !category.archivedAt)
+      .map(({ id }) => id),
   );
   const availability = new Map(
     state.menuAvailabilities.map((rule) => [rule.id, rule]),
@@ -105,7 +56,7 @@ export const selectCustomerMenuItems = (
       if (item.status !== "ACTIVE" && item.status !== "SOLD_OUT") return false;
       if (!activeCategoryIds.has(item.categoryId)) return false;
       const rule = availability.get(item.availabilityId);
-      return rule ? isMenuAvailabilityActive(rule, date) : true;
+      return rule ? isMenuAvailabilityActive(rule, date) : false;
     })
     .sort((a, b) => a.displayOrder - b.displayOrder);
 };
@@ -234,9 +185,15 @@ export const selectTopSellingItems = (
   state: FoodFlowState,
   limit = 5,
 ) => {
-  const totals = new Map<string, { menuItemId: string; name: string; quantity: number; sales: number }>();
+  const totals = new Map<
+    string,
+    { menuItemId: string; name: string; quantity: number; sales: number }
+  >();
   state.orders
-    .filter((order) => !["DRAFT", "REJECTED", "CANCELLED", "VOIDED"].includes(order.status))
+    .filter(
+      (order) =>
+        !["DRAFT", "REJECTED", "CANCELLED", "VOIDED"].includes(order.status),
+    )
     .forEach((order) =>
       order.items.forEach((item) => {
         const current = totals.get(item.menuItemId);
