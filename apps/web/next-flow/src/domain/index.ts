@@ -1,6 +1,7 @@
 export * from "./audit";
 export * from "./kitchen";
 export * from "./menu";
+export * from "./menu-rules";
 export * from "./order";
 export * from "./payment";
 export * from "./restaurant";

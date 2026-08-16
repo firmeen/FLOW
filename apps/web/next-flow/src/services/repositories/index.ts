@@ -91,6 +91,7 @@ export * from "./helpers";
 export * from "./kitchen-repository";
 export * from "./menu-repository";
 export * from "./order-repository";
+export * from "./payment-calculation";
 export * from "./payment-repository";
 export * from "./service-repository";
 export * from "./state-repository";

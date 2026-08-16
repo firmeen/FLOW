@@ -6,7 +6,12 @@ import { Check, Minus, Plus, X } from "lucide-react";
 import { FoodImage } from "@/components/menu/food-image";
 import { Badge, Button, useDialogFocus } from "@/components/foodflow-ui";
 import { IconButton } from "@/components/ui/icon-button";
-import type { MenuBadge, MenuItem, ModifierGroup } from "@/domain";
+import {
+  getMissingRequiredModifierGroupIds,
+  type MenuBadge,
+  type MenuItem,
+  type ModifierGroup,
+} from "@/domain";
 import { formatTHB, formatTHBAdjustment } from "@/lib/currency";
 
 import type { CustomerCartLine } from "./types";
@@ -46,15 +51,20 @@ export function ProductSheet({ item, modifierGroups, badges, initialLine, onClos
 
   if (!item) return null;
 
+  const selections = Object.entries(selected).flatMap(([modifierGroupId, ids]) =>
+    ids.map((modifierChoiceId) => ({ modifierGroupId, modifierChoiceId })),
+  );
   const modifierTotal = groups.reduce((sum, group) => {
     const ids = selected[group.id] ?? [];
     return sum + group.choices.filter((choice) => ids.includes(choice.id)).reduce((choiceSum, choice) => choiceSum + choice.priceDelta, 0);
   }, 0);
   const total = (item.basePrice + modifierTotal) * quantity;
-  const valid = groups.every((group) => {
-    const count = selected[group.id]?.length ?? 0;
-    return count >= group.minimumSelections && count <= group.maximumSelections;
-  });
+  const valid =
+    getMissingRequiredModifierGroupIds(item, modifierGroups, selections).length === 0 &&
+    groups.every((group) => {
+      const count = selected[group.id]?.length ?? 0;
+      return count <= group.maximumSelections;
+    });
 
   function toggleChoice(group: ModifierGroup, choiceId: string) {
     setSelected((current) => {
@@ -72,9 +82,7 @@ export function ProductSheet({ item, modifierGroups, badges, initialLine, onClos
       id: initialLine?.id ?? `cart-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       menuItemId: item!.id,
       quantity,
-      modifiers: Object.entries(selected).flatMap(([modifierGroupId, ids]) =>
-        ids.map((modifierChoiceId) => ({ modifierGroupId, modifierChoiceId })),
-      ),
+      modifiers: selections,
       specialRequest: specialRequest.trim() || undefined,
     });
     onClose();
