@@ -1,0 +1,48 @@
+name: Supabase Database Quality
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "supabase/**"
+      - ".github/workflows/supabase-db-quality.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/**"
+      - ".github/workflows/supabase-db-quality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Install application dependencies
+        working-directory: apps/web/next-flow
+        run: npm ci
+
+      - name: Start local Supabase
+        run: ./apps/web/next-flow/node_modules/.bin/supabase start
+
+      - name: Reset migrations and seed
+        run: ./apps/web/next-flow/node_modules/.bin/supabase db reset --local
+
+      - name: Database tests
+        run: ./apps/web/next-flow/node_modules/.bin/supabase test db --local
+
+      - name: Database lint
+        run: ./apps/web/next-flow/node_modules/.bin/supabase db lint --local --schema app,foodflow,payments,audit,private --level warning --fail-on error
