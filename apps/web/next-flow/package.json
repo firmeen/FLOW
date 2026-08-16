@@ -19,7 +19,7 @@
     "db:verify-types": "node scripts/verify-database-types.mjs"
   },
   "dependencies": {
-    "@auth/core": "^0.41.3",
+    "@auth/core": "0.41.3",
     "@base-ui/react": "^1.7.0",
     "@supabase/server": "^1.4.1",
     "@supabase/ssr": "^0.12.4",
@@ -30,6 +30,7 @@
     "kysely": "0.29.4",
     "lucide-react": "^1.31.0",
     "next": "16.3.0",
+    "next-auth": "5.0.0-beta.32",
     "pg": "8.22.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
