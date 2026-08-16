@@ -15,8 +15,8 @@
     "test:integration": "vitest run tests/integration",
     "test:db-runtime": "vitest run tests/integration/database-runtime.test.ts",
     "test:e2e": "playwright test",
-    "db:generate": "kysely-codegen --dialect postgres --url $DATABASE_DIRECT_URL --out-file src/server/db/generated/database.ts --schemas app,foodflow,payments,audit",
-    "db:verify-types": "npm run db:generate && git diff --exit-code -- src/server/db/generated/database.ts"
+    "db:generate": "node scripts/generate-database-types.mjs",
+    "db:verify-types": "node scripts/verify-database-types.mjs"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
