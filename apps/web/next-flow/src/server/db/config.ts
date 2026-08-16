@@ -11,6 +11,14 @@ export interface DatabaseRuntimeConfig {
   idleTimeoutMillis: number;
 }
 
+type DatabaseEnvironment = Pick<
+  NodeJS.ProcessEnv,
+  | "DATABASE_URL"
+  | "DATABASE_POOL_MAX"
+  | "DATABASE_CONNECTION_TIMEOUT_MS"
+  | "DATABASE_IDLE_TIMEOUT_MS"
+>;
+
 export class DatabaseConfigurationError extends Error {
   constructor(message: string) {
     super(message);
@@ -41,7 +49,7 @@ function parsePositiveInteger(
 }
 
 export function getDatabaseConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<DatabaseEnvironment> = process.env,
 ): DatabaseRuntimeConfig {
   const connectionString = env.DATABASE_URL?.trim();
   if (!connectionString) {
