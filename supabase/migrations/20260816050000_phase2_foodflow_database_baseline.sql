@@ -94,6 +94,7 @@ create table app.branches (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (tenant_id, id),
+  unique (tenant_id, restaurant_id, id),
   unique (tenant_id, restaurant_id, code),
   foreign key (tenant_id) references app.organizations(id) on delete restrict,
   foreign key (tenant_id, restaurant_id) references app.restaurants(tenant_id, id) on delete restrict
@@ -198,6 +199,7 @@ create table foodflow.restaurant_tables (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (tenant_id, id),
+  unique (tenant_id, branch_id, id),
   unique (tenant_id, branch_id, code),
   foreign key (tenant_id, branch_id) references app.branches(tenant_id, id) on delete restrict
 );
@@ -217,6 +219,7 @@ create table foodflow.table_sessions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (tenant_id, id),
+  unique (tenant_id, branch_id, id),
   unique (tenant_id, branch_id, session_number),
   check ((status = 'CLOSED' and closed_at is not null) or status <> 'CLOSED'),
   foreign key (tenant_id, branch_id) references app.branches(tenant_id, id) on delete restrict,
@@ -297,6 +300,7 @@ create table foodflow.modifier_groups (
   display_order integer not null default 0 check (display_order >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  unique (tenant_id, id),
   unique (tenant_id, restaurant_id, id),
   check (maximum_selections >= minimum_selections),
   foreign key (tenant_id, restaurant_id) references app.restaurants(tenant_id, id) on delete restrict
@@ -314,6 +318,8 @@ create table foodflow.modifier_choices (
   display_order integer not null default 0 check (display_order >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  unique (tenant_id, id),
+  unique (tenant_id, modifier_group_id, id),
   unique (tenant_id, restaurant_id, modifier_group_id, id),
   foreign key (tenant_id, restaurant_id, modifier_group_id) references foodflow.modifier_groups(tenant_id, restaurant_id, id) on delete restrict
 );
@@ -341,6 +347,7 @@ create table foodflow.menu_items (
   archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  unique (tenant_id, id),
   unique (tenant_id, restaurant_id, id),
   foreign key (tenant_id, restaurant_id, category_id) references foodflow.menu_categories(tenant_id, restaurant_id, id) on delete restrict,
   foreign key (tenant_id, restaurant_id, availability_id) references foodflow.menu_availabilities(tenant_id, restaurant_id, id) on delete restrict
@@ -581,9 +588,11 @@ create table payments.payments (
   created_at timestamptz not null default now(),
   unique (tenant_id, id),
   unique (tenant_id, branch_id, reference),
-  check ((discount_type = 'FIXED' and discount_value_minor is not null and discount_value_minor >= 0 and discount_bps is null)
-      or (discount_type = 'PERCENT' and discount_bps between 0 and 10000 and discount_value_minor is null)
-      or (discount_type = 'NONE' and discount_bps is null and discount_value_minor is null)),
+  check (
+    (discount_type = 'NONE' and discount_value_minor is null and discount_bps is null) or
+    (discount_type = 'FIXED' and discount_value_minor is not null and discount_value_minor >= 0 and discount_bps is null) or
+    (discount_type = 'PERCENT' and discount_value_minor is null and discount_bps between 0 and 10000)
+  ),
   foreign key (tenant_id, restaurant_id) references app.restaurants(tenant_id, id) on delete restrict,
   foreign key (tenant_id, branch_id) references app.branches(tenant_id, id) on delete restrict,
   foreign key (tenant_id, table_id) references foodflow.restaurant_tables(tenant_id, id) on delete restrict,
@@ -628,7 +637,7 @@ create table audit.events (
   action text not null check (btrim(action) <> ''),
   entity_type text not null check (btrim(entity_type) <> ''),
   entity_id uuid,
-  summary text not null check (btrim(summary) <> ''),
+  summary text not null,
   reason text,
   metadata jsonb,
   occurred_at timestamptz not null default now(),
@@ -641,129 +650,99 @@ create table audit.events (
 
 create index restaurants_tenant_idx on app.restaurants (tenant_id);
 create index branches_tenant_restaurant_idx on app.branches (tenant_id, restaurant_id);
-create index tables_tenant_branch_idx on foodflow.restaurant_tables (tenant_id, branch_id, active, display_order);
-create index sessions_tenant_branch_status_idx on foodflow.table_sessions (tenant_id, branch_id, status, opened_at desc);
-create index categories_tenant_restaurant_idx on foodflow.menu_categories (tenant_id, restaurant_id, active, display_order);
-create index menu_items_tenant_category_idx on foodflow.menu_items (tenant_id, restaurant_id, category_id, status, display_order);
-create index modifier_groups_tenant_restaurant_idx on foodflow.modifier_groups (tenant_id, restaurant_id, active, display_order);
-create index carts_tenant_table_status_idx on foodflow.carts (tenant_id, table_id, status, updated_at desc);
-create index orders_tenant_session_idx on foodflow.orders (tenant_id, table_session_id, submitted_at desc);
-create index orders_tenant_status_idx on foodflow.orders (tenant_id, branch_id, status, submitted_at desc);
-create index kitchen_tenant_station_status_idx on foodflow.kitchen_tickets (tenant_id, branch_id, station, status, created_at);
-create index service_tenant_status_idx on foodflow.service_requests (tenant_id, branch_id, status, requested_at);
-create index payments_tenant_session_idx on payments.payments (tenant_id, table_session_id, recorded_at desc);
-create index allocations_order_idx on payments.payment_allocations (tenant_id, order_id);
-create index audit_tenant_time_idx on audit.events (tenant_id, branch_id, occurred_at desc);
+create index branch_hours_branch_idx on app.branch_opening_hours (tenant_id, branch_id, day_of_week, display_order);
+create index memberships_user_idx on app.memberships (user_id, status);
+create index restaurant_tables_branch_idx on foodflow.restaurant_tables (tenant_id, branch_id, active, display_order);
+create index table_sessions_branch_status_idx on foodflow.table_sessions (tenant_id, branch_id, status, opened_at desc);
+create index menu_categories_restaurant_idx on foodflow.menu_categories (tenant_id, restaurant_id, active, display_order);
+create index modifier_groups_restaurant_idx on foodflow.modifier_groups (tenant_id, restaurant_id, active, display_order);
+create index menu_items_restaurant_category_idx on foodflow.menu_items (tenant_id, restaurant_id, category_id, status, display_order);
+create index carts_table_status_idx on foodflow.carts (tenant_id, table_id, status, updated_at desc);
+create index cart_items_cart_idx on foodflow.cart_items (tenant_id, cart_id, created_at);
+create index orders_session_idx on foodflow.orders (tenant_id, table_session_id, submitted_at desc);
+create index orders_branch_status_idx on foodflow.orders (tenant_id, branch_id, status, submitted_at desc);
+create index kitchen_tickets_queue_idx on foodflow.kitchen_tickets (tenant_id, branch_id, station, status, created_at);
+create index service_requests_queue_idx on foodflow.service_requests (tenant_id, branch_id, status, requested_at);
+create index payments_session_idx on payments.payments (tenant_id, table_session_id, recorded_at desc);
+create index audit_events_tenant_time_idx on audit.events (tenant_id, occurred_at desc);
 
-alter table app.organizations enable row level security;
-alter table app.restaurants enable row level security;
-alter table app.branches enable row level security;
-alter table app.branch_opening_hours enable row level security;
-alter table app.branch_settings enable row level security;
-alter table app.roles enable row level security;
-alter table app.memberships enable row level security;
-alter table foodflow.restaurant_tables enable row level security;
-alter table foodflow.table_sessions enable row level security;
-alter table foodflow.menu_categories enable row level security;
-alter table foodflow.menu_badges enable row level security;
-alter table foodflow.menu_availabilities enable row level security;
-alter table foodflow.menu_availability_windows enable row level security;
-alter table foodflow.modifier_groups enable row level security;
-alter table foodflow.modifier_choices enable row level security;
-alter table foodflow.menu_items enable row level security;
-alter table foodflow.menu_item_modifier_groups enable row level security;
-alter table foodflow.menu_item_badges enable row level security;
-alter table foodflow.carts enable row level security;
-alter table foodflow.cart_items enable row level security;
-alter table foodflow.cart_item_modifiers enable row level security;
-alter table foodflow.orders enable row level security;
-alter table foodflow.order_items enable row level security;
-alter table foodflow.order_item_modifiers enable row level security;
-alter table foodflow.order_events enable row level security;
-alter table foodflow.kitchen_tickets enable row level security;
-alter table foodflow.kitchen_ticket_items enable row level security;
-alter table foodflow.service_requests enable row level security;
-alter table payments.payments enable row level security;
-alter table payments.payment_allocations enable row level security;
-alter table payments.payment_events enable row level security;
-alter table audit.events enable row level security;
+-- Shared canonical updated_at trigger.
+create trigger organizations_set_updated_at before update on app.organizations for each row execute function private.set_updated_at();
+create trigger restaurants_set_updated_at before update on app.restaurants for each row execute function private.set_updated_at();
+create trigger branches_set_updated_at before update on app.branches for each row execute function private.set_updated_at();
+create trigger branch_settings_set_updated_at before update on app.branch_settings for each row execute function private.set_updated_at();
+create trigger users_set_updated_at before update on app.users for each row execute function private.set_updated_at();
+create trigger memberships_set_updated_at before update on app.memberships for each row execute function private.set_updated_at();
+create trigger restaurant_tables_set_updated_at before update on foodflow.restaurant_tables for each row execute function private.set_updated_at();
+create trigger table_sessions_set_updated_at before update on foodflow.table_sessions for each row execute function private.set_updated_at();
+create trigger menu_categories_set_updated_at before update on foodflow.menu_categories for each row execute function private.set_updated_at();
+create trigger menu_badges_set_updated_at before update on foodflow.menu_badges for each row execute function private.set_updated_at();
+create trigger menu_availabilities_set_updated_at before update on foodflow.menu_availabilities for each row execute function private.set_updated_at();
+create trigger modifier_groups_set_updated_at before update on foodflow.modifier_groups for each row execute function private.set_updated_at();
+create trigger modifier_choices_set_updated_at before update on foodflow.modifier_choices for each row execute function private.set_updated_at();
+create trigger menu_items_set_updated_at before update on foodflow.menu_items for each row execute function private.set_updated_at();
+create trigger carts_set_updated_at before update on foodflow.carts for each row execute function private.set_updated_at();
+create trigger cart_items_set_updated_at before update on foodflow.cart_items for each row execute function private.set_updated_at();
+create trigger orders_set_updated_at before update on foodflow.orders for each row execute function private.set_updated_at();
 
-alter table app.organizations force row level security;
-alter table app.restaurants force row level security;
-alter table app.branches force row level security;
-alter table app.branch_opening_hours force row level security;
-alter table app.branch_settings force row level security;
-alter table app.roles force row level security;
-alter table app.memberships force row level security;
-alter table foodflow.restaurant_tables force row level security;
-alter table foodflow.table_sessions force row level security;
-alter table foodflow.menu_categories force row level security;
-alter table foodflow.menu_badges force row level security;
-alter table foodflow.menu_availabilities force row level security;
-alter table foodflow.menu_availability_windows force row level security;
-alter table foodflow.modifier_groups force row level security;
-alter table foodflow.modifier_choices force row level security;
-alter table foodflow.menu_items force row level security;
-alter table foodflow.menu_item_modifier_groups force row level security;
-alter table foodflow.menu_item_badges force row level security;
-alter table foodflow.carts force row level security;
-alter table foodflow.cart_items force row level security;
-alter table foodflow.cart_item_modifiers force row level security;
-alter table foodflow.orders force row level security;
-alter table foodflow.order_items force row level security;
-alter table foodflow.order_item_modifiers force row level security;
-alter table foodflow.order_events force row level security;
-alter table foodflow.kitchen_tickets force row level security;
-alter table foodflow.kitchen_ticket_items force row level security;
-alter table foodflow.service_requests force row level security;
-alter table payments.payments force row level security;
-alter table payments.payment_allocations force row level security;
-alter table payments.payment_events force row level security;
-alter table audit.events force row level security;
+comment on column foodflow.table_sessions.customer_capability_digest is 'Digest of a future customer table-session capability. Raw capability tokens must never be stored.';
+comment on table foodflow.order_items is 'Immutable order-time menu snapshot. Mutable menu data must not rewrite historical order facts.';
+comment on table foodflow.order_item_modifiers is 'Immutable order-time modifier snapshot for historical display and financial correctness.';
+comment on table audit.events is 'Append-oriented tenant audit history. Runtime mutation is intentionally restricted.';
 
-do $$
+-- Tenant-owned tables use RLS as a defense-in-depth baseline for the future server runtime.
+do $rls$
 declare
-  r record;
+  target record;
 begin
-  for r in
-    select n.nspname as schema_name, c.relname as table_name
-    from pg_class c
-    join pg_namespace n on n.oid = c.relnamespace
-    join pg_attribute a on a.attrelid = c.oid and a.attname = 'tenant_id' and a.attnum > 0 and not a.attisdropped
-    where c.relkind = 'r'
-      and n.nspname in ('app','foodflow','payments','audit')
-      and c.relname not in ('users','permissions','role_permissions')
+  for target in
+    select * from (values
+      ('app','organizations'),
+      ('app','restaurants'),
+      ('app','branches'),
+      ('app','branch_opening_hours'),
+      ('app','branch_settings'),
+      ('app','roles'),
+      ('app','memberships'),
+      ('foodflow','restaurant_tables'),
+      ('foodflow','table_sessions'),
+      ('foodflow','menu_categories'),
+      ('foodflow','menu_badges'),
+      ('foodflow','menu_availabilities'),
+      ('foodflow','menu_availability_windows'),
+      ('foodflow','modifier_groups'),
+      ('foodflow','modifier_choices'),
+      ('foodflow','menu_items'),
+      ('foodflow','menu_item_modifier_groups'),
+      ('foodflow','menu_item_badges'),
+      ('foodflow','carts'),
+      ('foodflow','cart_items'),
+      ('foodflow','cart_item_modifiers'),
+      ('foodflow','orders'),
+      ('foodflow','order_items'),
+      ('foodflow','order_item_modifiers'),
+      ('foodflow','order_events'),
+      ('foodflow','kitchen_tickets'),
+      ('foodflow','kitchen_ticket_items'),
+      ('foodflow','service_requests'),
+      ('payments','payments'),
+      ('payments','payment_allocations'),
+      ('payments','payment_events'),
+      ('audit','events')
+    ) as t(schema_name, table_name)
   loop
-    execute format('grant select, insert, update, delete on table %I.%I to flow_runtime', r.schema_name, r.table_name);
-    execute format('create policy tenant_select on %I.%I for select to flow_runtime using (tenant_id = private.current_tenant_id())', r.schema_name, r.table_name);
-    execute format('create policy tenant_insert on %I.%I for insert to flow_runtime with check (tenant_id = private.current_tenant_id())', r.schema_name, r.table_name);
-    execute format('create policy tenant_update on %I.%I for update to flow_runtime using (tenant_id = private.current_tenant_id()) with check (tenant_id = private.current_tenant_id())', r.schema_name, r.table_name);
-    execute format('create policy tenant_delete on %I.%I for delete to flow_runtime using (tenant_id = private.current_tenant_id())', r.schema_name, r.table_name);
+    execute format('alter table %I.%I enable row level security', target.schema_name, target.table_name);
+    execute format('alter table %I.%I force row level security', target.schema_name, target.table_name);
+    execute format(
+      'create policy tenant_isolation on %I.%I for all to flow_runtime using (tenant_id = private.current_tenant_id()) with check (tenant_id = private.current_tenant_id())',
+      target.schema_name,
+      target.table_name
+    );
   end loop;
-end $$;
+end
+$rls$;
 
+grant select, insert, update, delete on all tables in schema app, foodflow, payments to flow_runtime;
+revoke all on app.users, app.permissions, app.role_permissions from flow_runtime;
+grant select, insert on audit.events to flow_runtime;
 revoke update, delete on audit.events from flow_runtime;
-
-comment on table app.organizations is 'Tenant root. Phase 2 RLS uses this tenant id as the database isolation boundary.';
-comment on column foodflow.table_sessions.customer_capability_digest is 'Digest only; never persist the raw customer capability token.';
-comment on table foodflow.order_items is 'Immutable order-line snapshot fields must remain independent from future mutable menu changes.';
-comment on table foodflow.order_item_modifiers is 'Immutable modifier snapshots preserve historical names and price deltas.';
-comment on table audit.events is 'Append-oriented tenant audit history; normal runtime mutation is intentionally restricted.';
-
-create trigger organizations_updated_at before update on app.organizations for each row execute function private.set_updated_at();
-create trigger restaurants_updated_at before update on app.restaurants for each row execute function private.set_updated_at();
-create trigger branches_updated_at before update on app.branches for each row execute function private.set_updated_at();
-create trigger branch_settings_updated_at before update on app.branch_settings for each row execute function private.set_updated_at();
-create trigger users_updated_at before update on app.users for each row execute function private.set_updated_at();
-create trigger memberships_updated_at before update on app.memberships for each row execute function private.set_updated_at();
-create trigger restaurant_tables_updated_at before update on foodflow.restaurant_tables for each row execute function private.set_updated_at();
-create trigger table_sessions_updated_at before update on foodflow.table_sessions for each row execute function private.set_updated_at();
-create trigger menu_categories_updated_at before update on foodflow.menu_categories for each row execute function private.set_updated_at();
-create trigger menu_badges_updated_at before update on foodflow.menu_badges for each row execute function private.set_updated_at();
-create trigger menu_availabilities_updated_at before update on foodflow.menu_availabilities for each row execute function private.set_updated_at();
-create trigger modifier_groups_updated_at before update on foodflow.modifier_groups for each row execute function private.set_updated_at();
-create trigger modifier_choices_updated_at before update on foodflow.modifier_choices for each row execute function private.set_updated_at();
-create trigger menu_items_updated_at before update on foodflow.menu_items for each row execute function private.set_updated_at();
-create trigger carts_updated_at before update on foodflow.carts for each row execute function private.set_updated_at();
-create trigger cart_items_updated_at before update on foodflow.cart_items for each row execute function private.set_updated_at();
-create trigger orders_updated_at before update on foodflow.orders for each row execute function private.set_updated_at();
