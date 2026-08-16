@@ -11,8 +11,8 @@ import {
   requireNonEmptyReason,
   requireSession,
   requireTable,
-  roundCurrency,
 } from "./helpers";
+import { calculateBill } from "./payment-calculation";
 import type { MutationResult, RecordPaymentResult } from "./types";
 
 export const recordPayment = (
@@ -32,43 +32,30 @@ export const recordPayment = (
   if (!payableOrders.length) {
     throw new Error("There are no payable orders in this session.");
   }
-  const subtotal = roundCurrency(
-    payableOrders.reduce((sum, order) => sum + order.subtotal, 0),
-  );
+
   const discountType = input.discountType ?? "NONE";
   const requestedDiscount = Math.max(0, input.discountValue ?? 0);
-  const discountAmount = roundCurrency(
-    discountType === "FIXED"
-      ? Math.min(subtotal, requestedDiscount)
-      : discountType === "PERCENT"
-        ? (subtotal * Math.min(requestedDiscount, 100)) / 100
-        : 0,
-  );
-  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
   const serviceChargeEnabled =
     input.serviceChargeEnabled ?? initialState.settings.serviceChargeEnabled;
   const serviceChargePercent = Math.max(
     0,
     input.serviceChargePercent ?? initialState.settings.serviceChargePercent,
   );
-  const serviceChargeAmount = roundCurrency(
-    serviceChargeEnabled
-      ? (discountedSubtotal * serviceChargePercent) / 100
-      : 0,
-  );
   const vatEnabled = input.vatEnabled ?? initialState.settings.vatEnabled;
   const vatPercent = Math.max(
     0,
     input.vatPercent ?? initialState.settings.vatPercent,
   );
-  const vatAmount = roundCurrency(
-    vatEnabled
-      ? ((discountedSubtotal + serviceChargeAmount) * vatPercent) / 100
-      : 0,
-  );
-  const total = roundCurrency(
-    discountedSubtotal + serviceChargeAmount + vatAmount,
-  );
+  const bill = calculateBill({
+    session,
+    orders: initialState.orders,
+    discountType,
+    discountValue: requestedDiscount,
+    serviceChargeEnabled,
+    serviceChargePercent,
+    vatEnabled,
+    vatPercent,
+  });
   const timestamp = now();
   const actor = getActor(
     initialState,
@@ -87,20 +74,20 @@ export const recordPayment = (
     method: input.method,
     status: "RECORDED",
     currency: initialState.restaurant.currency,
-    subtotal,
+    subtotal: bill.subtotal,
     discount: {
       type: discountType,
       value: requestedDiscount,
-      amount: discountAmount,
+      amount: bill.discountAmount,
       reason: input.discountReason?.trim() || undefined,
     },
     serviceChargeEnabled,
     serviceChargePercent,
-    serviceChargeAmount,
+    serviceChargeAmount: bill.serviceChargeAmount,
     vatEnabled,
     vatPercent,
-    vatAmount,
-    total,
+    vatAmount: bill.vatAmount,
+    total: bill.total,
     recordedAt: timestamp,
     recordedBy: actor.id,
   };
@@ -140,7 +127,7 @@ export const recordPayment = (
         : request,
     ),
   };
-  if (discountAmount > 0) {
+  if (bill.discountAmount > 0) {
     state = addAudit(state, {
       actorId: actor.id,
       fallbackActorId: actor.id,
@@ -148,7 +135,7 @@ export const recordPayment = (
       action: "DISCOUNT_APPLIED",
       entityType: "PAYMENT",
       entityId: payment.id,
-      summary: `Applied THB ${discountAmount.toFixed(2)} discount to ${table.label}`,
+      summary: `Applied THB ${bill.discountAmount.toFixed(2)} discount to ${table.label}`,
       reason: input.discountReason?.trim() || undefined,
       timestamp,
     });
@@ -160,8 +147,8 @@ export const recordPayment = (
     action: "PAYMENT_RECORDED",
     entityType: "PAYMENT",
     entityId: payment.id,
-    summary: `Recorded ${input.method.replace(/_/g, " ")} payment of THB ${total.toFixed(2)} for ${table.label}`,
-    metadata: { total, method: input.method },
+    summary: `Recorded ${input.method.replace(/_/g, " ")} payment of THB ${bill.total.toFixed(2)} for ${table.label}`,
+    metadata: { total: bill.total, method: input.method },
     timestamp,
   });
   state = addAudit(state, {
@@ -174,7 +161,10 @@ export const recordPayment = (
     summary: `Closed ${table.label} session ${session.sessionNumber}`,
     timestamp,
   });
-  return { state, value: { paymentId: payment.id, total } };
+  return {
+    state,
+    value: { paymentId: payment.id, total: bill.total },
+  };
 };
 
 export const voidPayment = (
