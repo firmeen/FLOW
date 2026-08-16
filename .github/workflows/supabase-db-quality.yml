@@ -6,12 +6,24 @@ on:
       - main
     paths:
       - "supabase/**"
+      - "apps/web/next-flow/src/server/db/**"
+      - "apps/web/next-flow/tests/integration/database-runtime.test.ts"
+      - "apps/web/next-flow/tests/unit/database-*.test.ts"
+      - "apps/web/next-flow/scripts/*database-types.mjs"
+      - "apps/web/next-flow/package.json"
+      - "apps/web/next-flow/package-lock.json"
       - ".github/workflows/supabase-db-quality.yml"
   push:
     branches:
       - main
     paths:
       - "supabase/**"
+      - "apps/web/next-flow/src/server/db/**"
+      - "apps/web/next-flow/tests/integration/database-runtime.test.ts"
+      - "apps/web/next-flow/tests/unit/database-*.test.ts"
+      - "apps/web/next-flow/scripts/*database-types.mjs"
+      - "apps/web/next-flow/package.json"
+      - "apps/web/next-flow/package-lock.json"
       - ".github/workflows/supabase-db-quality.yml"
 
 permissions:
@@ -36,13 +48,43 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase
-        run: ./apps/web/next-flow/node_modules/.bin/supabase start
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if ./apps/web/next-flow/node_modules/.bin/supabase start; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Supabase start failed after 3 attempts."
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
 
       - name: Reset migrations and seed
         run: ./apps/web/next-flow/node_modules/.bin/supabase db reset --local
 
-      - name: Database tests
+      - name: Database SQL tests
         run: ./apps/web/next-flow/node_modules/.bin/supabase test db --local
 
       - name: Database lint
         run: ./apps/web/next-flow/node_modules/.bin/supabase db lint --local --schema app,foodflow,payments,audit,private --level warning --fail-on error
+
+      - name: Generate Kysely database types
+        working-directory: apps/web/next-flow
+        env:
+          DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: npm run db:generate
+
+      - name: Verify generated type drift
+        working-directory: apps/web/next-flow
+        run: git diff --exit-code -- src/server/db/generated/database.ts
+
+      - name: Database runtime integration tests
+        working-directory: apps/web/next-flow
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          DATABASE_POOL_MAX: 1
+        run: npm run test:db-runtime
