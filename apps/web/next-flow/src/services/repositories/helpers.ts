@@ -10,6 +10,7 @@ import type {
   Table,
   TableSession,
 } from "@/domain";
+import { isMenuAvailabilityActive } from "@/domain";
 
 export const createEntityId = (prefix: string): string => {
   const uuid =
@@ -216,6 +217,7 @@ export const getOrCreateSession = (
 export const makeOrderItems = (
   state: FoodFlowState,
   inputs: SubmitOrderItemInput[],
+  referenceDate = new Date(),
 ): OrderItem[] => {
   if (!inputs.length) {
     throw new Error("Add at least one item before sending the order.");
@@ -230,6 +232,19 @@ export const makeOrderItems = (
         `${menuItem?.name ?? "This item"} is not currently orderable.`,
       );
     }
+    const category = state.categories.find(
+      (candidate) => candidate.id === menuItem.categoryId,
+    );
+    if (!category?.active || category.archivedAt) {
+      throw new Error(`${menuItem.name} is not currently orderable.`);
+    }
+    const availability = state.menuAvailabilities.find(
+      (candidate) => candidate.id === menuItem.availabilityId,
+    );
+    if (!availability || !isMenuAvailabilityActive(availability, referenceDate)) {
+      throw new Error(`${menuItem.name} is not available at this time.`);
+    }
+
     const allowedModifierGroupIds = new Set(menuItem.modifierGroupIds);
     const selectedModifierChoices = new Set<string>();
     const modifiers = (input.modifiers ?? []).map((selection) => {
