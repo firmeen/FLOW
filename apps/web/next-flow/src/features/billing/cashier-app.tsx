@@ -31,6 +31,7 @@ import {
 import type { DiscountType, PaymentMethod, TableSession } from "@/domain";
 import { formatTHB } from "@/lib/currency";
 import { formatBangkokTime } from "@/lib/date";
+import { calculateBill } from "@/services/repositories";
 import { useFoodFlow } from "@/store";
 
 type CashierTab = "requests" | "active" | "paid";
@@ -161,7 +162,16 @@ export function CashierApp() {
                 {billRequests.map((request) => {
                   const table = state.tables.find((candidate) => candidate.id === request.tableId);
                   const session = state.tableSessions.find((candidate) => candidate.id === request.tableSessionId);
-                  const bill = session ? calculateBill(session, state.orders, 0, "NONE", false, 0, false, 0) : null;
+                  const bill = session
+                    ? calculateBill({
+                        session,
+                        orders: state.orders,
+                        serviceChargeEnabled: false,
+                        serviceChargePercent: 0,
+                        vatEnabled: false,
+                        vatPercent: 0,
+                      })
+                    : null;
                   return (
                     <Card className="p-5" key={request.id}>
                       <div className="flex items-start justify-between gap-4">
@@ -187,7 +197,14 @@ export function CashierApp() {
               <div className="overflow-hidden rounded-lg border border-border bg-card">
                 {openSessions.map((session, index) => {
                   const table = state.tables.find((candidate) => candidate.id === session.tableId);
-                  const bill = calculateBill(session, state.orders, 0, "NONE", false, 0, false, 0);
+                  const bill = calculateBill({
+                    session,
+                    orders: state.orders,
+                    serviceChargeEnabled: false,
+                    serviceChargePercent: 0,
+                    vatEnabled: false,
+                    vatPercent: 0,
+                  });
                   return (
                     <button className={`grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left transition hover:bg-muted sm:grid-cols-[140px_1fr_120px_auto] ${index ? "border-t border-border" : ""}`} key={session.id} onClick={() => openBill(session)}>
                       <div><p className="font-bold text-foreground">{table?.code}</p><p className="text-[10px] text-foreground/40">{session.sessionNumber}</p></div>
@@ -278,7 +295,16 @@ function BillDrawer(props: BillDrawerProps) {
   if (!session) return null;
   const table = state.tables.find((candidate) => candidate.id === session.tableId);
   const orders = session.orderIds.map((id) => state.orders.find((order) => order.id === id)).filter(Boolean);
-  const bill = calculateBill(session, state.orders, props.discountValue, props.discountType, props.serviceChargeEnabled, state.settings.serviceChargePercent, props.vatEnabled, state.settings.vatPercent);
+  const bill = calculateBill({
+    session,
+    orders: state.orders,
+    discountValue: props.discountValue,
+    discountType: props.discountType,
+    serviceChargeEnabled: props.serviceChargeEnabled,
+    serviceChargePercent: state.settings.serviceChargePercent,
+    vatEnabled: props.vatEnabled,
+    vatPercent: state.settings.vatPercent,
+  });
 
   return (
     <Drawer
@@ -329,13 +355,4 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 
 function BillRow({ label, value, muted = false }: { label: string; value: number; muted?: boolean }) {
   return <div className={`flex justify-between py-1 text-sm ${muted ? "text-white/58" : "text-white/82"}`}><span>{label}</span><span>{formatTHB(value)}</span></div>;
-}
-
-function calculateBill(session: TableSession, orders: ReturnType<typeof useFoodFlow>["state"]["orders"], discountValue: number, discountType: DiscountType, serviceEnabled: boolean, servicePercent: number, vatEnabled: boolean, vatPercent: number) {
-  const subtotal = session.orderIds.map((id) => orders.find((order) => order.id === id)).filter((order) => order && !["REJECTED", "CANCELLED", "VOIDED"].includes(order.status)).reduce((sum, order) => sum + (order?.subtotal ?? 0), 0);
-  const discountAmount = discountType === "FIXED" ? Math.min(subtotal, discountValue) : discountType === "PERCENT" ? subtotal * Math.min(100, discountValue) / 100 : 0;
-  const afterDiscount = Math.max(0, subtotal - discountAmount);
-  const serviceChargeAmount = serviceEnabled ? afterDiscount * servicePercent / 100 : 0;
-  const vatAmount = vatEnabled ? (afterDiscount + serviceChargeAmount) * vatPercent / 100 : 0;
-  return { subtotal, discountAmount, serviceChargeAmount, vatAmount, total: afterDiscount + serviceChargeAmount + vatAmount };
 }
