@@ -32,11 +32,6 @@ function createRuntime(): DatabaseRuntime {
 }
 
 export function getDatabaseRuntime(): DatabaseRuntime {
-  if (process.env.NODE_ENV === "development") {
-    globalThis.__flowDatabaseRuntime ??= createRuntime();
-    return globalThis.__flowDatabaseRuntime;
-  }
-
   globalThis.__flowDatabaseRuntime ??= createRuntime();
   return globalThis.__flowDatabaseRuntime;
 }
