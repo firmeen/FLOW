@@ -39,7 +39,11 @@ export const submitOrder = (
 
   const timestamp = now();
   const sessionResult = getOrCreateSession(initialState, input.tableId, timestamp);
-  const items = makeOrderItems(sessionResult.state, input.items);
+  const items = makeOrderItems(
+    sessionResult.state,
+    input.items,
+    new Date(timestamp),
+  );
   const order: Order = {
     id: input.orderId ?? createEntityId("order"),
     number: nextOrderNumber(sessionResult.state.orders),
@@ -188,8 +192,12 @@ export const changeOrder = (
   if (order.status !== "PENDING_CONFIRMATION") {
     throw new Error("Only an unconfirmed order can be edited.");
   }
-  const updatedItems = makeOrderItems(initialState, items);
   const timestamp = now();
+  const updatedItems = makeOrderItems(
+    initialState,
+    items,
+    new Date(timestamp),
+  );
   let state: FoodFlowState = {
     ...initialState,
     orders: initialState.orders.map((candidate) =>
