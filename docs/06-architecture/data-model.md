@@ -3,13 +3,15 @@ title: FLOW Data Model
 document_id: FLOW-ARCH-DATA
 status: proposed
 owner: Data Architecture
-last_reviewed: 2026-08-13
+last_reviewed: 2026-08-16
 source_of_truth: true
 ---
 
 # FLOW Data Model
 
 FLOW ใช้ Supabase Postgres เป็น Operational source of truth โดยออกแบบ Multi-tenancy, Product configuration และ Payment purpose separation ตั้งแต่ Schema/Constraint ไม่พึ่ง UI filter เพียงอย่างเดียว
+
+> **Implementation status — Phase 2/12:** repository มี PostgreSQL/Supabase relational baseline สำหรับ `app`, `foodflow`, `payments`, `audit` และ `private` แล้ว รวม tenant/composite-FK structure, tenant-context RLS foundation, local synthetic seed และ pgTAP database tests. `billing`, `careflow`, `jobflow` ถูก reserve namespace เท่านั้น. Next.js runtime ยังใช้ FoodFlowState/localStorage และยังไม่ได้เชื่อม database; Kysely/pg runtime เป็น Phase 3, identity/permission-aware authorization เป็น Phase 4 และ operational persistence integration เป็น Phase 5–8.
 
 ## Schema ownership
 
@@ -184,6 +186,8 @@ Policy ต้องตรวจ
 - View ที่เปิดผ่าน Data API ใช้ `security_invoker` เมื่อรองรับ หรือ revoke จาก public roles
 - Service/secret role ไม่ใช้ใน Browser และไม่ใช้เพื่อหลบ RLS bug
 
+Phase 2 implements only tenant matching/default-deny context using `flow_runtime`; membership, permission and branch/assignment authorization remain Phase 4.
+
 Test matrix ขั้นต่ำ
 
 | Test | Expected |
@@ -228,8 +232,8 @@ Deletion request ต้องแยก Erase, Anonymize, Restrict และ Lega
 
 ## Open decisions
 
-- UUID generation standard และ Typed query layer/ORM
-- Schema exposure ผ่าน Supabase Data API (Baseline: none for domain tables)
+- Typed query runtime wiring and generated database types (Phase 3)
+- Identity mapping and permission/branch RLS (Phase 4)
 - Durable queue/outbox worker implementation
 - Partitioning/archiving threshold สำหรับ Audit/Webhook/Payment events
 - Backup/PITR tier, restore RTO/RPO และ regional/data residency
