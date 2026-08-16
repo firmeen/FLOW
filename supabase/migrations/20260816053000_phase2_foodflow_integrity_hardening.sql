@@ -1,6 +1,3 @@
-alter table app.branches
-  add constraint branches_tenant_restaurant_id_unique unique (tenant_id, restaurant_id, id);
-
 alter table app.branch_settings
   drop constraint branch_settings_tenant_id_restaurant_id_fkey,
   drop constraint branch_settings_tenant_id_branch_id_fkey,
@@ -9,26 +6,12 @@ alter table app.branch_settings
     references app.branches(tenant_id, restaurant_id, id)
     on delete cascade;
 
-alter table foodflow.restaurant_tables
-  add constraint restaurant_tables_tenant_branch_id_unique unique (tenant_id, branch_id, id);
-
 alter table foodflow.table_sessions
-  add constraint table_sessions_tenant_branch_id_unique unique (tenant_id, branch_id, id),
   drop constraint table_sessions_tenant_id_table_id_fkey,
   add constraint table_sessions_branch_table_fkey
     foreign key (tenant_id, branch_id, table_id)
     references foodflow.restaurant_tables(tenant_id, branch_id, id)
     on delete restrict;
-
-alter table foodflow.modifier_groups
-  add constraint modifier_groups_tenant_id_unique unique (tenant_id, id);
-
-alter table foodflow.modifier_choices
-  add constraint modifier_choices_tenant_id_unique unique (tenant_id, id),
-  add constraint modifier_choices_tenant_group_id_unique unique (tenant_id, modifier_group_id, id);
-
-alter table foodflow.menu_items
-  add constraint menu_items_tenant_id_unique unique (tenant_id, id);
 
 alter table foodflow.carts
   drop constraint carts_tenant_id_table_id_fkey,
