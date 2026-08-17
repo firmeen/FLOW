@@ -16,10 +16,8 @@ on:
       - "apps/web/next-flow/package-lock.json"
       - ".github/workflows/dependency-integrity.yml"
 
-# TEMPORARY R01 REPAIR PERMISSION: used only to commit npm-generated lockfile
-# repair back to the current implementation branch. This is removed before merge.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   dependency-integrity:
@@ -30,10 +28,8 @@ jobs:
         working-directory: apps/web/next-flow
 
     steps:
-      - name: Checkout implementation branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -43,34 +39,4 @@ jobs:
           cache-dependency-path: apps/web/next-flow/package-lock.json
 
       - name: Clean install from committed dependency state
-        id: clean_install
-        continue-on-error: true
         run: npm ci
-
-      - name: Generate npm lockfile repair
-        if: steps.clean_install.outcome != 'success'
-        run: npm install --package-lock-only --ignore-scripts
-
-      - name: Commit npm-generated lockfile repair to implementation branch
-        if: steps.clean_install.outcome != 'success'
-        env:
-          TARGET_BRANCH: ${{ github.head_ref }}
-        working-directory: .
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/web/next-flow/package-lock.json
-          git diff --cached --quiet && {
-            echo "npm did not produce a lockfile change; refusing to fabricate one."
-            exit 1
-          }
-          git commit -m "fix(deps): synchronize npm lockfile for P01 R01"
-          git push origin "HEAD:${TARGET_BRANCH}"
-
-      - name: Enforce committed clean install
-        if: steps.clean_install.outcome != 'success'
-        run: |
-          echo "Committed dependency state was inconsistent."
-          echo "An npm-generated repair was pushed to the implementation branch; rerun on the new commit."
-          exit 1
