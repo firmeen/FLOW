@@ -1,7 +1,7 @@
 # FLOW P01 R03 — Implementation Specification
 
 > Phase 01 — Development Control + Baseline Recovery  
-> Round 03 — Fresh Database Bootstrap Recovery
+> Round 03 — Fresh Database Bootstrap + Structural Database Quality Recovery
 
 ---
 
@@ -17,14 +17,15 @@
 - Planned execution: `2026-08-19 04:00 Asia/Bangkok`
 - Owner approval required: `YES`
 - Automatic merge allowed: `NO`
-- Proposal issue: `#21`
-- Specification base SHA: `a368fcdbb7ead87fed4655a0ac92314f0d963e08`
+- Original proposal issue: `#21`
+- Boundary-correction issue: `#23`
+- Original specification base SHA: `a368fcdbb7ead87fed4655a0ac92314f0d963e08`
+- Specification amendment base SHA: `6c332ab1b3204135576bd987427603bb4dab7b1b`
 - Previous implementation PR: `#20`
-- Previous implementation merge SHA: `PENDING OWNER MERGE`
+- Previous implementation merge SHA: `02b804dd817cf485419801e8b9f8aa9cb939e3de`
 - Previous required checks: `Phase/Round Gate`, `Next Flow Quality`
-- Current inherited database evidence source: `P01/R02 PR #20`
+- Current inherited database evidence source: `P01/R02 PR #20` and its final `Supabase Database Quality` run
 - Current planning scope: `PHASE 01 / ROUND 03 ONLY`
-- Normal Phase 01 round slots: `04:00`, `12:00`, `20:00` Asia/Bangkok
 - Recommended implementation branch: `phase/01-round/03-fresh-database-bootstrap`
 - Recommended implementation PR title: `fix(database): recover P01 R03 fresh bootstrap baseline`
 
@@ -32,14 +33,16 @@
 
 ## Execution Authority Statement
 
-This specification proposes the executable authority for P01/R03 only after it is reviewed and merged to `main`.
+This specification is the executable authority for P01/R03 only after this corrected version is reviewed and merged to `main`.
 
-`Status: READY` does **not** bypass the previous-round gate.
+R02 is already owner-merged. That fact does not allow R03 implementation to start from an older copy of this specification.
 
-R03 implementation is legal only when all of the following are simultaneously true on current `main`:
+R03 implementation is legal only when all of the following are true on current `main`:
 
 ```text
 FLOW_P01_R03_IMPLEMENTATION_SPEC.md EXISTS
++
+THIS CORRECTED SPEC VERSION IS MERGED
 +
 STATUS = READY
 +
@@ -47,112 +50,214 @@ P01/R02 IMPLEMENTATION PR #20 IS MERGED
 +
 P01/R02 REQUIRED CHECKS PASSED
 +
-LATEST MAIN HAS BEEN INSPECTED
+LATEST MAIN HAS BEEN FETCHED AND INSPECTED
 ```
 
-If PR #20 is not merged, this specification may exist on `main` but R03 implementation must still stop.
+The implementation agent must derive authority from current repository evidence, not from authoring-time assumptions.
 
-The implementation agent must derive authority from current repository evidence, not from this document's authoring-time assumptions.
+This revision intentionally resolves the previous ambiguity between R03 and R04:
+
+```text
+R03
+=
+FRESH DATABASE CREATION
++
+STRUCTURAL DATABASE QUALITY
++
+ACTORLESS DEFAULT-DENY BASELINE
++
+DATABASE RUNTIME MECHANICS
+
+R04
+=
+REAL ACTOR / USER / ROLE / MEMBERSHIP FIXTURES
++
+TENANT-WIDE VS BRANCH-SCOPED MEMBERSHIP SEMANTICS
++
+POSITIVE ACTOR AUTHORIZATION
++
+ACTOR-AWARE NEGATIVE AUTHORIZATION
++
+MINIMUM PRIVILEGE-ESCALATION HARDENING
+```
+
+R03 must not steal R04 merely to make tests green.
+
+At the same time, R03 must not weaken, skip or hide tests. Stale tests whose assumptions predate actor-aware RLS may be corrected so that R03 proves the correct actorless/default-deny baseline; R04 then adds the positive actor-aware matrix.
 
 ---
 
 # 1. Phase Objective
 
-Phase 01 establishes a trustworthy, deterministic and enforceable development baseline before product-level expansion continues.
+Phase 01 establishes a trusted and enforceable technical baseline before new product architecture is allowed to build on it.
 
-R01 established delivery authorization and deterministic dependency installation. R02 recovers the application-quality baseline. R03 owns the next independent trust boundary: **a fresh local database must be able to bootstrap from committed repository state and reach the full database-quality validation chain**.
+R01 established deterministic development control and dependency installation.
 
-R03 must make repository evidence able to answer:
+R02 restored the application-quality baseline and made `Next Flow Quality` green.
+
+R03 owns the next independent trust boundary:
+
+> A completely fresh local Supabase/PostgreSQL environment must be reproducibly creatable from committed repository state, all structural database validation stages must execute, and actor-protected runtime behavior must fail closed when no real actor has been established.
+
+R03 must make repository evidence answer all of the following:
 
 ```text
-Can a clean local Supabase/PostgreSQL environment start from the committed migrations?
+Can a clean local Supabase environment start from committed migrations?
 YES
 
-Can migrations apply in deterministic order from an empty database?
+Can every committed migration apply in deterministic order?
 YES
 
-Can the committed seed load deterministically?
+Can the deterministic synthetic seed load?
 YES
 
-Can database SQL tests run and pass?
+Can local reset complete?
 YES
 
-Can database lint run and pass at the repository's declared level?
+Can structural SQL tests execute and pass?
+YES
+
+Can RLS remain enabled and fail closed without actor authority?
+YES
+
+Can database lint execute and pass?
 YES
 
 Can Kysely types be generated from the freshly migrated schema?
 YES
 
-Can generated schema types be verified for drift?
+Can generated type drift be verified?
 YES
 
-Can the database runtime integration suite reach and execute against the fresh database?
+Can DB runtime connection, transaction, role and context mechanics execute?
 YES
 
-Can this be done without production access or hidden migration-history damage?
+Can actorless runtime access to actor-protected domain data remain denied?
+YES
+
+Can connection/context state be proven not to leak across transactions?
+YES
+
+Can Supabase Database Quality become green without inventing real actor fixtures in R03?
+YES
+
+Can all of this be done without production or linked-database mutation?
 YES
 ```
 
-R03 is a **fresh bootstrap / migration execution / database quality recovery round**.
-
-It is not an actor-aware authorization redesign round and not a product persistence round.
-
 ---
 
-# 2. Phase Scope Context
+# 2. Phase Scope
 
-## In scope for R03
+## 2.1 R03 In Scope
 
-- reproduce the inherited fresh-Supabase failure from latest authorized `main`;
-- capture the first deterministic SQL/database error, not only the outer CLI wrapper error;
-- distinguish transient image/registry failures from deterministic migration failures;
-- repair only what is necessary to make a fresh local database bootstrap trustworthy;
-- preserve migration-history safety and document any migration-history decision;
-- preserve deterministic synthetic seed behavior;
-- make database SQL tests executable and green where owned by the bootstrap baseline;
-- make database lint executable and green where owned by the bootstrap baseline;
-- regenerate Kysely types from a fresh migrated database when schema truth requires it;
-- verify committed generated database types for legitimate drift;
-- execute the database runtime integration suite against the fresh local database;
-- restore `Supabase Database Quality` to PASS;
-- preserve the green application baseline established by R02;
-- record any later authorization-specific failure that properly belongs to R04 instead of silently broadening scope.
+R03 owns:
 
-## Explicitly out of scope
+- reproducing the inherited fresh-Supabase failure from current authorized `main`;
+- capturing the first deterministic database/migration failure rather than only an outer CLI wrapper;
+- distinguishing transient Docker/container-registry noise from deterministic SQL failure;
+- restoring fresh migration execution;
+- fixing mechanical migration bootstrap incompatibilities that prevent schema creation;
+- preserving migration-history safety and explicitly documenting whether an existing migration may be corrected or a forward migration is required;
+- preserving the historical no-op migration unchanged;
+- deterministic synthetic seed structural validity;
+- structural pgTAP/database tests;
+- correcting stale tenant-only positive RLS expectations to actorless default-deny expectations when the committed actor-aware migration has made those tests invalid;
+- DB lint;
+- Kysely generation from the freshly migrated database;
+- generated database type drift verification;
+- DB runtime connection/health mechanics;
+- transaction-local `flow_runtime` role mechanics;
+- transaction-local tenant/branch/actor setting mechanics;
+- explicit no-actor default denial;
+- cross-tenant denial that does not require positive actor authorization;
+- transaction rollback and connection-context cleanup mechanics;
+- concurrent transaction context isolation;
+- making the existing `Supabase Database Quality` workflow pass for the R03 baseline;
+- preserving the R02 application-quality baseline.
 
-Unless a minimal compatibility correction is mechanically required to make the current committed database baseline boot at all, R03 must not implement:
+## 2.2 R03 Explicitly Out of Scope
 
-- new product features;
-- Auth.js runtime cutover;
-- OAuth provider work;
-- customer/session/cart/order persistence migration;
-- realtime synchronization;
-- kitchen runtime redesign;
-- Omise / Opn integration;
-- Stripe SaaS billing;
+R03 must not implement:
+
+- Auth.js;
+- OAuth;
+- credentials/password verification;
+- login throttling runtime;
+- real identity/session mapping;
+- AccessContext;
+- workspace selection;
+- customer capability/session/cart/order persistence;
+- realtime;
+- kitchen redesign;
+- Omise/Opn;
+- Stripe Billing;
 - Voice Ordering;
-- CareFlow or JobFlow implementation;
+- CareFlow or JobFlow product work;
 - repository gitlink/submodule cleanup;
 - Vercel/deployment recovery;
 - branch protection/ruleset rollout;
-- actor-aware business permission redesign;
-- new tenant membership semantics;
-- broad RLS authorization expansion owned by R04;
+- real users/roles/memberships solely to make positive RLS tests pass;
+- final tenant-wide versus branch-membership semantics;
+- positive actor access matrix;
+- role-permission product authorization rollout;
+- full permission-aware RLS conversion;
+- role/member self-elevation hardening beyond a mechanical bootstrap necessity;
 - production or linked Supabase mutation.
 
-## R03 / R04 boundary
+These actor-aware authorization responsibilities belong to P01/R04 or the later Identity/Auth.js phase as explicitly assigned there.
 
-R03 owns whether the database can be created, migrated, seeded, linted, type-generated and exercised from a fresh environment.
+## 2.3 R03 / R04 Hard Boundary
 
-R04 owns whether actor/user/membership/branch-aware authorization and negative access semantics are correct.
+The following distinction is mandatory.
 
-If an R03 validation reaches an actor-aware authorization assertion and reveals an inherited semantic defect that is not necessary for basic bootstrap correctness, record it for R04 instead of redesigning authorization in R03.
+### R03 proves
+
+```text
+NO ACTOR
+→ NO ACTOR-PROTECTED DOMAIN ACCESS
+
+WRONG TENANT WRITE
+→ DENIED
+
+TRANSACTION CONTEXT
+→ SET LOCALLY
+→ CLEARED AFTER COMMIT/ROLLBACK
+
+DATABASE CREATION
+→ DETERMINISTIC
+```
+
+### R04 proves
+
+```text
+REAL ACTIVE USER + VALID MEMBERSHIP
+→ EXPECTED ACCESS
+
+BRANCH-ONLY MEMBER
+→ SAME BRANCH ALLOWED
+→ OTHER BRANCH DENIED
+
+TENANT-WIDE MEMBER
+→ TENANT-SCOPED / VALID BRANCH ACCESS ACCORDING TO CONTRACT
+
+SUSPENDED / REVOKED / WRONG-TENANT ACTOR
+→ DENIED
+
+PERMISSION HELPER
+→ CORRECT
+
+ORDINARY ACTOR SELF-ELEVATION
+→ DENIED
+```
+
+If R03 reaches a failure caused by the absence of real actor fixtures or final membership semantics, do not introduce those fixtures or redesign those semantics in R03. Correct the test so that R03 asserts the actorless default-deny contract, then hand the positive actor case to R04.
 
 ---
 
-# 3. This Round Objective
+# 3. Current Round Objective
 
-At the end of R03, the following chain must be reproducible from committed state:
+At the end of R03 the following chain must be reproducible from committed state:
 
 ```text
 CLEAN APPLICATION DEPENDENCY INSTALL
@@ -165,7 +270,9 @@ DETERMINISTIC SEED LOADS
         ↓
 LOCAL DATABASE RESET SUCCEEDS
         ↓
-DATABASE SQL TESTS PASS
+STRUCTURAL DATABASE SQL TESTS PASS
+        ↓
+ACTORLESS DEFAULT-DENY ASSERTIONS PASS
         ↓
 DATABASE LINT PASS
         ↓
@@ -173,139 +280,176 @@ KYSELY TYPES GENERATE
         ↓
 GENERATED TYPE DRIFT CHECK PASS
         ↓
-DATABASE RUNTIME INTEGRATION PASS
+DATABASE RUNTIME MECHANICS PASS
         ↓
 SUPABASE DATABASE QUALITY PASS
 ```
 
-The existing application quality gate must remain green if R03 modifies any application-side generated or DB runtime file.
+R03 must leave R04 a green fresh database rather than forcing R04 to rediscover migration/bootstrap failures.
 
-## Mandatory outcomes
+## Mandatory Outcome A — Verify R02 Handoff
 
-### Outcome A — exact R02 handoff verification
-
-Before editing:
+Before any implementation edit:
 
 - verify PR #20 is merged;
-- verify its actual merge SHA;
+- verify actual merge SHA is `02b804dd817cf485419801e8b9f8aa9cb939e3de` or explain repository evidence if history has changed;
 - verify `Phase/Round Gate` passed for R02;
 - verify `Next Flow Quality` passed for R02;
 - fetch latest `main`;
-- compare latest `main` to this spec base SHA;
-- inspect every intervening commit that can affect R03 assumptions.
+- compare latest `main` against both the original R03 authoring base and this corrected-spec base;
+- inspect intervening commits that can change R03 assumptions.
 
-If R02 is not merged or required checks are not green, stop.
+## Mandatory Outcome B — Reproduce the Database Failure
 
-### Outcome B — deterministic failure reproduction
-
-Reproduce the database workflow from latest `main` before changing SQL.
-
-The inherited evidence at specification authoring time is:
+The inherited evidence from R02 is:
 
 ```text
 Supabase Database Quality
 → Install dependencies: PASS
 → Start local Supabase: FAIL
-→ attempts: 3
 → deterministic failure while applying
-  20260816050000_phase2_foodflow_database_baseline.sql
-→ statement: 97
-→ RLS bootstrap block / tenant_isolation policy creation
-→ all later DB validation stages: NOT RUN / SKIPPED
+  supabase/migrations/20260816050000_phase2_foodflow_database_baseline.sql
+→ statement 97
+→ generic RLS tenant_isolation bootstrap block
+→ later reset/test/lint/codegen/runtime stages skipped
 ```
 
-The same R02 run also observed transient container-registry `toomanyrequests` messages while images were being pulled. Those transient messages must not be confused with the later deterministic SQL failure that reproduced after images became available.
+Transient registry `toomanyrequests` messages were also observed while pulling images. They are infrastructure noise, not an explanation for a SQL failure that reproduces after the relevant images become available.
 
-### Outcome C — root SQL error identified
+R03 must reproduce and classify the current failure from current `main` before changing SQL unless repository state has changed in a way that makes the previous failure impossible to reproduce; in that case the PR must explain exactly why.
 
-The implementation PR must report the actual PostgreSQL/Supabase root error beneath the generic migration wrapper.
+## Mandatory Outcome C — Capture Root SQL/PostgreSQL Error
 
-Use debug output or a direct safe local reproduction when necessary.
-
-Do not state only:
+Do not stop at:
 
 ```text
 Failed to execute statement 97
 ```
 
-Record which table/policy/expression/constraint caused the failure and why.
+The implementation evidence must identify the actual failing relation/policy/expression/constraint/function and the PostgreSQL/Supabase root error.
 
-### Outcome D — migration-history safety decision
+## Mandatory Outcome D — Handle Both Known Mechanical Policy Risks
 
-Before editing any existing committed migration, determine whether the candidate migration is safe to alter under repository history policy.
+Current source inspection shows two independent mechanical bootstrap risks involving `app.organizations`:
 
-Repository policy currently states:
+1. `20260816050000_phase2_foodflow_database_baseline.sql` includes `app.organizations` in a generic loop whose policy expression references `tenant_id`.
+2. `20260816070000_phase4_auth_rbac_tenancy.sql` also includes `app.organizations` in a generic actor-aware loop whose non-branch expression references `tenant_id`.
+
+`app.organizations` is the tenant root and uses `id` as its tenant identity; it does not have a `tenant_id` column.
+
+R03 must not assume fixing the first occurrence completes fresh bootstrap. It must rerun the complete migration chain and repair each distinct mechanical bootstrap incompatibility actually encountered.
+
+The repair must preserve tenant isolation intent. Removing RLS or granting bypass privilege is not a valid fix.
+
+## Mandatory Outcome E — Migration-History Decision
+
+Before changing an existing migration:
+
+- determine whether it is known to be applied to any authoritative environment;
+- follow repository forward-only policy;
+- do not rewrite the historical no-op migration;
+- if an existing broken migration is proven unapplied and repository/owner policy permits a minimal correction, document the evidence;
+- if it may already be applied, prefer a safe forward migration where possible;
+- if a safe strategy cannot be established, stop for owner direction.
+
+No production or linked database may be queried or mutated merely to manufacture this evidence unless owner-approved tooling/policy explicitly allows read-only verification; default R03 validation remains local/CI.
+
+## Mandatory Outcome F — Correct Stale Tenant-Only Tests Without Creating R04 Fixtures
+
+Current SQL and runtime tests predate the historical actor-aware RLS migration in important places.
+
+Examples include expectations equivalent to:
 
 ```text
-APPLIED MIGRATIONS MUST NOT BE REWRITTEN
-FORWARD-ONLY MIGRATION POLICY
-NO PRODUCTION PUSH / REPAIR AS VALIDATION
+flow_runtime + tenant A + no actor
+→ sees tenant A menu rows
 ```
 
-Special handling:
+That is no longer a valid positive-access baseline once actor-aware policies require active membership.
 
-- `20260814071654_phase1_tenant_audit_baseline.sql` is a historical no-op and must remain untouched.
-- The currently failing migration is `20260816050000_phase2_foodflow_database_baseline.sql`.
-- If evidence shows that the failing migration may already be applied to an authoritative external environment, do not rewrite it merely to make local CI green. Stop and request owner direction if no safe forward-compatible recovery exists.
-- If evidence proves the migration is an unapplied broken baseline and owner/repository history permits minimal correction, document that evidence and keep the change narrowly limited to the actual bootstrap defect.
+R03 may and should correct these stale assertions to the R03 contract:
 
-No migration history decision may be hidden in a generic SQL diff.
+```text
+flow_runtime + tenant A + no actor
+→ sees zero actor-protected domain rows
+```
 
-### Outcome E — fresh database chain restored
+Do not solve this in R03 by creating users/roles/memberships.
 
-After repair, all database quality stages owned by R03 must actually execute, not merely become reachable in theory.
+Those positive authorization fixtures are R04.
 
-### Outcome F — application baseline preserved
+## Mandatory Outcome G — Runtime Mechanics Still Execute
 
-R02 established a green application baseline. R03 must not regress it.
+R03 must keep the DB runtime integration suite meaningful.
 
-If generated database types or DB runtime files change and trigger `Next Flow Quality`, that workflow must pass before R03 can merge.
+Required mechanics include:
 
-### Outcome G — stop at owner review
+- `checkDatabaseHealth()` works without exposing tenant data;
+- effective role inside tenant transaction is `flow_runtime`;
+- tenant, branch and actor settings are transaction-local;
+- actor may be absent and must serialize to empty/null context safely;
+- actorless access to actor-protected rows fails closed;
+- cross-tenant write attempts remain denied;
+- callback failure rolls back and local role/context does not leak;
+- reused pooled connection does not leak context;
+- concurrent transactions keep context isolated.
 
-Open/update the R03 implementation PR with complete database evidence and stop.
+If an existing rollback test requires a successful actor-authorized write before throwing, it may be rewritten to test rollback/context mechanics without inventing a positive actor fixture. R04 owns the positive actor write case.
 
-No auto-merge.
+## Mandatory Outcome H — Full R03 Workflow Green
 
-No R04 implementation.
+The existing `Supabase Database Quality` workflow remains canonical.
+
+R03 must not make it green by skipping stages.
+
+The expected final R03 chain is:
+
+```text
+Install dependencies             PASS
+Start local Supabase             PASS
+Reset migrations and seed        PASS
+Database SQL tests               PASS
+Database lint                    PASS
+Generate Kysely database types   PASS
+Verify generated type drift      PASS
+Database runtime integration     PASS
+```
+
+## Mandatory Outcome I — Preserve R02 Application Baseline
+
+If generated DB types, DB runtime code, tests or other application paths trigger `Next Flow Quality`, it must pass before R03 implementation can merge.
 
 ---
 
 # 4. Preconditions
 
-## Development gate
-
-- [ ] This exact R03 specification exists on `main`.
-- [ ] `Status` is `READY`.
+- [ ] Corrected R03 specification exists on `main`.
+- [ ] Status is `READY`.
 - [ ] Phase is `01`.
 - [ ] Round is `03`.
 - [ ] Previous is `FLOW_P01_R02_IMPLEMENTATION_SPEC.md`.
 - [ ] Next is `FLOW_P01_R04_IMPLEMENTATION_SPEC.md`.
-- [ ] R02 implementation PR #20 is merged.
+- [ ] PR #20 is merged.
 - [ ] R02 required checks passed.
-- [ ] R03 implementation branch is created from latest verified `main`.
+- [ ] Latest `main` fetched.
+- [ ] Intervening commits inspected.
+- [ ] Implementation branch created from latest verified `main`.
 
-If any item fails, stop before implementation.
+Before changes read at minimum:
 
-## Required repository reading
+- repository `README.md`;
+- `CONTRIBUTING.md`;
+- `SECURITY.md`;
+- `docs/07-delivery/development-phases/README.md`;
+- `FLOW_PHASE_ROUND_SPEC_TEMPLATE.md`;
+- final R02 implementation PR evidence;
+- this complete corrected R03 specification;
+- `supabase/README.md`;
+- `apps/web/next-flow/AGENTS.md`;
+- `apps/web/next-flow/src/server/db/README.md`;
+- applicable nested instructions.
 
-Before changes:
-
-- [ ] repository `README.md`;
-- [ ] `CONTRIBUTING.md`;
-- [ ] `SECURITY.md`;
-- [ ] `docs/07-delivery/development-phases/README.md`;
-- [ ] `FLOW_PHASE_ROUND_SPEC_TEMPLATE.md`;
-- [ ] full R02 specification and final R02 implementation PR evidence;
-- [ ] this full R03 specification;
-- [ ] `supabase/README.md`;
-- [ ] `apps/web/next-flow/AGENTS.md`;
-- [ ] `apps/web/next-flow/src/server/db/README.md`;
-- [ ] any nested instruction file applying to modified paths.
-
-## Working-tree safety
-
-Before local edits:
+Working-tree safety:
 
 ```bash
 git status
@@ -314,157 +458,132 @@ git rev-parse HEAD
 git rev-parse origin/main
 ```
 
-Preserve unrelated user changes. Do not use destructive reset/clean/restore commands against unreviewed work.
-
-## Environment
+Do not destroy unrelated local work.
 
 Required local/CI capabilities:
 
-- Node.js 22 compatible with repository CI;
+- Node.js 22;
 - npm compatible with lockfile v3;
-- Docker or compatible runtime required by local Supabase;
-- pinned Supabase CLI from `apps/web/next-flow` dependencies;
+- Docker-compatible runtime;
+- repository-pinned Supabase CLI;
+- local test database URLs only;
 - no production credentials;
-- no linked production Supabase project.
+- no linked production Supabase mutation.
 
 ---
 
 # 5. Architecture Scope
 
-## Frontend
+| Layer | R03 impact |
+|---|---|
+| Customer UI | NONE |
+| Staff/Kitchen/Cashier/Admin UI | NONE |
+| Auth.js | NONE |
+| Product domain services | NONE |
+| Database bootstrap/migrations | HIGH |
+| Structural RLS bootstrap | HIGH |
+| Actor-aware positive authorization | DEFER R04 |
+| Seed structural fixtures | MEDIUM |
+| Identity fixtures | DEFER R04 |
+| DB SQL tests | HIGH |
+| Kysely generation | HIGH |
+| DB runtime mechanics/tests | MEDIUM/HIGH |
+| Deployment/gitlinks | DEFER R05 |
+| Branch protection | DEFER R06 |
 
-Impact: `NONE` expected.
+The architectural rule for R03 is:
 
-No customer, staff, kitchen, cashier, manager or owner UI change belongs to R03.
-
-## Backend application behavior
-
-Impact: `LOW / COMPATIBILITY ONLY`.
-
-Application-side DB files may change only if required for generated schema type correctness or fresh runtime integration compatibility discovered after the database is restored.
-
-Do not migrate business repositories or product flows.
-
-## Database
-
-Impact: `HIGH`.
-
-R03 may touch only database-bootstrap surfaces necessary to restore deterministic creation and validation:
-
-- migration compatibility;
-- seed compatibility;
-- DB tests directly invalidated by corrected bootstrap truth;
-- generated DB types;
-- narrow DB runtime compatibility if fresh integration exposes an R03-owned defect.
-
-## Authentication / Authorization
-
-No Auth.js runtime work.
-
-R03 must preserve existing tenant/RLS intent while avoiding actor-aware redesign owned by R04.
-
-## Infrastructure / CI
-
-Existing `Supabase Database Quality` is the canonical R03 workflow.
-
-Do not replace it with a weaker workflow. Modify it only if evidence proves the workflow itself, rather than repository database state, prevents the intended deterministic validation chain.
-
-Transient registry failures should be classified honestly; retries must not mask deterministic SQL failure.
+```text
+DATABASE MUST BE STRUCTURALLY BOOTABLE
+BEFORE ACTOR AUTHORIZATION IS ACCEPTED
+```
 
 ---
 
 # 6. Existing Files and Current Behavior
 
-| Path | Current responsibility / evidence | R03 action |
+| Path | Current responsibility / observed issue | R03 action |
 |---|---|---|
-| `supabase/README.md` | Defines migration policy, local workflow, seed semantics, RLS baseline and deferred responsibilities. | Treat as governing DB baseline documentation; update only if recovery changes an explicitly documented contract. |
-| `supabase/config.toml` | Local Supabase service/config baseline. | Preserve unless a proven bootstrap configuration defect exists. |
-| `supabase/migrations/20260814071654_phase1_tenant_audit_baseline.sql` | Historical no-op migration that may exist outside repo. | DO NOT MODIFY. |
-| `supabase/migrations/20260816050000_phase2_foodflow_database_baseline.sql` | Structural FoodFlow/Supabase baseline; currently fails on fresh startup at statement 97. | Diagnose exact root cause before any change. Migration-history decision required. |
-| `supabase/migrations/20260816053000_phase2_foodflow_integrity_hardening.sql` | Later integrity hardening. | Must become reachable and apply successfully; modify only if it has an independently proven R03 bootstrap incompatibility. |
-| `supabase/migrations/20260816070000_phase4_auth_rbac_tenancy.sql` | Previously merged historical actor/RBAC tenancy work. | Must be allowed to apply during fresh bootstrap, but R03 must not redesign its authorization semantics unless a mechanical bootstrap blocker is unavoidable. Hand semantic auth issues to R04. |
-| `supabase/seed.sql` | Deterministic synthetic fixture data. | Must load on reset; no real data. |
-| `supabase/tests/**` | Database SQL/pgTAP validation. | Must execute after bootstrap; repair only R03-owned expectations proven inconsistent with corrected schema baseline. |
-| `apps/web/next-flow/src/server/db/generated/database.ts` | Generated Kysely representation of migrated schema. | Regenerate from fresh database; commit only legitimate schema drift. |
-| `apps/web/next-flow/scripts/generate-database-types.mjs` | Generates Kysely types from direct DB URL. | Preserve unless a proven generator defect exists. |
-| `apps/web/next-flow/scripts/verify-database-types.mjs` | Generated type verification support. | Preserve unless a proven R03 defect exists. |
-| `apps/web/next-flow/tests/integration/database-runtime.test.ts` | Runtime DB integration/RLS transaction baseline. | Must execute with local DB after bootstrap; actor-aware semantic expansion is R04. |
-| `.github/workflows/supabase-db-quality.yml` | Canonical DB CI chain. | Must end PASS; do not skip stages to force green. |
+| `supabase/README.md` | Migration policy and structural DB contract. | Preserve/align only if R03 changes documented structural truth. |
+| `supabase/config.toml` | Local Supabase configuration. | Preserve unless proven defective. |
+| `supabase/migrations/20260814071654_phase1_tenant_audit_baseline.sql` | Historical no-op. | DO NOT MODIFY. |
+| `supabase/migrations/20260816050000_phase2_foodflow_database_baseline.sql` | Fresh bootstrap currently fails in generic RLS block. | Diagnose exact root error; make minimum history-safe repair. |
+| `supabase/migrations/20260816053000_phase2_foodflow_integrity_hardening.sql` | Later integrity hardening. | Must become reachable and apply. |
+| `supabase/migrations/20260816070000_phase4_auth_rbac_tenancy.sql` | Historical actor/RBAC foundation; also contains generic organization-policy risk. | Mechanical bootstrap repair allowed if required; semantic membership/permission redesign deferred to R04. |
+| `supabase/seed.sql` | Synthetic tenant/menu fixtures; no actor fixtures. | Preserve actor-free seed in R03 unless structural schema compatibility requires narrow change. |
+| `supabase/tests/database/phase2_database_baseline.test.sql` | Structural tests plus stale tenant-only positive RLS assumption. | Preserve structural tests; change stale positive tenant-only expectation to actorless default-deny contract. |
+| `apps/web/next-flow/tests/integration/database-runtime.test.ts` | Runtime mechanics plus stale actorless positive access and fake actor ID usage. | Keep mechanics; remove stale R03 positive actor expectations; real actor positive tests belong R04. |
+| `apps/web/next-flow/src/server/db/generated/database.ts` | Generated DB types; currently may be stale until fresh codegen runs. | Regenerate from restored local DB and commit legitimate drift only. |
+| `.github/workflows/supabase-db-quality.yml` | Canonical DB quality chain. | Must remain full-strength and end PASS. |
 | `.github/workflows/next-flow-quality.yml` | Canonical application quality. | Preserve green R02 baseline. |
-
-## Current likely defect candidate — diagnosis only
-
-Source inspection shows the RLS loop includes `app.organizations` in a generic policy statement that references a `tenant_id` column, while `app.organizations` defines its tenant identity as primary key `id` and does not define a `tenant_id` column.
-
-This is a strong root-cause candidate, but **R03 must confirm the actual PostgreSQL error before implementing a fix**.
-
-Do not convert this observation into an unreviewed schema redesign.
 
 ---
 
 # 7. Files to CREATE
 
-No file creation is mandatory before diagnosis.
+No new file is mandatory before diagnosis.
 
-Permitted only when evidence requires it:
+Permitted only if evidence requires:
 
-- a narrowly scoped forward compatibility migration if migration-history policy and execution ordering make that approach safe;
-- a focused database test that reproduces the corrected bootstrap invariant;
-- an evidence/helper script only if existing repository tooling cannot deterministically expose the root error.
+- a narrow forward corrective migration when history safety requires forward-only repair;
+- a focused structural regression test for the corrected bootstrap invariant;
+- a diagnostic helper that exposes root DB failure without weakening the normal workflow.
 
-Do not create duplicate migration systems, alternate schemas, shadow seeds or parallel generated-type ownership.
+Do not create:
+
+- identity fixture systems;
+- alternate migration directories;
+- alternate seeds;
+- shadow database schemas;
+- duplicate generated-type ownership.
 
 ---
 
 # 8. Files to MODIFY
 
-Modification is evidence-driven, not pre-authorized by filename.
+Likely evidence-driven candidates:
 
-Likely candidate surfaces:
-
-- `supabase/migrations/20260816050000_phase2_foodflow_database_baseline.sql` — only after migration-history decision gate;
-- later migrations if they expose a distinct deterministic bootstrap incompatibility after the first blocker is resolved;
-- `supabase/seed.sql` if and only if corrected schema truth makes current deterministic seed invalid;
-- relevant `supabase/tests/**` if an existing assertion encodes an invalid baseline assumption;
-- `apps/web/next-flow/src/server/db/generated/database.ts` through generation tooling, never hand-fabricated;
-- DB runtime/test files only for a proven R03 compatibility defect.
+- failing migration(s), subject to history decision;
+- structural DB test expectations that predate actor-aware RLS;
+- DB runtime integration tests to reflect actorless default-deny mechanics;
+- generated Kysely types through codegen;
+- seed only if structural compatibility requires it;
+- DB workflow only if the workflow itself is proven defective, not to hide repository failure.
 
 Must not:
 
-- hand-edit generated database types;
-- delete failing DB tests to force green;
+- hand-edit generated types;
+- delete failing tests;
 - weaken RLS globally;
-- grant broad bypass roles;
-- disable DB lint;
-- skip migrations;
-- comment out the failing policy block without restoring equivalent intended protection;
+- add `BYPASSRLS`;
 - add `continue-on-error` to required DB stages;
-- replace deterministic seed with environment-dependent live data.
+- suppress DB lint;
+- skip migrations;
+- create real actor membership fixtures in R03 solely for positive access;
+- use production data.
 
 ---
 
 # 9. Files to MOVE
 
-No move is expected.
+No move expected.
 
-Do not rename existing migration versions as a casual repair.
-
-A migration filename/version is historical identity and must be treated as such.
+Migration filenames/versions are historical identity and must not be casually renamed.
 
 ---
 
 # 10. Files to REMOVE
 
-No removal is expected.
+No removal expected.
 
-Specifically do not remove:
+Do not remove:
 
 - historical migrations;
-- current database SQL tests;
-- RLS policies simply to make startup pass;
-- DB runtime integration tests;
+- RLS policies merely to make startup pass;
+- SQL tests;
+- DB runtime tests;
 - generated-type verification;
-- existing quality workflows.
+- quality workflows.
 
 ---
 
@@ -474,33 +593,31 @@ Specifically do not remove:
 
 Primary R03 responsibility.
 
-The fresh database must apply all committed migrations in deterministic order.
+All committed migrations must apply from an empty local database.
 
-## Schema
+## Mechanical RLS bootstrap corrections
 
-No new product schema is intended.
+Allowed where a generic policy generator references a column that a target table does not have or otherwise cannot create the schema.
 
-Any schema change must be a minimal correction of a proven bootstrap defect and documented with before/after semantics.
+The fix must preserve tenant isolation.
 
-## RLS / tenant isolation
+For tenant-root tables such as `app.organizations`, tenant identity may need a table-specific policy expression based on `id` rather than pretending a `tenant_id` column exists.
 
-Preserve tenant isolation intent.
-
-If the root error is caused by applying a generic `tenant_id` policy to a tenant-root table whose identity is `id`, the repair must preserve correct tenant semantics rather than simply removing RLS.
-
-R04 still owns actor/membership/branch-aware authorization refinement.
+Do not use this mechanical correction as permission to define final R04 membership semantics.
 
 ## Seed
 
-`supabase/seed.sql` remains synthetic and deterministic.
+R03 seed remains deterministic and synthetic.
 
-No production data, provider token, customer PII or live credential may be introduced.
+It may remain actor-free.
+
+No real credential, password hash, raw customer capability, provider token or customer data may be introduced.
 
 ## Generated types
 
-Generate from the freshly migrated local database using repository tooling.
+Run repository generation tooling against the fresh migrated database.
 
-Generated type changes must correspond to real schema truth and be reviewed for broad/unexpected drift.
+Generated file changes must correspond to real schema truth.
 
 ## Production database
 
@@ -508,28 +625,21 @@ Generated type changes must correspond to real schema truth and be reviewed for 
 PRODUCTION_DB_MODIFIED: NO
 REMOTE_DB_PUSHED: NO
 LINKED_DB_RESET: NO
+MIGRATION_REPAIR_AGAINST_PRODUCTION: NO
 ```
-
-R03 must not run production mutation commands as validation.
 
 ---
 
 # 12. Backend Changes
 
-No business-domain backend feature work.
+No product backend feature work.
 
-Permitted backend work is limited to:
+Permitted application-side changes are limited to:
 
-- generated Kysely type synchronization;
-- narrow DB runtime compatibility discovered only after the fresh bootstrap chain is restored.
+- generated DB type synchronization;
+- DB runtime/test mechanical compatibility needed to prove R03 context behavior.
 
-Any runtime change must preserve:
-
-- server-only boundary;
-- lazy DB configuration;
-- explicit tenant transaction context;
-- no secret exposure;
-- no browser-controlled authorization context.
+No repository/domain persistence cutover.
 
 ---
 
@@ -537,68 +647,66 @@ Any runtime change must preserve:
 
 None.
 
-No page, component, UX, route, responsive or customer-copy change belongs to R03.
-
 ---
 
 # 14. Authentication and Authorization
 
-## Application authentication
-
-Unchanged.
+Application authentication remains unchanged.
 
 No Auth.js implementation.
 
-## Database authorization
+R03 authorization contract is intentionally narrow:
 
-R03 verifies that existing committed database authorization structures can bootstrap and support the current baseline tests.
+```text
+NO VERIFIED ACTOR
+→ FAIL CLOSED
+```
 
-Do not turn R03 into final RBAC acceptance.
-
-If fresh bootstrap reaches failures specifically requiring real actor fixtures, memberships, branch-scoped policies or negative actor authorization semantics, record the first actionable failure for R04 unless the failure prevents basic schema creation itself.
+R03 must not claim that positive actor authorization, membership/branch semantics or permission enforcement are correct. That claim requires R04 evidence.
 
 ---
 
 # 15. Security Requirements
 
-- no production database credentials;
-- no remote production mutation;
-- no `supabase db reset --linked`;
-- no `supabase migration repair` against production as a shortcut;
-- no `supabase db push` to a production project as validation;
-- no migration-history rewrite without explicit evidence and policy decision;
-- preserve RLS/tenant isolation rather than bypass it;
-- no `BYPASSRLS` privilege added for normal runtime;
-- no secrets in migration, seed, test, PR or logs;
-- no real customer data in seed/tests;
-- generated types come from tooling, not hand edits;
-- database error reporting in PR must redact connection strings/passwords;
-- transient Docker/registry errors must be distinguished from deterministic SQL errors;
-- retries must not be used to hide a deterministic migration defect.
+- no production DB credentials;
+- no linked production reset/push/repair;
+- no migration-history rewrite without explicit evidence;
+- historical no-op migration untouched;
+- preserve RLS and tenant isolation;
+- no `BYPASSRLS` shortcut;
+- no secret in migration/seed/test/PR/log;
+- no real customer data;
+- generated types from tooling only;
+- redact connection secrets from evidence;
+- distinguish transient registry failure from deterministic SQL failure;
+- retries may mitigate registry noise but may not hide deterministic SQL failure;
+- actorless default-deny must remain explicit;
+- no synthetic actor credentials in R03.
 
 ---
 
 # 16. Failure and Recovery Paths
 
-| Failure case | Expected behavior | Recovery / retry |
-|---|---|---|
-| R02 PR #20 not merged | R03 implementation forbidden. | Wait for owner/manual merge. |
-| R02 required check failed | R03 implementation forbidden. | Return to R02 ownership. |
-| R03 spec missing/not READY on main | Stop. | Review/merge correct spec first. |
-| Latest main differs from spec base | Do not use stale base. | Inspect intervening commits and branch from latest main. |
-| Docker/container registry rate limit | Classify as transient only if SQL has not begun. | Retry with evidence; do not edit DB code solely for registry rate limit. |
-| Same SQL failure reproduces after images are available | Treat as deterministic DB blocker. | Capture debug/root DB error and fix in R03 scope. |
-| Root error indicates generic RLS expression references nonexistent column | Do not merely disable RLS. | Correct policy/schema relationship while preserving tenant isolation and history safety. |
-| Candidate migration is already applied externally | Do not rewrite blindly. | Use safe forward strategy or stop for owner decision if impossible. |
-| Migration-history status cannot be established | Do not guess. | Record blocker and request owner direction. |
-| Fresh start passes but reset/seed fails | Continue R03 diagnosis at first deterministic reset/seed error. | Repair only bootstrap/seed compatibility. |
-| SQL tests fail after successful bootstrap | Classify assertion as R03 structural vs R04 actor-aware. | Fix only R03-owned structural baseline; hand authorization semantics to R04. |
-| DB lint fails | Record exact warning/error and schema. | Repair real DB quality issue without suppressing lint. |
-| Kysely generation produces broad drift | Do not commit blindly. | Compare migrated schema, generator version and expected type ownership. |
-| DB runtime integration fails due missing bootstrap prerequisites | R03 owns prerequisite. | Repair minimal runtime/schema compatibility. |
-| DB runtime integration reaches actor-aware semantic mismatch | Do not expand silently. | Record for R04 unless basic bootstrap is impossible. |
-| Next Flow Quality regresses because of R03 change | R03 cannot merge. | Fix R03-induced application regression. |
-| Vercel/gitlink warning remains | Keep visible but do not steal R05 scope. | Handoff to R05. |
+| Failure | R03 response |
+|---|---|
+| Corrected spec not merged | STOP. |
+| R02 not merged / required check failed | STOP and return to R02. |
+| Latest main advanced | Inspect intervening commits; branch from latest main. |
+| Registry rate limit before SQL begins | Classify transient; bounded retry allowed. |
+| SQL failure reproduces after images available | Deterministic R03 blocker; capture root error. |
+| Baseline migration generic organization policy fails | Repair mechanically while preserving tenant isolation and history policy. |
+| Later historical actor migration generic organization policy fails | R03 owns mechanical bootstrap repair; do not redesign membership semantics. |
+| Candidate migration already applied externally | Do not rewrite blindly; safe forward strategy or owner decision. |
+| Migration history cannot be established | STOP rather than guess. |
+| Seed fails structurally | R03 fixes structural seed compatibility only. |
+| SQL test expects tenant-only positive access with no actor | Replace with actorless default-deny expectation; positive actor test goes R04. |
+| Runtime test expects menu rows with no actor | Replace with actorless denial/mechanics assertion; positive actor test goes R04. |
+| Runtime rollback test requires authorized write | Rewrite to prove rollback/context cleanup without positive actor fixture; R04 adds authorized write coverage. |
+| Kysely broad unexpected drift | Investigate schema/generator; do not commit blindly. |
+| DB lint fails | Fix real R03 structural issue; do not suppress lint. |
+| Next Flow Quality regresses due R03 change | R03 cannot merge until restored. |
+| Actor-aware semantic defect remains | Record exact handoff for R04. |
+| Gitlink/deployment issue remains | Record for R05; do not steal scope. |
 
 ---
 
@@ -606,89 +714,96 @@ If fresh bootstrap reaches failures specifically requiring real actor fixtures, 
 
 ## Internal
 
-- merged R02 implementation and evidence;
+- merged R02 implementation;
+- corrected R03 spec;
 - `supabase/README.md`;
-- `supabase/config.toml`;
-- all committed migrations;
-- `supabase/seed.sql`;
-- `supabase/tests/**`;
-- generated DB types and generation scripts;
+- committed migrations;
+- seed;
+- SQL tests;
+- Kysely generation scripts/types;
 - DB runtime integration tests;
-- `Supabase Database Quality` workflow;
-- `Next Flow Quality` workflow;
-- Phase/Round gate.
+- `Supabase Database Quality`;
+- `Next Flow Quality`;
+- Phase/Round Gate.
 
 ## External execution
 
 - GitHub Actions;
-- Docker-compatible container runtime;
-- Supabase CLI pinned by repository dependencies;
-- PostgreSQL image/config selected by current Supabase project configuration;
+- Docker-compatible runtime;
+- repository-pinned Supabase CLI;
+- PostgreSQL image/config selected by project config;
 - Node.js 22;
 - npm.
 
-## Environment variables
-
-Local CI values may include only test/local URLs such as the current workflow's localhost PostgreSQL URL.
-
-No live production secret is required.
+No live application/provider secret is required.
 
 ---
 
 # 18. Tests
 
-## Bootstrap
+## Fresh bootstrap
 
-- [ ] `supabase start` succeeds from clean local state.
-- [ ] all migrations apply in order.
-- [ ] no migration is silently skipped.
-- [ ] deterministic seed loads.
-- [ ] `supabase db reset --local` succeeds.
+- [ ] local Supabase starts;
+- [ ] all migrations apply in order;
+- [ ] no migration silently skipped;
+- [ ] deterministic seed loads;
+- [ ] local DB reset succeeds.
 
-## SQL / structural database
+## Structural SQL
 
-- [ ] repository pgTAP/SQL tests run.
-- [ ] tenant/RLS structural baseline assertions pass where owned by R03.
-- [ ] money/currency/integrity constraints remain protected.
-- [ ] order/table/session baseline constraints remain protected.
-- [ ] no database test removed merely to force green.
+- [ ] schemas/tables/constraints/indexes baseline remains valid;
+- [ ] RLS remains enabled/forced where expected;
+- [ ] negative money/currency/integrity constraints pass;
+- [ ] order/session/idempotency structural constraints pass;
+- [ ] actorless runtime role sees zero actor-protected rows;
+- [ ] cross-tenant write denial remains protected;
+- [ ] no stale tenant-only positive assertion remains in R03.
 
-## Lint
+## DB lint
 
-- [ ] database lint runs against declared schemas.
-- [ ] lint passes at repository-configured warning/error contract.
+- [ ] configured schemas lint;
+- [ ] configured fail-on-error contract passes.
 
 ## Generated types
 
-- [ ] Kysely codegen runs against freshly migrated DB.
-- [ ] generated output is deterministic.
-- [ ] drift check passes.
-- [ ] broad unexpected drift investigated.
+- [ ] codegen runs;
+- [ ] output reflects fresh schema;
+- [ ] expected diff committed if legitimate;
+- [ ] subsequent drift verification passes.
 
-## Runtime integration
+## Runtime mechanics
 
-- [ ] DB runtime test executes with local database URL.
-- [ ] health query works.
-- [ ] tenant transaction context works for current baseline.
-- [ ] cross-tenant denial baseline remains protected.
-- [ ] pooled connection context does not leak.
-- [ ] rollback/context cleanup baseline remains protected.
+- [ ] health query works;
+- [ ] effective runtime role is `flow_runtime` inside transaction;
+- [ ] tenant context is local;
+- [ ] branch context is local;
+- [ ] actor context can be absent safely;
+- [ ] no actor => actor-protected domain rows denied;
+- [ ] cross-tenant write denied;
+- [ ] rollback clears local role/context;
+- [ ] reused connection does not leak context;
+- [ ] concurrent contexts remain isolated.
 
-R04 may later strengthen actor-aware fixtures and semantics; R03 must not delete current security coverage.
+## Deferred positive actor tests
 
-## Application regression
+The following are deliberately NOT R03 tests:
 
-- [ ] `Next Flow Quality` remains green if triggered.
-- [ ] no DATABASE_URL is required for `next build`.
-- [ ] no product behavior changed.
+- active actor sees same-tenant row;
+- branch-only actor sees same branch;
+- branch-only actor denied other same-tenant branch;
+- tenant-wide actor behavior;
+- suspended actor denial;
+- revoked membership denial;
+- permission helper allow/deny;
+- ordinary actor self-role elevation denial.
+
+Those are mandatory R04 coverage.
 
 ---
 
 # 19. Validation Commands
 
-Use repository commands that actually exist and record actual outcomes.
-
-## Repository/base evidence
+Repository/base evidence:
 
 ```bash
 git status
@@ -697,9 +812,7 @@ git rev-parse HEAD
 git rev-parse origin/main
 ```
 
-## Toolchain
-
-From `apps/web/next-flow`:
+Toolchain from `apps/web/next-flow`:
 
 ```bash
 node --version
@@ -707,9 +820,7 @@ npm --version
 npm ci
 ```
 
-## Fresh local Supabase
-
-From repository root using the pinned CLI path or equivalent repository-supported invocation:
+Local Supabase from repository root using repository-pinned CLI:
 
 ```bash
 ./apps/web/next-flow/node_modules/.bin/supabase start
@@ -718,30 +829,22 @@ From repository root using the pinned CLI path or equivalent repository-supporte
 ./apps/web/next-flow/node_modules/.bin/supabase db lint --local --schema app,foodflow,payments,audit,private --level warning --fail-on error
 ```
 
-If startup fails before repair, rerun with diagnostic/debug output sufficient to capture the underlying PostgreSQL error. Record the exact diagnostic command actually used.
+Use `--debug` or another safe local diagnostic mode when needed to capture the root migration error.
 
-## Generated database types
-
-From `apps/web/next-flow` with the local direct URL:
+Generated types from `apps/web/next-flow`:
 
 ```bash
 npm run db:generate
 git diff --exit-code -- src/server/db/generated/database.ts
 ```
 
-If generation intentionally changes the committed file, review and commit the legitimate generated diff, then rerun generation/drift verification from clean committed state.
-
-## Database runtime integration
+DB runtime:
 
 ```bash
 npm run test:db-runtime
 ```
 
-with local `DATABASE_URL` / `DATABASE_DIRECT_URL` values only.
-
-## Application preservation
-
-When affected paths trigger application quality, record:
+Application preservation when affected:
 
 ```bash
 npm run lint
@@ -751,9 +854,7 @@ npm run test:integration
 npm run build:next
 ```
 
-## Result vocabulary
-
-Every reported item must use exactly one of:
+Result vocabulary:
 
 ```text
 PASS
@@ -763,11 +864,13 @@ BLOCKED
 NOT APPLICABLE
 ```
 
+Never fabricate command outcomes.
+
 ---
 
 # 20. PR Requirements
 
-The R03 implementation PR must target `main` and include:
+R03 implementation PR metadata:
 
 ```text
 Specification: FLOW_P01_R03_IMPLEMENTATION_SPEC.md
@@ -775,56 +878,58 @@ Phase: 01
 Round: 03
 Previous: FLOW_P01_R02_IMPLEMENTATION_SPEC.md
 Previous PR: #20
-Related Issue: #21
+Related Issue: #21 / #23 as applicable
 Next Specification: FLOW_P01_R04_IMPLEMENTATION_SPEC.md
 ```
 
-## Required SHA evidence
+Required SHA evidence:
 
 ```text
-SPEC_BASE_SHA: a368fcdbb7ead87fed4655a0ac92314f0d963e08
-R02_MERGE_SHA: <actual owner merge SHA>
+ORIGINAL_SPEC_BASE_SHA: a368fcdbb7ead87fed4655a0ac92314f0d963e08
+CORRECTED_SPEC_BASE_SHA: 6c332ab1b3204135576bd987427603bb4dab7b1b
+R02_MERGE_SHA: 02b804dd817cf485419801e8b9f8aa9cb939e3de
 IMPLEMENTATION_BASE_SHA: <latest main used for branch>
 IMPLEMENTATION_HEAD_SHA: <final branch head>
 ```
 
-Explain all intervening commits between spec base and implementation base.
-
-## Required database evidence
+Required database evidence:
 
 ```text
-SUPABASE_START_BEFORE: PASS / FAIL / BLOCKED
-FIRST_DETERMINISTIC_DB_BLOCKER_BEFORE: ...
-ROOT_DB_ERROR: ...
-TRANSIENT_INFRA_NOISE: ...
-MIGRATION_HISTORY_DECISION: ...
-MIGRATION_FILES_CHANGED: ...
-SEED_CHANGED: YES / NO
-DATABASE_SCHEMA_CHANGED: YES / NO
-RLS_CHANGED: YES / NO
-GENERATED_DB_TYPES_CHANGED: YES / NO
-SUPABASE_START_AFTER: PASS / FAIL
-DB_RESET_LOCAL: PASS / FAIL
-DB_SQL_TESTS: PASS / FAIL
-DB_LINT: PASS / FAIL
-DB_GENERATE: PASS / FAIL
-DB_TYPE_DRIFT: PASS / FAIL
-DB_RUNTIME_INTEGRATION: PASS / FAIL / BLOCKED
-SUPABASE_DB_QUALITY: PASS / FAIL
+SUPABASE_START_BEFORE:
+FIRST_DETERMINISTIC_DB_BLOCKER_BEFORE:
+ROOT_DB_ERROR:
+TRANSIENT_INFRA_NOISE:
+MIGRATION_HISTORY_DECISION:
+MECHANICAL_BASELINE_POLICY_FIX:
+MECHANICAL_ACTOR_MIGRATION_POLICY_FIX:
+MIGRATION_FILES_CHANGED:
+SEED_CHANGED:
+SQL_TEST_EXPECTATIONS_CHANGED:
+DATABASE_SCHEMA_CHANGED:
+RLS_CHANGED:
+GENERATED_DB_TYPES_CHANGED:
+SUPABASE_START_AFTER:
+DB_RESET_LOCAL:
+DB_SQL_TESTS:
+DB_LINT:
+DB_GENERATE:
+DB_TYPE_DRIFT:
+DB_RUNTIME_INTEGRATION:
+SUPABASE_DB_QUALITY:
 ```
 
-## Required application preservation evidence
+Required R03/R04 boundary evidence:
 
 ```text
-NEXT_FLOW_QUALITY: PASS / FAIL / NOT APPLICABLE
-LINT: PASS / FAIL / NOT RUN / NOT APPLICABLE
-TYPECHECK: PASS / FAIL / NOT RUN / NOT APPLICABLE
-UNIT: PASS / FAIL / NOT RUN / NOT APPLICABLE
-APP_INTEGRATION: PASS / FAIL / NOT RUN / NOT APPLICABLE
-BUILD_NEXT: PASS / FAIL / NOT RUN / NOT APPLICABLE
+REAL_ACTOR_FIXTURES_ADDED: NO
+POSITIVE_ACTOR_AUTHORIZATION_IMPLEMENTED: NO
+FINAL_BRANCH_MEMBERSHIP_SEMANTICS_IMPLEMENTED: NO
+FULL_PERMISSION_RLS_IMPLEMENTED: NO
+ACTORLESS_DEFAULT_DENY_PROVEN: YES
+R04_HANDOFF_GAPS: <exact list>
 ```
 
-## Required production declarations
+Required production declarations:
 
 ```text
 PRODUCTION_DB_MODIFIED: NO
@@ -841,78 +946,85 @@ CUSTOMER_REDESIGN: NO
 VOICE_IMPLEMENTED: NO
 ```
 
-## Merge control
+Required checks for R03 implementation merge:
 
-- no direct push to `main`;
-- no auto-merge;
-- required R03 checks must pass;
-- owner/manual merge required;
-- R03 remains incomplete until owner merges the implementation PR.
+```text
+Phase/Round Gate = PASS
+Supabase Database Quality = PASS
+Next Flow Quality = PASS if triggered
+Dependency Integrity = PASS only if package files change
+```
+
+No auto-merge. Owner/manual merge only.
 
 ---
 
 # 21. Definition of Done
 
-P01/R03 is complete only when all required conditions are backed by repository/CI evidence.
+R03 is done only when all applicable items are backed by actual repository/CI evidence.
 
-## Authorization / base
+## Authorization/base
 
-- [ ] R02 implementation PR #20 was merged first.
-- [ ] R02 required checks passed.
-- [ ] this R03 spec was merged to main before implementation.
-- [ ] implementation branch started from latest verified main.
-- [ ] implementation base SHA documented.
+- [ ] corrected spec merged before implementation;
+- [ ] R02 merged and required checks green;
+- [ ] latest main inspected;
+- [ ] implementation branch from latest main.
 
-## Failure diagnosis
+## Diagnosis/history
 
-- [ ] inherited Supabase failure reproduced from current main or explained if repository state changed.
-- [ ] transient registry/image failures distinguished from deterministic SQL failure.
-- [ ] actual root DB error captured.
-- [ ] migration-history safety decision documented.
+- [ ] inherited failure reproduced or repository change explains why not;
+- [ ] transient registry noise distinguished from SQL failure;
+- [ ] actual root DB error captured;
+- [ ] migration-history decision explicit;
+- [ ] historical no-op migration untouched.
 
-## Fresh bootstrap
+## Fresh database
 
-- [ ] local Supabase starts.
-- [ ] all migrations apply.
-- [ ] deterministic seed loads.
+- [ ] local Supabase starts;
+- [ ] every migration applies;
+- [ ] deterministic seed loads;
 - [ ] local reset succeeds.
+
+## R03 structural security
+
+- [ ] organization/tenant-root policy bootstrap is structurally valid;
+- [ ] RLS is not disabled to force green;
+- [ ] no bypass privilege added;
+- [ ] no actor results in default denial on actor-protected domain rows;
+- [ ] cross-tenant write remains denied.
 
 ## Database quality
 
-- [ ] SQL tests pass.
-- [ ] DB lint passes.
-- [ ] Kysely generation succeeds.
-- [ ] generated type drift verification passes.
-- [ ] DB runtime integration executes and passes for R03 baseline.
+- [ ] SQL tests pass;
+- [ ] DB lint passes;
+- [ ] Kysely generation succeeds;
+- [ ] generated drift check passes;
+- [ ] DB runtime mechanics pass;
 - [ ] `Supabase Database Quality` passes.
 
-## Security / history
+## R03/R04 discipline
 
-- [ ] historical no-op migration remains untouched.
-- [ ] no applied migration rewritten without explicit safe evidence/policy decision.
-- [ ] tenant isolation not disabled to force green.
-- [ ] no BYPASSRLS shortcut added.
-- [ ] no production/remote database modified.
-- [ ] no real data/secrets introduced.
+- [ ] no real actor/user/role/membership fixture matrix added for positive authorization;
+- [ ] no final branch-membership semantic redesign;
+- [ ] no full permission-aware RLS rollout;
+- [ ] stale tenant-only positive tests corrected to default-deny where necessary;
+- [ ] exact remaining actor-aware gaps handed to R04.
 
 ## Application preservation
 
-- [ ] R02 application baseline not regressed.
-- [ ] Next Flow Quality passes if triggered.
-- [ ] build remains independent of real DB secret.
+- [ ] R02 application baseline not regressed;
+- [ ] Next Flow Quality passes if triggered;
+- [ ] build remains independent of production DB secret.
 
-## Scope discipline
+## Product scope discipline
 
-- [ ] no Auth.js runtime work.
-- [ ] no product persistence migration.
-- [ ] no realtime.
-- [ ] no kitchen redesign.
-- [ ] no payment provider implementation.
-- [ ] no voice work.
-- [ ] no R05 repository/deployment cleanup stolen.
-- [ ] actor-aware authorization redesign deferred to R04 unless mechanically required for bootstrap.
-
-## Completion rule
+- [ ] no Auth.js;
+- [ ] no persistence cutover;
+- [ ] no realtime;
+- [ ] no kitchen redesign;
+- [ ] no payment provider work;
+- [ ] no voice work;
+- [ ] no R05/R06 work.
 
 Before owner merge:
 
@@ -930,53 +1042,47 @@ P01/R03 = COMPLETE
 
 # 22. Handoff to Next Round
 
-## Expected completed state after R03 merge
-
-P01/R04 should inherit:
+R04 must inherit:
 
 ```text
-DETERMINISTIC APPLICATION BASELINE
+GREEN APPLICATION BASELINE
 +
 FRESH LOCAL SUPABASE BOOTSTRAP PASS
 +
 ALL MIGRATIONS APPLY
 +
-DETERMINISTIC SEED PASS
+DETERMINISTIC STRUCTURAL SEED PASS
 +
-DATABASE SQL TEST BASELINE PASS
+STRUCTURAL SQL TESTS PASS
 +
-DATABASE LINT PASS
+ACTORLESS DEFAULT-DENY PASS
 +
-KYSELY GENERATED TYPE DRIFT PASS
+DB LINT PASS
 +
-DATABASE RUNTIME INTEGRATION BASELINE PASS
+KYSELY TYPE DRIFT PASS
 +
-EXACT EVIDENCE OF REMAINING ACTOR / RLS AUTHORIZATION GAPS
+DB RUNTIME MECHANICS PASS
++
+SUPABASE DATABASE QUALITY PASS
++
+NO REAL ACTOR AUTHORIZATION CLAIM YET
 ```
 
-R04 must not have to rediscover whether a fresh database can start.
-
-## Required next specification
+Required next specification:
 
 ```text
 FLOW_P01_R04_IMPLEMENTATION_SPEC.md
 ```
 
-Required location:
+If the exact R04 spec is absent from current `main` after R03 implementation is owner-merged, stop.
 
-```text
-docs/07-delivery/development-phases/FLOW_P01_R04_IMPLEMENTATION_SPEC.md
-```
-
-After R03 implementation is owner-merged, if that exact file does not exist on current `main`, development must stop.
-
-Do not infer or implement R04 from the Phase 01 boundary description alone.
+If the R04 spec exists but R03 implementation is not owner-merged or required checks failed, stop.
 
 ---
 
 # 23. Development Gate
 
-The FLOW hard gate remains:
+The hard gate remains:
 
 ```text
 NO SPEC = NO DEVELOPMENT
@@ -986,26 +1092,18 @@ FAILED REQUIRED CI = NO NEXT ROUND
 NO NEXT PHASE SPEC = STOP
 ```
 
-## R03 legal execution sequence
+Legal R03 execution sequence:
 
 ```text
-R03 SPEC REVIEWED + MERGED TO MAIN
+CORRECTED R03 SPEC MERGED TO MAIN
         ↓
-VERIFY R02 PR #20 OWNER-MERGED
-        ↓
-VERIFY R02 REQUIRED CHECKS
+VERIFY R02 MERGE + REQUIRED CHECKS
         ↓
 FETCH LATEST MAIN
         ↓
-VERIFY EXACT R03 SPEC = READY
-        ↓
-INSPECT INTERVENING COMMITS
-        ↓
 CREATE R03 IMPLEMENTATION BRANCH
         ↓
-READ DATABASE + REPOSITORY INSTRUCTIONS
-        ↓
-REPRODUCE FRESH SUPABASE FAILURE
+REPRODUCE CURRENT FRESH-SUPABASE FAILURE
         ↓
 CAPTURE ROOT SQL ERROR
         ↓
@@ -1013,25 +1111,29 @@ CLASSIFY TRANSIENT VS DETERMINISTIC FAILURE
         ↓
 DECIDE MIGRATION-HISTORY SAFETY
         ↓
-MAKE MINIMUM SAFE R03 REPAIR
+REPAIR FIRST MECHANICAL BOOTSTRAP BLOCKER
         ↓
-SUPABASE START
+RERUN COMPLETE MIGRATION CHAIN
         ↓
-DB RESET + SEED
+REPAIR ANY LATER DISTINCT MECHANICAL BOOTSTRAP BLOCKER
         ↓
-SQL TESTS
+RESET + STRUCTURAL SEED
+        ↓
+STRUCTURAL SQL TESTS
+        ↓
+CORRECT STALE TENANT-ONLY POSITIVE TESTS TO ACTORLESS DEFAULT-DENY
         ↓
 DB LINT
         ↓
-KYSELY GENERATE + DRIFT VERIFY
+KYSELY GENERATE + DRIFT
         ↓
-DB RUNTIME INTEGRATION
-        ↓
-PRESERVE APPLICATION QUALITY
+DB RUNTIME CONNECTION/ROLE/CONTEXT/DEFAULT-DENY MECHANICS
         ↓
 SUPABASE DATABASE QUALITY PASS
         ↓
-OPEN / UPDATE R03 IMPLEMENTATION PR
+PRESERVE NEXT FLOW QUALITY
+        ↓
+OPEN R03 IMPLEMENTATION PR
         ↓
 STOP FOR OWNER REVIEW
         ↓
@@ -1039,55 +1141,39 @@ OWNER MANUAL MERGE
         ↓
 P01/R03 COMPLETE
         ↓
-VERIFY EXACT R04 SPEC ON MAIN
+VERIFY R04 SPEC
         ↓
-IF MISSING → STOP
+IF R04 SPEC MISSING OR REQUIRED R03 CHECK FAILED → STOP
 ```
 
-## Explicit prohibitions
-
-The R03 implementation agent must not:
+Explicit prohibitions:
 
 ```text
-start before R02 is merged
-push directly to main
-merge its own implementation PR
-enable auto-merge
-start R04 implementation
-invent R04 scope
-rewrite migration history without evidence
-modify the historical no-op migration
-disable RLS to force green
-add BYPASSRLS for convenience
-skip failing DB tests
-weaken DB lint
-disable generated-type drift checks
-use production DB credentials
-push/reset/repair a linked production DB
-implement Auth.js
-implement product persistence
-implement payment providers
-implement Voice Ordering
-hide transient or deterministic failure evidence
+NO DIRECT MAIN PUSH
+NO AUTO-MERGE
+NO R04 IMPLEMENTATION IN R03
+NO PRODUCTION DB MUTATION
+NO MIGRATION HISTORY GUESSING
+NO RLS DISABLE/BYPASS SHORTCUT
+NO TEST SKIPPING TO FORCE GREEN
+NO REAL ACTOR FIXTURE MATRIX IN R03
+NO AUTH.JS
+NO PRODUCT PERSISTENCE
+NO PAYMENT OR VOICE WORK
 ```
 
-## Final R03 success test
-
-R03 succeeds only when repository/CI evidence can answer:
+Final R03 success test:
 
 ```text
-Fresh local database boots from committed state? YES
-All committed migrations apply? YES
-Seed is deterministic? YES
-Database tests pass? YES
-Database lint passes? YES
-Generated DB types match schema? YES
-DB runtime integration reaches and passes baseline? YES
-Supabase Database Quality is green? YES
-Production database was untouched? YES
-Migration history was handled safely and explicitly? YES
-Application baseline remains trustworthy? YES
-R04 is not started without its exact spec? YES
+Fresh local DB boots? YES
+All migrations apply? YES
+Seed structurally deterministic? YES
+Structural SQL tests pass? YES
+Actorless access fails closed? YES
+DB lint passes? YES
+Generated DB types match fresh schema? YES
+DB runtime mechanics pass? YES
+Supabase Database Quality green? YES
+Production DB untouched? YES
+Positive actor semantics deferred cleanly to R04? YES
 ```
-
-Until owner/manual merge, `PR_MERGED = NO` and R03 is not COMPLETE.
