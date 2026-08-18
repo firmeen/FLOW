@@ -26,6 +26,15 @@ export class DatabaseConfigurationError extends Error {
   }
 }
 
+function readDatabaseEnvironment(): Partial<DatabaseEnvironment> {
+  return {
+    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_POOL_MAX: process.env.DATABASE_POOL_MAX,
+    DATABASE_CONNECTION_TIMEOUT_MS: process.env.DATABASE_CONNECTION_TIMEOUT_MS,
+    DATABASE_IDLE_TIMEOUT_MS: process.env.DATABASE_IDLE_TIMEOUT_MS,
+  };
+}
+
 function parsePositiveInteger(
   value: string | undefined,
   fallback: number,
@@ -49,24 +58,30 @@ function parsePositiveInteger(
 }
 
 export function getDatabaseConfig(
-  env: Partial<DatabaseEnvironment> = process.env,
+  env?: Partial<DatabaseEnvironment>,
 ): DatabaseRuntimeConfig {
-  const connectionString = env.DATABASE_URL?.trim();
+  const resolvedEnv = env ?? readDatabaseEnvironment();
+  const connectionString = resolvedEnv.DATABASE_URL?.trim();
   if (!connectionString) {
     throw new DatabaseConfigurationError("Database runtime is not configured.");
   }
 
   return {
     connectionString,
-    poolMax: parsePositiveInteger(env.DATABASE_POOL_MAX, DEFAULT_POOL_MAX, "DATABASE_POOL_MAX", 20),
+    poolMax: parsePositiveInteger(
+      resolvedEnv.DATABASE_POOL_MAX,
+      DEFAULT_POOL_MAX,
+      "DATABASE_POOL_MAX",
+      20,
+    ),
     connectionTimeoutMillis: parsePositiveInteger(
-      env.DATABASE_CONNECTION_TIMEOUT_MS,
+      resolvedEnv.DATABASE_CONNECTION_TIMEOUT_MS,
       DEFAULT_CONNECTION_TIMEOUT_MS,
       "DATABASE_CONNECTION_TIMEOUT_MS",
       60_000,
     ),
     idleTimeoutMillis: parsePositiveInteger(
-      env.DATABASE_IDLE_TIMEOUT_MS,
+      resolvedEnv.DATABASE_IDLE_TIMEOUT_MS,
       DEFAULT_IDLE_TIMEOUT_MS,
       "DATABASE_IDLE_TIMEOUT_MS",
       300_000,
