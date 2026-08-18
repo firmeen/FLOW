@@ -16,6 +16,26 @@ describe("database config", () => {
     expect(() => getDatabaseConfig({})).toThrow(DatabaseConfigurationError);
   });
 
+  it("fails lazily through the default process.env path when DATABASE_URL is absent", () => {
+    delete process.env.DATABASE_URL;
+
+    expect(() => getDatabaseConfig()).toThrow(DatabaseConfigurationError);
+  });
+
+  it("reads the current process.env lazily when no explicit environment is provided", () => {
+    process.env.DATABASE_URL = "postgresql://default.invalid/postgres";
+    process.env.DATABASE_POOL_MAX = "3";
+    process.env.DATABASE_CONNECTION_TIMEOUT_MS = "4000";
+    process.env.DATABASE_IDLE_TIMEOUT_MS = "8000";
+
+    const result = getDatabaseConfig();
+
+    expect(result.connectionString).toBe("postgresql://default.invalid/postgres");
+    expect(result.poolMax).toBe(3);
+    expect(result.connectionTimeoutMillis).toBe(4000);
+    expect(result.idleTimeoutMillis).toBe(8000);
+  });
+
   it("does not include a configured secret URL in validation errors", () => {
     const secretUrl = "postgresql://user:secret@example.invalid:5432/postgres";
     try {
