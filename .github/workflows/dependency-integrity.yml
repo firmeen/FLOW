@@ -1,0 +1,42 @@
+name: Dependency Integrity
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/web/next-flow/package.json"
+      - "apps/web/next-flow/package-lock.json"
+      - ".github/workflows/dependency-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/web/next-flow/package.json"
+      - "apps/web/next-flow/package-lock.json"
+      - ".github/workflows/dependency-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-integrity:
+    name: Dependency Integrity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web/next-flow
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Clean install from committed dependency state
+        run: npm ci
