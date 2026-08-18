@@ -1,0 +1,36 @@
+name: R02 Application Integration Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/web/next-flow/**"
+      - ".github/workflows/r02-application-integration-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  application-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web/next-flow
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run application integration suite
+        run: npm run test:integration
