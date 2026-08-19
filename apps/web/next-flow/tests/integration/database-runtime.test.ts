@@ -5,11 +5,11 @@ import { destroyDatabaseRuntimeForTests, getDatabaseRuntime } from "@/server/db/
 import { checkDatabaseHealth } from "@/server/db/health";
 import { withTenantTransaction } from "@/server/db/transaction";
 
-const tenantA = "00000000-0000-0000-0000-0000000000a1";
-const tenantB = "00000000-0000-0000-0000-0000000000b1";
-const branchA = "00000000-0000-0000-0000-0000000000a3";
-const branchB = "00000000-0000-0000-0000-0000000000b3";
-const actorProbe = "00000000-0000-0000-0000-0000000000f1";
+const tenantA = "10000000-0000-4000-8000-0000000000a1";
+const tenantB = "10000000-0000-4000-8000-0000000000b1";
+const branchA = "20000000-0000-4000-8000-0000000000a3";
+const branchB = "20000000-0000-4000-8000-0000000000b3";
+const actorProbe = "30000000-0000-4000-8000-0000000000f1";
 
 describe.runIf(Boolean(process.env.DATABASE_URL))("database runtime", () => {
   beforeAll(() => {
@@ -52,14 +52,13 @@ describe.runIf(Boolean(process.env.DATABASE_URL))("database runtime", () => {
     await expect(
       withTenantTransaction({ tenantId: tenantA }, async (trx) => {
         await trx
-          .insertInto("app.restaurants")
+          .insertInto("app.organizations")
           .values({
-            tenant_id: tenantA,
+            id: tenantA,
+            slug: "forbidden-actorless-write",
             name: "Forbidden Actorless Write",
             legal_name: null,
-            slug: "forbidden-actorless-write",
-            logo_url: null,
-            currency: "THB",
+            default_currency: "THB",
             timezone: "Asia/Bangkok",
           })
           .execute();
