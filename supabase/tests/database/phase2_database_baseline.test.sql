@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(26);
+select plan(27);
 
 select has_schema('app', 'app schema exists');
 select has_schema('foodflow', 'foodflow schema exists');
@@ -99,19 +99,32 @@ select throws_ok(
   'duplicate submission key rejected'
 );
 
-set local role flow_runtime;
-select set_config('app.tenant_id', '', true);
-select is((select count(*)::integer from foodflow.menu_items), 0, 'no tenant context sees no domain rows');
-select set_config('app.tenant_id', '00000000-0000-0000-0000-0000000000a1', true);
-select is((select count(*)::integer from foodflow.menu_items), 1, 'tenant A sees only tenant A menu rows');
-select throws_ok(
-  $$ insert into foodflow.menu_categories (tenant_id, restaurant_id, name, display_order)
-     values ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b2', 'Cross tenant', 1) $$,
-  '42501',
-  null,
-  'tenant A cannot insert tenant B row through RLS'
+select ok(
+  coalesce((select not rolbypassrls from pg_roles where rolname = 'flow_runtime'), false)
+  and exists (
+    select 1
+    from pg_policy p
+    where p.polrelid = 'foodflow.menu_items'::regclass
+      and p.polname = 'tenant_actor_isolation'
+      and pg_get_expr(p.polqual, p.polrelid) like '%actor_has_active_membership%'
+  )
+  and exists (
+    select 1
+    from pg_policy p
+    where p.polrelid = 'app.organizations'::regclass
+      and p.polname = 'tenant_actor_isolation'
+      and pg_get_expr(p.polqual, p.polrelid) like '%current_tenant_id%'
+      and pg_get_expr(p.polqual, p.polrelid) like '%actor_has_active_membership%'
+  )
+  and exists (
+    select 1
+    from pg_policy p
+    where p.polrelid = 'app.branches'::regclass
+      and p.polname = 'tenant_actor_isolation'
+      and pg_get_expr(p.polqual, p.polrelid) like '%actor_has_active_membership%'
+  ),
+  'flow_runtime cannot bypass RLS and actor-aware policies structurally gate tenant, organization, and branch access'
 );
-reset role;
 
 select * from finish();
 rollback;

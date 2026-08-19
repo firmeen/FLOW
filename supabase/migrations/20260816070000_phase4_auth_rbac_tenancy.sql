@@ -4,6 +4,7 @@ exception when duplicate_object then null;
 end $$;
 
 grant usage on schema app, private to flow_identity;
+grant usage on schema private to flow_runtime;
 grant execute on function private.current_actor_id() to flow_identity;
 
 create table private.user_credentials (
@@ -117,7 +118,19 @@ begin
     ) as t(schema_name, table_name, branch_scoped)
   loop
     execute format('drop policy if exists tenant_isolation on %I.%I', target.schema_name, target.table_name);
-    if target.branch_scoped then
+    if target.schema_name = 'app' and target.table_name = 'organizations' then
+      execute format(
+        'create policy tenant_actor_isolation on %I.%I for all to flow_runtime using (id = private.current_tenant_id() and private.actor_has_active_membership(id, null)) with check (id = private.current_tenant_id() and private.actor_has_active_membership(id, null))',
+        target.schema_name,
+        target.table_name
+      );
+    elsif target.schema_name = 'app' and target.table_name = 'branches' then
+      execute format(
+        'create policy tenant_actor_isolation on %I.%I for all to flow_runtime using (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, id)) with check (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, id))',
+        target.schema_name,
+        target.table_name
+      );
+    elsif target.branch_scoped then
       execute format(
         'create policy tenant_actor_isolation on %I.%I for all to flow_runtime using (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, branch_id)) with check (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, branch_id))',
         target.schema_name,

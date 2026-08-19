@@ -733,11 +733,19 @@ begin
   loop
     execute format('alter table %I.%I enable row level security', target.schema_name, target.table_name);
     execute format('alter table %I.%I force row level security', target.schema_name, target.table_name);
-    execute format(
-      'create policy tenant_isolation on %I.%I for all to flow_runtime using (tenant_id = private.current_tenant_id()) with check (tenant_id = private.current_tenant_id())',
-      target.schema_name,
-      target.table_name
-    );
+    if target.schema_name = 'app' and target.table_name = 'organizations' then
+      execute format(
+        'create policy tenant_isolation on %I.%I for all to flow_runtime using (id = private.current_tenant_id()) with check (id = private.current_tenant_id())',
+        target.schema_name,
+        target.table_name
+      );
+    else
+      execute format(
+        'create policy tenant_isolation on %I.%I for all to flow_runtime using (tenant_id = private.current_tenant_id()) with check (tenant_id = private.current_tenant_id())',
+        target.schema_name,
+        target.table_name
+      );
+    end if;
   end loop;
 end
 $rls$;
