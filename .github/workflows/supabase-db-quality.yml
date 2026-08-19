@@ -86,5 +86,5 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
           DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-          DATABASE_POOL_MAX: 1
+          DATABASE_POOL_MAX: 2
         run: npm run test:db-runtime
