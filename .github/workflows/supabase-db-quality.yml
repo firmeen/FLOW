@@ -77,13 +77,6 @@ jobs:
           DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
         run: npm run db:generate
 
-      - name: Upload generated R03 database types
-        uses: actions/upload-artifact@v4
-        with:
-          name: r03-generated-database-types
-          path: apps/web/next-flow/src/server/db/generated/database.ts
-          if-no-files-found: error
-
       - name: Verify generated type drift
         working-directory: apps/web/next-flow
         run: git diff --exit-code -- src/server/db/generated/database.ts
