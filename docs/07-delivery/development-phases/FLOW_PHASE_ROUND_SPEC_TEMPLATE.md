@@ -9,7 +9,11 @@
 - Previous: `NONE | FLOW_PXX_RXX_IMPLEMENTATION_SPEC.md`
 - Next: `FLOW_PXX_RXX_IMPLEMENTATION_SPEC.md | NONE`
 - Planned execution: `YYYY-MM-DD HH:mm Asia/Bangkok`
-- Owner approval required: `YES`
+- Automatic merge allowed: `YES`
+- Merge condition: `ALL REQUIRED CHECKS PASS`
+- Owner approval required before merge: `NO`
+
+> Default merge mechanics are governed by `FLOW_MERGE_POLICY.md`. A round may require manual owner approval only when this specification explicitly declares and justifies a high-risk exception.
 
 ## 1. Phase Objective
 
@@ -262,6 +266,16 @@ Run only commands that exist for the repository/application and record actual ou
 # build
 ```
 
+Record actual outcomes using only:
+
+```text
+PASS
+FAIL
+NOT RUN
+BLOCKED
+NOT APPLICABLE
+```
+
 ## 20. PR Requirements
 
 The PR for this round must:
@@ -272,8 +286,10 @@ The PR for this round must:
 - [ ] Explain database/configuration/environment changes.
 - [ ] Include test and validation results.
 - [ ] Identify known limitations or deferred work.
-- [ ] Pass required CI before merge.
-- [ ] Be merged before the next round may start.
+- [ ] Pass every required CI/check before merge.
+- [ ] Record merge-eligibility evidence required by `FLOW_MERGE_POLICY.md`.
+- [ ] Be merged successfully before the next round may start.
+- [ ] Never bypass a failed, pending, cancelled, blocked, or incomplete required check.
 
 ## 21. Definition of Done
 
@@ -285,7 +301,21 @@ The PR for this round must:
 - [ ] Database migrations are safe and documented where applicable.
 - [ ] UI states and failure paths are implemented where applicable.
 - [ ] Documentation/configuration affected by the round is updated.
-- [ ] PR is ready for owner review and merge.
+- [ ] PR is mergeable and non-conflicting.
+- [ ] Merge-eligibility gate passes.
+- [ ] PR is merged to `main` and the merge SHA is verified before the round is declared complete.
+
+Before merge:
+
+```text
+PXX/RXX = IMPLEMENTED / WAITING FOR VALIDATED MERGE
+```
+
+After successful validated merge:
+
+```text
+PXX/RXX = COMPLETE
+```
 
 ## 22. Handoff to Next Round
 
@@ -305,14 +335,18 @@ Summarize the repository state the next round is expected to inherit.
 FLOW_PXX_RXX_IMPLEMENTATION_SPEC.md
 ```
 
+After merge, stop the current scheduled execution. The next round may begin only on a later scheduled slot after current `main` is read again and the exact `Next` specification is verified.
+
 ## 23. Development Gate
 
 ```text
 NO SPEC = NO DEVELOPMENT
-NO MERGE = NO NEXT ROUND
-FAILED REQUIRED CI = NO NEXT ROUND
+FAILED REQUIRED CI = NO MERGE
+NO SUCCESSFUL MERGE = NO NEXT ROUND
 6 MERGED ROUNDS = PHASE COMPLETE
 NO NEXT PHASE SPEC = STOP
 ```
 
-Before the next round begins, verify that the exact file named in `Next` exists on `main`. If it does not exist, stop and notify the owner. Do not infer or invent the next implementation scope.
+Before the next round begins, verify that the previous implementation PR merged successfully, its required checks passed, and the exact file named in `Next` exists on current `main`. If any condition fails, stop and report the exact blocker. Do not infer or invent the next implementation scope.
+
+Merge mechanics default to `FLOW_MERGE_POLICY.md`: validated automatic merge after all required checks pass, with at most one round executed per scheduled slot.
