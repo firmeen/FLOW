@@ -1,0 +1,86 @@
+name: R03 Database Bootstrap Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "supabase/**"
+      - ".github/workflows/r03-database-bootstrap-diagnostic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  prove-branch-root-error:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Reproduce branch-root policy error in PostgreSQL
+        shell: bash
+        env:
+          PGPASSWORD: postgres
+        run: |
+          cat > /tmp/r03-branch-root.sql <<'SQL'
+          create schema app;
+          create schema private;
+          create role flow_runtime nologin nobypassrls;
+
+          create function private.current_tenant_id() returns uuid
+          language sql stable
+          set search_path = pg_catalog
+          as $$ select nullif(current_setting('app.tenant_id', true), '')::uuid $$;
+
+          create function private.actor_has_active_membership(target_tenant_id uuid, target_branch_id uuid default null)
+          returns boolean language sql stable as $$ select false $$;
+
+          create table app.branches (
+            id uuid primary key,
+            tenant_id uuid not null
+          );
+
+          alter table app.branches enable row level security;
+          alter table app.branches force row level security;
+
+          create policy tenant_actor_isolation on app.branches
+          for all to flow_runtime
+          using (
+            tenant_id = private.current_tenant_id()
+            and private.actor_has_active_membership(tenant_id, branch_id)
+          )
+          with check (
+            tenant_id = private.current_tenant_id()
+            and private.actor_has_active_membership(tenant_id, branch_id)
+          );
+          SQL
+
+          set +e
+          output=$(psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f /tmp/r03-branch-root.sql 2>&1)
+          status=$?
+          set -e
+
+          printf '%s\n' "$output"
+
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the historical branch-root policy expression to fail, but it succeeded."
+            exit 1
+          fi
+
+          if ! grep -Fq 'column "branch_id" does not exist' <<<"$output"; then
+            echo "The failure did not match the expected PostgreSQL root error."
+            exit 1
+          fi
+
+          echo "Confirmed blocker: app.branches uses id as branch identity and has no branch_id column."
