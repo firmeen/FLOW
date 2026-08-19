@@ -35,6 +35,7 @@ Rules:
 - One phase contains 6 rounds.
 - The normal cadence is 2 days per phase and 3 rounds per day.
 - The normal round times are 04:00, 12:00, and 20:00 Asia/Bangkok.
+- One scheduled slot may execute at most one round, even when that round merges successfully before the slot ends.
 - Do not rename a specification after development for that round has started.
 - Do not reuse a phase/round filename for a different scope.
 
@@ -44,8 +45,8 @@ FLOW development must follow these hard gates:
 
 ```text
 NO SPEC = NO DEVELOPMENT
-NO MERGE = NO NEXT ROUND
-FAILED REQUIRED CI = NO NEXT ROUND
+FAILED REQUIRED CI = NO MERGE
+NO SUCCESSFUL MERGE = NO NEXT ROUND
 6 MERGED ROUNDS = PHASE COMPLETE
 NO NEXT PHASE SPEC = STOP
 ```
@@ -59,7 +60,50 @@ Before starting any round, verify all of the following:
 5. The specification identifies the previous and next specification explicitly.
 6. The current implementation scope is taken from the specification; agents must not invent the next round when no specification exists.
 
-If any required gate fails, stop before implementation and notify the owner.
+If any required entry gate fails, stop before implementation and report the exact blocker.
+
+## Validated automatic merge policy
+
+The default FLOW merge model is **validated automatic merge after required checks pass**.
+
+The authoritative merge policy is:
+
+```text
+FLOW_MERGE_POLICY.md
+```
+
+For every implementation round:
+
+```text
+IMPLEMENT EXACT SPEC
+→ OPEN OR UPDATE EXACTLY ONE IMPLEMENTATION PR TO MAIN
+→ WAIT FOR ALL REQUIRED CHECKS
+→ VERIFY ALL REQUIRED CHECKS PASS
+→ VERIFY PR IS MERGEABLE / NON-CONFLICTING
+→ MERGE TO MAIN
+→ VERIFY MERGE SHA AND CURRENT MAIN
+→ STOP UNTIL THE NEXT SCHEDULED SLOT
+```
+
+An implementation PR must not merge while a required check is failed, pending, queued, cancelled, blocked, timed out, or otherwise incomplete. A failed or incomplete merge gate stops progression and must be reported rather than bypassed.
+
+Direct push to `main` remains prohibited.
+
+### Legacy specification merge wording
+
+Specifications authored before `FLOW_MERGE_POLICY.md` may contain historical merge-only language such as:
+
+```text
+Automatic merge allowed: NO
+Owner/manual merge required
+Stop for owner review
+```
+
+Once the validated automatic merge policy is present on `main`, `FLOW_MERGE_POLICY.md` and this README supersede those legacy phrases **only for the actor/mechanics of merging**. The executable specification remains authoritative for implementation scope, security boundaries, required validation, Phase/Round metadata, and all non-merge prohibitions.
+
+Historical completed-round specs do not need to be rewritten solely to modernize old merge wording.
+
+A future specification may explicitly require manual approval for a concrete high-risk reason. Such an exception must be declared clearly in that round's metadata and is not inferred from legacy wording.
 
 ## Required specification structure
 
@@ -101,6 +145,9 @@ Round: 01
 Status: READY
 Previous: NONE
 Next: FLOW_P01_R02_IMPLEMENTATION_SPEC.md
+Automatic merge allowed: YES
+Merge condition: ALL REQUIRED CHECKS PASS
+Owner approval required before merge: NO
 ```
 
 The final round of a phase points to the first round of the next phase:
@@ -119,7 +166,8 @@ For a new round specification:
 2. Rename it using `FLOW_P{PHASE}_R{ROUND}_IMPLEMENTATION_SPEC.md`.
 3. Fill every section required by the scope.
 4. Confirm `Previous` and `Next` are correct.
-5. Open a PR targeting `main`.
-6. Merge the specification before that development round is allowed to start.
+5. Confirm merge metadata follows `FLOW_MERGE_POLICY.md` unless the round explicitly documents a manual-approval exception.
+6. Open a PR targeting `main`.
+7. Merge the specification before that development round is allowed to start.
 
 The repository state on `main` is the authoritative source for whether a specification exists and whether development may continue.
