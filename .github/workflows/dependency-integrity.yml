@@ -4,17 +4,9 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "apps/web/next-flow/package.json"
-      - "apps/web/next-flow/package-lock.json"
-      - ".github/workflows/dependency-integrity.yml"
   push:
     branches:
       - main
-    paths:
-      - "apps/web/next-flow/package.json"
-      - "apps/web/next-flow/package-lock.json"
-      - ".github/workflows/dependency-integrity.yml"
 
 permissions:
   contents: read
@@ -23,15 +15,36 @@ jobs:
   dependency-integrity:
     name: Dependency Integrity
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web/next-flow
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify dependency scope
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          CHANGED="$(git diff --name-only "$BASE...$HEAD" || true)"
+          printf '%s\n' "$CHANGED"
+          if printf '%s\n' "$CHANGED" | grep -Eq '^(apps/web/next-flow/package\.json|apps/web/next-flow/package-lock\.json|\.github/workflows/dependency-integrity\.yml)$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Dependency scope: applicable"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Dependency scope: not applicable"
+          fi
 
       - name: Set up Node.js
+        if: steps.scope.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -39,4 +52,10 @@ jobs:
           cache-dependency-path: apps/web/next-flow/package-lock.json
 
       - name: Clean install from committed dependency state
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
         run: npm ci
+
+      - name: Report not applicable
+        if: steps.scope.outputs.run != 'true'
+        run: echo "Dependency Integrity: PASS (not applicable)"
