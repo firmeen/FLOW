@@ -19,9 +19,7 @@ export function parseCanonicalPrMetadata(body = "") {
     if (!match) continue;
     const key = match[1].toLowerCase();
     const value = match[2].trim().replace(/^`|`$/g, "");
-    if (fields[key] && fields[key] !== value) {
-      fail(`ERROR: Conflicting ${match[1]} fields are not allowed.`);
-    }
+    if (fields[key] && fields[key] !== value) fail(`ERROR: Conflicting ${match[1]} fields are not allowed.`);
     fields[key] = value;
   }
   return fields;
@@ -40,8 +38,7 @@ export function parseSpecMetadata(content) {
   for (const rawLine of content.split(/\r?\n/)) {
     const match = rawLine.trim().match(/^-\s+([^:]+):\s*`?([^`]+?)`?\s*$/);
     if (!match) continue;
-    const normalized = match[1].trim().toLowerCase();
-    const canonical = wanted.get(normalized);
+    const canonical = wanted.get(match[1].trim().toLowerCase());
     if (canonical) out[canonical] = match[2].trim();
   }
   for (const canonical of wanted.values()) {
@@ -55,9 +52,7 @@ export function validateSpecFilename(filename) {
     fail("ERROR: Specification must be a bare canonical filename in the controlled specification directory.");
   }
   const match = filename.match(SPEC_RE);
-  if (!match) {
-    fail("ERROR: Invalid specification filename. Expected FLOW_PXX_RXX_IMPLEMENTATION_SPEC.md with zero-padded phase and round.");
-  }
+  if (!match) fail("ERROR: Invalid specification filename. Expected FLOW_PXX_RXX_IMPLEMENTATION_SPEC.md with zero-padded phase and round.");
   const phase = Number(match[1]);
   const round = Number(match[2]);
   if (phase < 1) fail("ERROR: Phase must be >= 01.");
@@ -67,8 +62,11 @@ export function validateSpecFilename(filename) {
 
 export function classifyChangedFiles(changedFiles) {
   if (!changedFiles.length) fail("ERROR: Unable to classify PR because no changed files were supplied.");
-  const specOnly = changedFiles.every((path) => path.startsWith(`${SPEC_DIR}/`));
-  return specOnly ? "SPECIFICATION_PR" : "IMPLEMENTATION_PR";
+  const executableSpecs = changedFiles.filter((path) => path.startsWith(`${SPEC_DIR}/`) && SPEC_RE.test(path.slice(SPEC_DIR.length + 1)));
+  const outsideSpecDir = changedFiles.some((path) => !path.startsWith(`${SPEC_DIR}/`));
+  if (outsideSpecDir) return { classification: "IMPLEMENTATION_PR", executableSpecs };
+  if (executableSpecs.length > 0) return { classification: "EXECUTABLE_SPEC_PR", executableSpecs };
+  return { classification: "SPEC_MAINTENANCE_PR", executableSpecs: [] };
 }
 
 function validateContinuation(value, { allowNone }) {
@@ -76,36 +74,57 @@ function validateContinuation(value, { allowNone }) {
   validateSpecFilename(value);
 }
 
-export function evaluateAuthorization({ prBody, targetBranch, changedFiles, readBaseSpec }) {
-  const classification = classifyChangedFiles(changedFiles);
-  if (classification === "SPECIFICATION_PR") {
+function validateExecutableSpec(filename, content, targetBranch) {
+  const fileParts = validateSpecFilename(filename);
+  const spec = parseSpecMetadata(content);
+  if (!STATUS_ALLOWED.has(spec.Status)) fail(`ERROR: Referenced specification status is ${spec.Status}.`);
+  if (spec["Target branch"] !== targetBranch) fail(`ERROR: Specification target branch ${spec["Target branch"]} does not match PR target ${targetBranch}.`);
+  if (fileParts.phase !== spec.Phase || fileParts.round !== spec.Round) fail("ERROR: Filename Phase/Round does not match specification metadata.");
+  validateContinuation(spec.Previous, { allowNone: true });
+  validateContinuation(spec.Next, { allowNone: true });
+  return spec;
+}
+
+export function evaluateAuthorization({ prBody, targetBranch, changedFiles, readBaseSpec, readHeadSpec }) {
+  const { classification, executableSpecs } = classifyChangedFiles(changedFiles);
+
+  if (classification === "SPEC_MAINTENANCE_PR") {
     return { classification, authorized: true, specification: null };
   }
 
-  const pr = parseCanonicalPrMetadata(prBody);
-  if (!pr.specification) {
-    fail("ERROR: Implementation PR must include exactly one Specification field.\nExpected format:\nSpecification: FLOW_P01_R01_IMPLEMENTATION_SPEC.md");
+  if (classification === "EXECUTABLE_SPEC_PR") {
+    if (executableSpecs.length !== 1) fail("ERROR: Executable specification PRs must change exactly one canonical executable specification at a time.");
+    const path = executableSpecs[0];
+    const filename = path.slice(SPEC_DIR.length + 1);
+    const headContent = readHeadSpec(path);
+    const headSpec = validateExecutableSpec(filename, headContent, targetBranch);
+
+    let baseContent = null;
+    try { baseContent = readBaseSpec(path); } catch {}
+    if (baseContent) {
+      const baseSpec = validateExecutableSpec(filename, baseContent, targetBranch);
+      for (const key of ["Phase", "Round", "Target branch", "Previous", "Next"]) {
+        if (baseSpec[key] !== headSpec[key]) fail(`ERROR: Executable specification amendment cannot rewrite ${key}.`);
+      }
+    }
+
+    return { classification, authorized: true, specification: filename, phase: headSpec.Phase, round: headSpec.Round };
   }
+
+  const pr = parseCanonicalPrMetadata(prBody);
+  if (!pr.specification) fail("ERROR: Implementation PR must include exactly one Specification field.\nExpected format:\nSpecification: FLOW_P01_R01_IMPLEMENTATION_SPEC.md");
   if (!pr.phase || !/^\d{2}$/.test(pr.phase)) fail("ERROR: Implementation PR must include Phase: XX.");
   if (!pr.round || !/^\d{2}$/.test(pr.round)) fail("ERROR: Implementation PR must include Round: XX.");
 
-  const fileParts = validateSpecFilename(pr.specification);
   const path = `${SPEC_DIR}/${pr.specification}`;
   let specContent;
-  try {
-    specContent = readBaseSpec(path);
-  } catch {
+  try { specContent = readBaseSpec(path); } catch {
     fail(`ERROR: ${pr.specification} is not present on the PR base branch.\nMerge the specification PR to main before implementation.`);
   }
   if (!specContent) fail(`ERROR: ${pr.specification} is not present on the PR base branch.`);
 
-  const spec = parseSpecMetadata(specContent);
-  if (!STATUS_ALLOWED.has(spec.Status)) fail(`ERROR: Referenced specification status is ${spec.Status}.\nImplementation is not authorized.`);
-  if (spec["Target branch"] !== targetBranch) fail(`ERROR: Specification target branch ${spec["Target branch"]} does not match PR target ${targetBranch}.`);
-  if (fileParts.phase !== spec.Phase || fileParts.round !== spec.Round) fail("ERROR: Filename Phase/Round does not match specification metadata.");
+  const spec = validateExecutableSpec(pr.specification, specContent, targetBranch);
   if (pr.phase !== spec.Phase || pr.round !== spec.Round) fail("ERROR: PR Phase/Round does not match referenced specification metadata.");
-  validateContinuation(spec.Previous, { allowNone: true });
-  validateContinuation(spec.Next, { allowNone: true });
   if (pr.previous && pr.previous !== spec.Previous) fail("ERROR: PR Previous field does not match specification Previous metadata.");
 
   return { classification, authorized: true, specification: pr.specification, phase: spec.Phase, round: spec.Round };
@@ -130,6 +149,7 @@ function runCli() {
     targetBranch: pr.base.ref,
     changedFiles: changed,
     readBaseSpec: (path) => git(["show", `${baseSha}:${path}`]),
+    readHeadSpec: (path) => git(["show", `${headSha}:${path}`]),
   });
   console.log(`Phase/Round classification: ${result.classification}`);
   if (result.specification) console.log(`Authorized specification: ${result.specification}`);
@@ -137,9 +157,7 @@ function runCli() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  try {
-    runCli();
-  } catch (error) {
+  try { runCli(); } catch (error) {
     console.error(error?.message ?? String(error));
     process.exit(1);
   }
