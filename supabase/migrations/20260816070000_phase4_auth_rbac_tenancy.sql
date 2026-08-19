@@ -123,6 +123,12 @@ begin
         target.schema_name,
         target.table_name
       );
+    elsif target.schema_name = 'app' and target.table_name = 'branches' then
+      execute format(
+        'create policy tenant_actor_isolation on %I.%I for all to flow_runtime using (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, id)) with check (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, id))',
+        target.schema_name,
+        target.table_name
+      );
     elsif target.branch_scoped then
       execute format(
         'create policy tenant_actor_isolation on %I.%I for all to flow_runtime using (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, branch_id)) with check (tenant_id = private.current_tenant_id() and private.actor_has_active_membership(tenant_id, branch_id))',
