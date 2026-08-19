@@ -1,6 +1,6 @@
 import "server-only";
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface DatabaseRequestContext {
   tenantId: string;
@@ -15,23 +15,29 @@ export class DatabaseContextError extends Error {
   }
 }
 
-function assertUuid(value: string, field: string): void {
+export function validateUuid(value: string, field: string): string {
   if (!UUID_PATTERN.test(value)) {
     throw new DatabaseContextError(`${field} must be a valid UUID.`);
   }
+
+  return value;
+}
+
+export function validateActorId(actorId: string): string {
+  return validateUuid(actorId, "actorId");
 }
 
 export function validateDatabaseContext(
   context: DatabaseRequestContext,
 ): DatabaseRequestContext {
-  assertUuid(context.tenantId, "tenantId");
+  validateUuid(context.tenantId, "tenantId");
 
   if (context.branchId !== undefined) {
-    assertUuid(context.branchId, "branchId");
+    validateUuid(context.branchId, "branchId");
   }
 
   if (context.actorId !== undefined) {
-    assertUuid(context.actorId, "actorId");
+    validateActorId(context.actorId);
   }
 
   return context;
