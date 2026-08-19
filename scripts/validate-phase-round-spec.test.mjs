@@ -18,12 +18,19 @@ const READY_SPEC = `# FLOW P01 R01 — Implementation Specification
 - Next: \`FLOW_P01_R02_IMPLEMENTATION_SPEC.md\`
 `;
 
+const READY_SPEC_R02 = READY_SPEC
+  .replaceAll("R01", "R02")
+  .replace("Round: `01`", "Round: `02`")
+  .replace("Previous: `NONE`", "Previous: `FLOW_P01_R01_IMPLEMENTATION_SPEC.md`")
+  .replace("Next: `FLOW_P01_R02_IMPLEMENTATION_SPEC.md`", "Next: `FLOW_P01_R03_IMPLEMENTATION_SPEC.md`");
+
 function run(overrides = {}) {
   return evaluateAuthorization({
     prBody: "Specification: FLOW_P01_R01_IMPLEMENTATION_SPEC.md\nPhase: 01\nRound: 01\nPrevious: NONE",
     targetBranch: "main",
     changedFiles: ["scripts/example.mjs"],
     readBaseSpec: () => READY_SPEC,
+    readHeadSpec: () => READY_SPEC,
     ...overrides,
   });
 }
@@ -38,12 +45,87 @@ test("valid implementation references exact READY base spec", () => {
   assert.equal(result.specification, "FLOW_P01_R01_IMPLEMENTATION_SPEC.md");
 });
 
-test("true specification-only PR is allowed to bootstrap", () => {
+test("valid new executable spec is validated from HEAD", () => {
+  const path = "docs/07-delivery/development-phases/FLOW_P01_R02_IMPLEMENTATION_SPEC.md";
   const result = run({
     prBody: "",
-    changedFiles: ["docs/07-delivery/development-phases/FLOW_P01_R02_IMPLEMENTATION_SPEC.md"],
+    changedFiles: [path],
+    readBaseSpec: () => { throw new Error("new file"); },
+    readHeadSpec: () => READY_SPEC_R02,
   });
-  assert.equal(result.classification, "SPECIFICATION_PR");
+  assert.equal(result.classification, "EXECUTABLE_SPEC_PR");
+  assert.equal(result.specification, "FLOW_P01_R02_IMPLEMENTATION_SPEC.md");
+});
+
+test("spec directory maintenance is distinguished from executable spec changes", () => {
+  const result = run({
+    prBody: "",
+    changedFiles: ["docs/07-delivery/development-phases/README.md"],
+  });
+  assert.equal(result.classification, "SPEC_MAINTENANCE_PR");
+});
+
+test("valid amendment preserves executable identity and continuity", () => {
+  const path = "docs/07-delivery/development-phases/FLOW_P01_R01_IMPLEMENTATION_SPEC.md";
+  const amended = `${READY_SPEC}\nAdditional implementation note.\n`;
+  const result = run({
+    prBody: "",
+    changedFiles: [path],
+    readBaseSpec: () => READY_SPEC,
+    readHeadSpec: () => amended,
+  });
+  assert.equal(result.classification, "EXECUTABLE_SPEC_PR");
+});
+
+test("amendment cannot silently rewrite phase round or continuity", () => {
+  const path = "docs/07-delivery/development-phases/FLOW_P01_R01_IMPLEMENTATION_SPEC.md";
+  for (const head of [
+    READY_SPEC.replace("Phase: `01`", "Phase: `02`"),
+    READY_SPEC.replace("Round: `01`", "Round: `02`"),
+    READY_SPEC.replace("Next: `FLOW_P01_R02_IMPLEMENTATION_SPEC.md`", "Next: `FLOW_P01_R03_IMPLEMENTATION_SPEC.md`"),
+  ]) {
+    rejects(
+      () => run({ changedFiles: [path], readBaseSpec: () => READY_SPEC, readHeadSpec: () => head }),
+      /Filename Phase\/Round|cannot rewrite/,
+    );
+  }
+});
+
+test("malformed executable HEAD spec is rejected", () => {
+  const path = "docs/07-delivery/development-phases/FLOW_P01_R02_IMPLEMENTATION_SPEC.md";
+  rejects(
+    () => run({
+      changedFiles: [path],
+      readBaseSpec: () => { throw new Error("new file"); },
+      readHeadSpec: () => READY_SPEC_R02.replace("Status: `READY`", "Status: `DRAFT`"),
+    }),
+    /status is DRAFT/,
+  );
+});
+
+test("malformed continuation syntax is rejected", () => {
+  const path = "docs/07-delivery/development-phases/FLOW_P01_R02_IMPLEMENTATION_SPEC.md";
+  rejects(
+    () => run({
+      changedFiles: [path],
+      readBaseSpec: () => { throw new Error("new file"); },
+      readHeadSpec: () => READY_SPEC_R02.replace("FLOW_P01_R03_IMPLEMENTATION_SPEC.md", "not-a-spec.md"),
+    }),
+    /Invalid specification filename/,
+  );
+});
+
+test("multiple executable specs in one specification PR fail closed", () => {
+  rejects(
+    () => run({
+      changedFiles: [
+        "docs/07-delivery/development-phases/FLOW_P01_R02_IMPLEMENTATION_SPEC.md",
+        "docs/07-delivery/development-phases/FLOW_P01_R03_IMPLEMENTATION_SPEC.md",
+      ],
+      readHeadSpec: () => READY_SPEC_R02,
+    }),
+    /exactly one canonical executable specification/,
+  );
 });
 
 test("mixed spec and implementation is classified as implementation and requires base authority", () => {
@@ -94,7 +176,7 @@ test("non-READY base status cannot authorize implementation", () => {
   }
 });
 
-test("head-only specification cannot self-authorize", () => {
+test("head-only specification cannot self-authorize mixed implementation", () => {
   rejects(() => run({ readBaseSpec: () => { throw new Error("head only"); } }), /not present on the PR base branch/);
 });
 
