@@ -15,8 +15,14 @@ const args = [
   directUrl,
   "--out-file",
   "src/server/db/generated/database.ts",
-  "--schemas",
-  "app,foodflow,payments,audit",
+  "--default-schema",
+  "app",
+  "--default-schema",
+  "foodflow",
+  "--default-schema",
+  "payments",
+  "--default-schema",
+  "audit",
 ];
 
 const result = spawnSync(command, args, {
