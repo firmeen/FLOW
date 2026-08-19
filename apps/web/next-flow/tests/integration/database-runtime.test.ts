@@ -144,8 +144,8 @@ describe.runIf(Boolean(process.env.DATABASE_URL))("database runtime", () => {
       withTenantTransaction({ tenantId }, async (trx) => {
         const result = await sql<{ tenant_id: string | null; actor_id: string | null }>`
           select private.current_tenant_id() as tenant_id,
-                 private.current_actor_id() as actor_id,
-                 pg_sleep(0.05)
+                 private.current_actor_id() as actor_id
+          from (select pg_sleep(0.05)) as delay
         `.execute(trx);
         return result.rows[0];
       });
