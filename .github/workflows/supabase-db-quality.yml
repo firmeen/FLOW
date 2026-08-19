@@ -81,10 +81,10 @@ jobs:
         working-directory: apps/web/next-flow
         run: git diff --exit-code -- src/server/db/generated/database.ts
 
-      - name: Provision local runtime login role
+      - name: Provision local database login roles
         env:
           PGPASSWORD: postgres
-        run: psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "grant flow_runtime to postgres;"
+        run: psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "grant flow_runtime, flow_identity to postgres;"
 
       - name: Database runtime integration tests
         working-directory: apps/web/next-flow
