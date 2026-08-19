@@ -4,6 +4,7 @@ exception when duplicate_object then null;
 end $$;
 
 grant usage on schema app, private to flow_identity;
+grant usage on schema private to flow_runtime;
 grant execute on function private.current_actor_id() to flow_identity;
 
 create table private.user_credentials (
