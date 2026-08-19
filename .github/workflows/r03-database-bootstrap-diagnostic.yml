@@ -1,0 +1,36 @@
+name: R03 Database Bootstrap Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "supabase/**"
+      - ".github/workflows/r03-database-bootstrap-diagnostic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Install application dependencies
+        working-directory: apps/web/next-flow
+        run: npm ci
+
+      - name: Reproduce fresh Supabase bootstrap with debug output
+        shell: bash
+        run: |
+          set -o pipefail
+          ./apps/web/next-flow/node_modules/.bin/supabase start --debug 2>&1 | tee /tmp/r03-supabase-debug.log
