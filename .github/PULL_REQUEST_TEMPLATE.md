@@ -90,18 +90,39 @@ STRIPE_IMPLEMENTED: NO
 CUSTOMER_REDESIGN: NO
 VOICE_IMPLEMENTED: NO
 
-## Branch Protection / Owner Action
+## Branch Protection / Repository Evidence
 
 MAIN_PROTECTED:
 CURRENT_REQUIRED_CHECKS:
 OWNER_ACTION_REQUIRED:
 
-## Owner Review
+## Merge Eligibility
 
-- [ ] Required round checks pass.
+- [ ] Required round checks completed.
+- [ ] Every required round check passed.
 - [ ] Inherited failures are recorded truthfully.
+- [ ] No unresolved blocker owned by this round remains.
 - [ ] No required scope is silently deferred.
 - [ ] No sensitive information is included.
-- [ ] Owner/manual merge required.
+- [ ] PR is mergeable and non-conflicting.
+- [ ] Current `main` and the exact executable specification still authorize the merge.
 
-Auto-merge: NO
+MERGE_ELIGIBLE: NO
+REQUIRED_CHECKS_COMPLETE: NO
+REQUIRED_CHECKS_PASS: NO
+PR_MERGEABLE: NO
+UNRESOLVED_ROUND_BLOCKER: NOT EVALUATED
+
+## Merge Result
+
+Before merge:
+
+PR_MERGED: NO
+MERGE_SHA: NOT APPLICABLE
+MAIN_SHA_AFTER_MERGE: NOT APPLICABLE
+ROUND_STATUS: IMPLEMENTED / WAITING FOR VALIDATED MERGE
+
+After validated merge, report the actual values from GitHub and stop the scheduled slot before any next round starts.
+
+Merge policy: `docs/07-delivery/development-phases/FLOW_MERGE_POLICY.md`
+Validated automatic merge: YES — only after all required checks pass.
