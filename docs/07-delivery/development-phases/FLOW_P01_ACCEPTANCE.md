@@ -1,112 +1,77 @@
 # FLOW Phase 01 Acceptance Record
 
 > **NON-EXECUTABLE ACCEPTANCE RECORD**  
-> This file is evidence for Phase 01 acceptance. It is not an implementation specification and cannot authorize development.
+> This file records Phase 01 acceptance evidence. It cannot authorize implementation work.
 
 ## Status
 
 ```text
 PHASE: 01
 ROUND: 06
-ACCEPTANCE_STATUS: IN PROGRESS
+ACCEPTANCE_STATUS: BLOCKED ON HOSTED MAIN PROTECTION
 ACCEPTANCE_DATE: 2026-08-20 Asia/Bangkok
 ACCEPTANCE_BASE_SHA: 1dfb42f639080d4078dbe1b663417e3d02e682ce
+R06_IMPLEMENTATION_PR: #35
 R06_IMPLEMENTATION_BRANCH: phase/01-round/06-full-baseline-acceptance
-R06_IMPLEMENTATION_PR: PENDING — assigned when the implementation PR opens
-R06_PRE_MERGE_HEAD_SHA: PENDING — record in final PR evidence before merge
+R06_CHECK_EVIDENCE_HEAD: 2d7a645e3677fd1f3558fce39d26e34cc535dade
 ```
 
-Phase 01 must not be declared complete until the R06 implementation PR passes its required checks, the hosted `main` protection contract is applied and read back successfully, the R06 merge occurs through that protected path, post-merge `main` remains protected, and expected deployment evidence is healthy.
+All repository-owned R06 acceptance checks and Vercel Preview are green. Phase 01 is **not complete** because GitHub-hosted `main` protection remains disabled and the connected GitHub capability does not expose a branch-protection/ruleset write operation. R06 must not be merged until the hosted protection contract below is applied and read back successfully.
 
-## Round implementation evidence
+## Phase 01 implementation evidence
 
-| Round | Implementation PR | Merge SHA | Final accepted responsibility |
+| Round | Implementation PR | Merge SHA | Accepted responsibility |
 |---|---:|---|---|
 | R01 | #17 | `5bcd155501b67d03183b05d7ac183ea0545529af` | deterministic dependency state + Phase/Round authorization gate |
 | R02 | #20 | `02b804dd817cf485419801e8b9f8aa9cb939e3de` | application install/lint/typecheck/test/build baseline |
-| R03 | #26 | `aaebc4cc3167b3f5b3247c513249d454bdcd9d4b` | fresh Supabase/bootstrap, structural DB quality, codegen and runtime DB baseline |
+| R03 | #26 | `aaebc4cc3167b3f5b3247c513249d454bdcd9d4b` | fresh Supabase/bootstrap, structural DB quality, type generation and DB runtime baseline |
 | R04 | #31 | `345538b274ed2f9e106d4b05a4260770626d843a` | actor-aware tenant/branch/RLS authorization baseline |
-| R05 | #34 | `1dfb42f639080d4078dbe1b663417e3d02e682ce` | repository topology, stable CI contexts, validator hardening and deployment baseline |
-| R06 | PENDING | PENDING | full cumulative acceptance + hosted `main` protection proof |
+| R05 | #34 | `1dfb42f639080d4078dbe1b663417e3d02e682ce` | repository/CI/deployment baseline |
+| R05 correction | #36 | `803b2b6ce02582a65db40c89701cc798d89c9d5f` | restore stable quality-gate workflow registration |
+| R05 correction | #37 | `fa37ee574c7c25847980ecaff642793a9b1f8f8a` | repair consolidated workflow YAML and prove real quality gates |
+| R06 | #35 | PENDING | cumulative acceptance + protected-main merge proof |
 
-## Per-round acceptance summary
+## R05 acceptance correction discovered by R06
 
-### R01
+R06 re-audit discovered that after original R05 merge, three promised stable contexts were not registering on PR synchronize events:
 
 ```text
-DEPENDENCY_INSTALLATION: PASS
+Dependency Integrity
+Next Flow Quality
+Supabase Database Quality
+```
+
+The defect was returned to R05 ownership and corrected before R06 acceptance continued.
+
+### Corrective PR #36
+
+```text
+MERGE_SHA: 803b2b6ce02582a65db40c89701cc798d89c9d5f
+CHANGE: consolidated the three missing contexts into .github/workflows/stable-quality-gates.yml
 PHASE_ROUND_GATE: PASS
+REPOSITORY_INTEGRITY: PASS
+VERCEL: PASS
+```
+
+### Corrective PR #37
+
+Root cause was invalid YAML caused by `: ` inside unquoted/plain single-line `run:` scalars. The three not-applicable commands were converted to YAML block scalars without changing command semantics.
+
+```text
+MERGE_SHA: fa37ee574c7c25847980ecaff642793a9b1f8f8a
+PHASE_ROUND_GATE: PASS
+REPOSITORY_INTEGRITY: PASS
 DEPENDENCY_INTEGRITY: PASS
-KNOWN_APPLICATION_BLOCKER: handed to R02 and subsequently resolved
-KNOWN_DATABASE_BLOCKER: handed to R03 and subsequently resolved
-KNOWN_REPOSITORY_GITLINK_BLOCKER: handed to R05 and subsequently resolved
-```
-
-### R02
-
-```text
-NPM_CI: PASS
-LINT: PASS
-TYPECHECK: PASS
-UNIT: PASS
-APP_INTEGRATION: PASS
-TEST_INTEGRATION_COMMAND: PASS
-BUILD_NEXT: PASS
-PHASE_ROUND_GATE: PASS
-NEXT_FLOW_QUALITY: PASS
-DATABASE_BOOTSTRAP_BLOCKER: handed to R03 and subsequently resolved
-```
-
-### R03
-
-```text
-PHASE_ROUND_GATE: PASS
 NEXT_FLOW_QUALITY: PASS
 SUPABASE_DATABASE_QUALITY: PASS
-SUPABASE_START: PASS
-DB_RESET_AND_SEED: PASS
-DATABASE_SQL_TESTS: PASS — 27/27
-DATABASE_LINT: PASS
-KYSELY_GENERATION: PASS — 35 tables
-GENERATED_TYPE_DRIFT: PASS
-DATABASE_RUNTIME_INTEGRATION: PASS — 7/7
-PRODUCTION_DB_MODIFIED: NO
+VERCEL: PASS
 ```
 
-### R04
+The real correction run exercised the full applicable paths. Dependency install passed; application install/lint/typecheck/test/build passed; and fresh Supabase start/reset/seed, database tests/lint, type generation/drift, and database runtime integration passed.
 
-```text
-PHASE_ROUND_GATE: PASS
-NEXT_FLOW_QUALITY: PASS
-SUPABASE_DATABASE_QUALITY: PASS
-DATABASE_SQL_TESTS: PASS — 73/73
-DATABASE_RUNTIME_INTEGRATION: PASS — 12/12
-TENANT_BRANCH_AUTHORIZATION_BASELINE: PASS
-PERMISSION_ALLOW_DENY_BASELINE: PASS
-SELF_ELEVATION_DENIAL_BASELINE: PASS
-PRODUCTION_DB_MODIFIED: NO
-```
+## Final repository-owned check contract
 
-### R05
-
-```text
-R05_IMPLEMENTATION_PR: #34
-R05_MERGE_SHA: 1dfb42f639080d4078dbe1b663417e3d02e682ce
-REPOSITORY_TOPOLOGY_CLEANUP: IMPLEMENTED
-REPOSITORY_INTEGRITY_CONTEXT: IMPLEMENTED
-EXECUTABLE_SPEC_HEAD_VALIDATION: IMPLEMENTED
-IMPLEMENTATION_BASE_AUTHORITY: PRESERVED
-STABLE_ALWAYS_PRESENT_CI_CONTEXT_CONTRACT: IMPLEMENTED
-SUPABASE_TRANSIENT_VS_DETERMINISTIC_RETRY_CLASSIFICATION: IMPLEMENTED
-DEPLOYMENT_BASELINE_RUNBOOK: IMPLEMENTED
-MAIN_PROTECTION_ENABLED_BY_R05: NO — intentionally deferred to R06
-```
-
-R06 must verify the actual R06 PR contexts before final acceptance rather than treating the R05 repository contract alone as sufficient proof.
-
-## Final stable required-check contract
-
-R05 establishes the following repository-owned contexts for every pull request targeting `main`:
+The final exact check contexts are:
 
 ```text
 Phase/Round Gate
@@ -116,160 +81,155 @@ Next Flow Quality
 Supabase Database Quality
 ```
 
-R06 acceptance requires these exact contexts to appear on the actual R06 implementation PR and complete successfully. Heavy checks may use their explicit successful not-applicable path when R06 changes only documentation/governance scope; they must not disappear.
+Vercel remains deployment evidence and is not a required branch-protection context for Phase 01.
 
-Vercel remains deployment evidence and is not branch-protection-required by default.
+## R06 current check evidence
 
-## Final repository baseline
+R06 branch was synchronized with corrected `main` and the fixed workflow before the final acceptance check run.
 
-At R06 entry, the accepted repository contract includes:
+Evidence head:
 
 ```text
-DETERMINISTIC_DEPENDENCY_STATE: ACCEPTED FROM R01
-APPLICATION_QUALITY_BASELINE: ACCEPTED FROM R02
-FRESH_DATABASE_BASELINE: ACCEPTED FROM R03
-GENERATED_DATABASE_TYPE_CONSISTENCY: ACCEPTED FROM R03
-ACTOR_AWARE_RLS_BASELINE: ACCEPTED FROM R04
-ORPHAN_GITLINKS: REMOVED BY R05
-REGISTERED_SUBMODULE_CONTRACT: NONE
-REPOSITORY_INTEGRITY_VALIDATOR: PRESENT FROM R05
-SPECIFICATION_HEAD_VALIDATION: PRESENT FROM R05
-IMPLEMENTATION_BASE_SPEC_AUTHORITY: PRESERVED
-STABLE_CI_CONTEXT_CONTRACT: PRESENT FROM R05
-DEPLOYMENT_PROJECT: flow
-DEPLOYMENT_ROOT: apps/web/next-flow
+2d7a645e3677fd1f3558fce39d26e34cc535dade
 ```
 
-The actual R06 PR must re-prove repository governance and stable-context reporting before this section can be considered final.
-
-## Branch protection state before R06
-
-GitHub read-back at R06 entry reports:
+Results:
 
 ```text
-MAIN_SHA_BEFORE_R06: 1dfb42f639080d4078dbe1b663417e3d02e682ce
-MAIN_PROTECTED_BEFORE_R06: NO
-REQUIRED_STATUS_CHECK_ENFORCEMENT_BEFORE_R06: OFF
+PHASE_ROUND_GATE: PASS
+REPOSITORY_INTEGRITY: PASS
+DEPENDENCY_INTEGRITY: PASS — explicit successful NOT APPLICABLE path
+NEXT_FLOW_QUALITY: PASS — explicit successful NOT APPLICABLE path
+SUPABASE_DATABASE_QUALITY: PASS — explicit successful NOT APPLICABLE path
+VERCEL_PREVIEW_STATUS: PASS
+PR_MERGEABLE: YES
 ```
 
-This is an expected R06-owned incomplete condition, not a successful Phase 01 acceptance result.
+The not-applicable paths are correct for the final R06 diff because application/database/dependency runtime scope is unchanged. The immediately preceding corrective PR #37 separately proved the real full quality paths green.
 
-## Target branch protection contract
-
-The canonical target is documented in:
+## Final accepted Phase 01 baseline
 
 ```text
-docs/08-operations/main-branch-protection.md
+DETERMINISTIC_DEPENDENCY_STATE: PASS
+PHASE_ROUND_AUTHORIZATION: PASS
+EXECUTABLE_SPEC_HEAD_VALIDATION: PASS
+APPLICATION_QUALITY_BASELINE: PASS
+FRESH_DATABASE_BOOTSTRAP: PASS
+DATABASE_SQL_AND_LINT_BASELINE: PASS
+GENERATED_DATABASE_TYPE_DRIFT: PASS
+DATABASE_RUNTIME_INTEGRATION: PASS
+ACTOR_AWARE_TENANT_BRANCH_RLS_BASELINE: PASS
+SELF_ELEVATION_DENIAL_BASELINE: PASS
+REPOSITORY_TOPOLOGY: PASS
+REPOSITORY_INTEGRITY_VALIDATOR: PASS
+STABLE_ALWAYS_PRESENT_CI_CONTEXTS: PASS
+DEPLOYMENT_PREVIEW: PASS
+PRODUCTION_DB_MODIFIED: NO
 ```
 
-Required effective behavior:
+## Hosted main protection state
+
+Latest GitHub read-back after R05 corrections:
 
 ```text
+MAIN_SHA: fa37ee574c7c25847980ecaff642793a9b1f8f8a
+MAIN_PROTECTED: NO
+REQUIRED_STATUS_CHECK_ENFORCEMENT: OFF
+REQUIRED_STATUS_CHECK_CONTEXTS: NONE
+```
+
+This is the sole remaining mandatory R06 blocker.
+
+## Required hosted protection contract
+
+Before PR #35 may merge, GitHub-hosted `main` protection or an equivalent ruleset must enforce:
+
+```text
+TARGET_BRANCH: main
 PULL_REQUEST_REQUIRED: YES
-REQUIRED_CHECKS:
+REQUIRED_STATUS_CHECKS:
   - Phase/Round Gate
   - Repository Integrity
   - Dependency Integrity
   - Next Flow Quality
   - Supabase Database Quality
-STRICT_UP_TO_DATE: YES where supported and workable
-ADMIN_ENFORCEMENT_NO_BYPASS: YES where supported
-FORCE_PUSH_ALLOWED: NO
-BRANCH_DELETION_ALLOWED: NO
-REQUIRED_APPROVAL_COUNT: 0 by default for current contributor model
-CODEOWNER_REVIEW_REQUIRED: NO by default for current contributor model
+STRICT_UP_TO_DATE: YES where supported and operationally workable
+ADMIN_OWNER_BYPASS_OF_REQUIRED_CHECKS: NO where supported
+ALLOW_FORCE_PUSHES: NO
+ALLOW_BRANCH_DELETION: NO
+REQUIRED_APPROVAL_COUNT: 0
+CODEOWNER_REVIEW_REQUIRED: NO
+REVIEW_CONVERSATION_RESOLUTION: YES when supported without deadlock
+LINEAR_HISTORY_REQUIRED: NO
+SIGNED_COMMITS_REQUIRED: NO
+MERGE_QUEUE_REQUIRED: NO
+REQUIRED_DEPLOYMENT: NO
 VERCEL_REQUIRED_FOR_MERGE: NO
 ```
 
-## Protection verification state
+The canonical operating procedure is `docs/08-operations/main-branch-protection.md`.
+
+## Connector capability boundary
+
+The connected GitHub action set can read branch protection and can mutate branches/files/PRs, but it does not expose branch-protection or repository-ruleset mutation. Therefore:
 
 ```text
-PROTECTION_MECHANISM: PENDING
-PULL_REQUEST_REQUIRED: BLOCKED — hosted protection not yet enabled/read back
-STRICT_UP_TO_DATE: BLOCKED — hosted protection not yet enabled/read back
-ADMIN_ENFORCEMENT: BLOCKED — hosted protection not yet enabled/read back
-FORCE_PUSH_ALLOWED: BLOCKED — hosted protection not yet enabled/read back
-BRANCH_DELETION_ALLOWED: BLOCKED — hosted protection not yet enabled/read back
-REQUIRED_APPROVAL_COUNT: 0 target
-CODEOWNER_REVIEW_REQUIRED: NO target
-OWNER_ACTION_REQUIRED: YES if the active connector cannot write branch protection/rulesets
+OWNER_ACTION_REQUIRED: YES
+PROTECTION_MUTATION_BY_CURRENT_CONNECTOR: BLOCKED
 ```
 
-The implementation agent must never change these `BLOCKED` fields to successful values without actual GitHub hosted-state read-back.
+This record must not claim protection is active until a hosted GitHub read-back proves it.
 
-## Deployment evidence
-
-R05 documents:
+## Remaining protected-merge sequence
 
 ```text
-VERCEL_PROJECT: flow
-VERCEL_ROOT: apps/web/next-flow
-PREVIEW_DEPLOYMENT: expected for PRs
-MAIN_DEPLOYMENT: expected after merge to main
+1. Apply the hosted main protection contract.
+2. Re-fetch main protection/ruleset state.
+3. Verify the exact five required checks and no-bypass contract.
+4. Verify PR #35 remains current, mergeable and green.
+5. Merge PR #35 through the protected path without bypass.
+6. Re-fetch main and verify the R06 merge SHA.
+7. Re-fetch protection and verify main remains protected.
+8. Verify post-merge Vercel/main deployment is healthy.
+9. Declare P01/R06 and Phase 01 COMPLETE.
 ```
 
-R06 must record the actual R06 Preview status in its PR and must verify the post-R06-merge `main` deployment before declaring Phase 01 complete.
+## Post-merge evidence placeholders
 
-## R06 merge evidence
+These values cannot truthfully exist until the protected merge occurs:
 
 ```text
-R06_IMPLEMENTATION_PR: PENDING
-R06_PRE_MERGE_HEAD_SHA: PENDING
-R06_REQUIRED_CHECKS: PENDING
-R06_PR_MERGEABLE: PENDING
-MAIN_PROTECTED_BEFORE_R06_MERGE: PENDING
-R06_MERGE_SHA: PENDING
-MAIN_SHA_AFTER_R06_MERGE: PENDING
-MAIN_PROTECTED_AFTER_R06_MERGE: PENDING
-POST_MERGE_DEPLOYMENT: PENDING
+R06_FINAL_PRE_MERGE_HEAD_SHA: PENDING PROTECTED MERGE
+R06_MERGE_SHA: PENDING PROTECTED MERGE
+MAIN_SHA_AFTER_R06_MERGE: PENDING PROTECTED MERGE
+MAIN_PROTECTED_AFTER_R06_MERGE: PENDING PROTECTED MERGE
+POST_MERGE_DEPLOYMENT: PENDING PROTECTED MERGE
 ```
-
-The final R06 merge SHA must be the `main` merge result that introduces this acceptance record and the verified protection handoff. The final post-merge handoff must cite that actual SHA.
-
-## Known non-blocking follow-up
-
-Historical npm audit output reported two high-severity findings during earlier Phase 01 rounds. Phase 01 explicitly did not perform forced dependency modernization merely to make those observations disappear. Any dependency-security upgrade must follow a separately authorized scope with regression validation.
-
-This observation is not permission to suppress audit evidence or weaken dependency checks.
 
 ## Phase 02 gate
 
-The exact required next executable specification is:
+Required next specification:
 
 ```text
 FLOW_P02_R01_IMPLEMENTATION_SPEC.md
 ```
 
-At R06 implementation start this file is absent from current `main`.
-
-Therefore the legal post-R06 state is:
+At R06 acceptance time that exact executable specification is absent from current `main`. Therefore, after R06 eventually completes:
 
 ```text
-IF R06 COMPLETE
-AND FLOW_P02_R01_IMPLEMENTATION_SPEC.md IS ABSENT ON CURRENT MAIN
-THEN:
-  PHASE 01 = COMPLETE
-  NEXT IMPLEMENTATION = STOP
+PHASE 01 = COMPLETE
+NEXT IMPLEMENTATION = STOP
 ```
 
-No Phase 02 scope may be inferred or generated automatically from this acceptance record.
+No Phase 02 scope may be inferred or generated automatically.
 
 ## Completion declaration
 
-Do not change this record to `ACCEPTANCE_STATUS: COMPLETE` until all of the following are proven from current GitHub evidence:
+Current truthful state:
 
 ```text
-R06 IMPLEMENTATION PR REQUIRED CHECKS = PASS
-R06 PR = MERGEABLE / NON-CONFLICTING
-MAIN PROTECTION = ENABLED AND VERIFIED
-R06 MERGE = THROUGH PROTECTED PATH WITHOUT BYPASS
-MAIN AFTER MERGE = STILL PROTECTED
-EXPECTED MAIN DEPLOYMENT = HEALTHY
+P01/R06 = IMPLEMENTED + REQUIRED CI GREEN / BLOCKED ON HOSTED MAIN PROTECTION
+PHASE 01 = NOT COMPLETE
 ```
 
-Until then:
-
-```text
-P01/R06 = IMPLEMENTED OR IN PROGRESS / NOT COMPLETE
-PHASE 01 = NOT YET COMPLETE
-```
+Only the successful protected merge and post-merge read-back may change this record to `COMPLETE`.
