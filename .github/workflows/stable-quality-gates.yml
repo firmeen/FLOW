@@ -1,0 +1,234 @@
+name: Stable Quality Gates
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-integrity:
+    name: Dependency Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify dependency scope
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          CHANGED="$(git diff --name-only "$BASE...$HEAD" || true)"
+          printf '%s\n' "$CHANGED"
+          if printf '%s\n' "$CHANGED" | grep -Eq '^(apps/web/next-flow/package\.json|apps/web/next-flow/package-lock\.json|\.github/workflows/stable-quality-gates\.yml)$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Dependency scope: applicable"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Dependency scope: not applicable"
+          fi
+
+      - name: Set up Node.js
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Clean install from committed dependency state
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm ci
+
+      - name: Report not applicable
+        if: steps.scope.outputs.run != 'true'
+        run: echo "Dependency Integrity: PASS (not applicable)"
+
+  next-flow-quality:
+    name: Next Flow Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify application scope
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          CHANGED="$(git diff --name-only "$BASE...$HEAD" || true)"
+          printf '%s\n' "$CHANGED"
+          if printf '%s\n' "$CHANGED" | grep -Eq '^(apps/web/next-flow/|\.github/workflows/stable-quality-gates\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Next Flow scope: applicable"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Next Flow scope: not applicable"
+          fi
+
+      - name: Set up Node.js
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Install dependencies
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm ci
+
+      - name: Lint
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm run lint
+
+      - name: Typecheck
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm run typecheck
+
+      - name: Test
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm run test
+
+      - name: Build Next.js
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm run build:next
+
+      - name: Report not applicable
+        if: steps.scope.outputs.run != 'true'
+        run: echo "Next Flow Quality: PASS (not applicable)"
+
+  supabase-db-quality:
+    name: Supabase Database Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify database scope
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          CHANGED="$(git diff --name-only "$BASE...$HEAD" || true)"
+          printf '%s\n' "$CHANGED"
+          if printf '%s\n' "$CHANGED" | grep -Eq '^(supabase/|apps/web/next-flow/src/server/db/|apps/web/next-flow/tests/integration/database-runtime\.test\.ts$|apps/web/next-flow/tests/unit/database-.*\.test\.ts$|apps/web/next-flow/scripts/.*database-types\.mjs$|apps/web/next-flow/package\.json$|apps/web/next-flow/package-lock\.json$|\.github/workflows/stable-quality-gates\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase database scope: applicable"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Supabase database scope: not applicable"
+          fi
+
+      - name: Set up Node.js
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Install application dependencies
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm ci
+
+      - name: Start local Supabase
+        if: steps.scope.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOG_FILE="$(mktemp)"
+          if ./apps/web/next-flow/node_modules/.bin/supabase start 2>&1 | tee "$LOG_FILE"; then
+            exit 0
+          fi
+          if grep -Eqi '(toomanyrequests|429|rate limit|connection reset|temporary failure|timeout|i/o timeout|TLS handshake timeout|unexpected EOF)' "$LOG_FILE"; then
+            echo "Transient Supabase infrastructure failure classified; retrying once."
+            sleep 20
+            ./apps/web/next-flow/node_modules/.bin/supabase start
+            exit $?
+          fi
+          echo "Deterministic Supabase startup/migration failure; not retrying."
+          exit 1
+
+      - name: Reset migrations and seed
+        if: steps.scope.outputs.run == 'true'
+        run: ./apps/web/next-flow/node_modules/.bin/supabase db reset --local
+
+      - name: Provision local database login roles
+        if: steps.scope.outputs.run == 'true'
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "grant flow_runtime, flow_identity to postgres;"
+
+      - name: Database SQL tests
+        if: steps.scope.outputs.run == 'true'
+        run: ./apps/web/next-flow/node_modules/.bin/supabase test db --local
+
+      - name: Database lint
+        if: steps.scope.outputs.run == 'true'
+        run: ./apps/web/next-flow/node_modules/.bin/supabase db lint --local --schema app,foodflow,payments,audit,private --level warning --fail-on error
+
+      - name: Generate Kysely database types
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        env:
+          DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: npm run db:generate
+
+      - name: Verify generated type drift
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: git diff --exit-code -- src/server/db/generated/database.ts
+
+      - name: Database runtime integration tests
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          DATABASE_POOL_MAX: 2
+        run: npm run test:db-runtime
+
+      - name: Report not applicable
+        if: steps.scope.outputs.run != 'true'
+        run: echo "Supabase Database Quality: PASS (not applicable)"
