@@ -58,7 +58,8 @@ jobs:
 
       - name: Report not applicable
         if: steps.scope.outputs.run != 'true'
-        run: echo "Dependency Integrity: PASS (not applicable)"
+        run: |
+          echo "Dependency Integrity: PASS (not applicable)"
 
   next-flow-quality:
     name: Next Flow Quality
@@ -126,7 +127,8 @@ jobs:
 
       - name: Report not applicable
         if: steps.scope.outputs.run != 'true'
-        run: echo "Next Flow Quality: PASS (not applicable)"
+        run: |
+          echo "Next Flow Quality: PASS (not applicable)"
 
   supabase-db-quality:
     name: Supabase Database Quality
@@ -231,4 +233,5 @@ jobs:
 
       - name: Report not applicable
         if: steps.scope.outputs.run != 'true'
-        run: echo "Supabase Database Quality: PASS (not applicable)"
+        run: |
+          echo "Supabase Database Quality: PASS (not applicable)"
