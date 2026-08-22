@@ -112,7 +112,7 @@ begin
     case when failure_limit <= 1 then observed_at + make_interval(secs => block_seconds) end,
     observed_at
   )
-  on conflict (subject_digest) do update
+  on conflict on constraint login_throttles_pkey do update
   set
     failure_count = case
       when t.window_started_at + make_interval(secs => window_seconds) <= observed_at then 1
