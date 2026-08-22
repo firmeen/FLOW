@@ -1,7 +1,6 @@
 import "server-only";
 
 import { scrypt as nodeScrypt, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
 
 import {
   CredentialEncodingError,
@@ -10,7 +9,6 @@ import {
 } from "./errors";
 import { MAX_PASSWORD_INPUT_LENGTH } from "./policy";
 
-const scrypt = promisify(nodeScrypt);
 const DUMMY_ENCODING = "scrypt-v1$16384$8$1$Zmxvdy1kdW1teS1zYWx0$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
 interface ParsedCredential {
@@ -44,13 +42,31 @@ function parseCredential(algorithm: string, encoded: string): ParsedCredential {
   return { n, r, p, salt, expected };
 }
 
+function deriveScrypt(password: string, parsed: ParsedCredential): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    nodeScrypt(
+      password,
+      parsed.salt,
+      parsed.expected.length,
+      {
+        N: parsed.n,
+        r: parsed.r,
+        p: parsed.p,
+        maxmem: Math.max(32 * 1024 * 1024, 128 * parsed.n * parsed.r * 2),
+      },
+      (error, derivedKey) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(derivedKey);
+      },
+    );
+  });
+}
+
 async function verifyParsed(password: string, parsed: ParsedCredential): Promise<boolean> {
-  const derived = (await scrypt(password, parsed.salt, parsed.expected.length, {
-    N: parsed.n,
-    r: parsed.r,
-    p: parsed.p,
-    maxmem: Math.max(32 * 1024 * 1024, 128 * parsed.n * parsed.r * 2),
-  })) as Buffer;
+  const derived = await deriveScrypt(password, parsed);
   return derived.length === parsed.expected.length && timingSafeEqual(derived, parsed.expected);
 }
 
