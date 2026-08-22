@@ -1,11 +1,7 @@
 # FLOW P02 R03 — Implementation Specification
-
 > Phase 02 — Identity / Auth.js / RBAC / Tenant-Branch Authorization
 > Round 03 — Auth.js Credentials Authentication + Session Authority Cutover
-> Revision — High-impact database-backed authentication and Auth.js session authority contract
-
----
-
+> Revision — Database-backed authentication and authoritative Auth.js session contract
 ## Metadata
 - Phase: `02`
 - Round: `03`
@@ -15,11 +11,11 @@
 - Target branch: `main`
 - Previous: `FLOW_P02_R02_IMPLEMENTATION_SPEC.md`
 - Next: `FLOW_P02_R04_IMPLEMENTATION_SPEC.md`
-- Planned execution: `STATE-DRIVEN — next eligible scheduled slot after R03 spec is present on main`
+- Planned execution: `STATE-DRIVEN — next eligible slot after this spec is on main`
 - Current planning scope: `PHASE 02 / ROUND 03 ONLY`
 - Implementation parent: `latest P02/R02 implementation lineage tip`
 - Expected implementation parent branch: `p02-r02-auth-fixtures`
-- Observed R02 branch head at specification authoring: `726568c18392f36d6b686c049c25bf1c885fcf73`
+- Observed R02 branch head at authoring: `726568c18392f36d6b686c049c25bf1c885fcf73`
 - Observed R02 implementation PR: `#59`
 - Recommended implementation branch: `p02-r03-authjs-session-cutover`
 - Recommended implementation PR title: `feat(auth): cut internal identity to Auth.js credentials sessions`
@@ -28,962 +24,1267 @@
 - Document validation authority: `DOCUMENT CONTENT + CURRENT REPOSITORY STATE`
 - GitHub Actions gate for document validation: `NO`
 - Specification depth policy: `1,800–2,500 lines required`
-- Live Auth.js authentication cutover in this round: `YES`
-- Legacy shared-auth code physical removal in this round: `NO — reserved for P02/R06`
-- Workspace / AccessContext productization in this round: `NO — reserved for P02/R04`
-- Route / command permission cutover in this round: `NO — reserved for P02/R05`
+- Auth.js live cutover in this round: `YES`
+- Legacy source physical removal in this round: `NO — P02/R06`
+- Workspace / AccessContext implementation in this round: `NO — P02/R04`
+- Permission route/command cutover in this round: `NO — P02/R05`
 - Production database destructive mutation: `NO`
-
----
-
-# 0. Specification Intent
-- Convert internal human login from shared environment credentials to database-backed identity.
-- Make Auth.js the authoritative internal session mechanism for newly authenticated users.
-- Reuse the credential boundary created by R01.
-- Reuse the deterministic identity fixtures created by R02.
-- Keep authentication separate from authorization.
-- Authenticate a real `app.users.id`.
-- Do not choose tenant during credential verification.
-- Do not choose branch during credential verification.
-- Do not infer workspace from password validity.
-- Do not physically remove legacy auth source yet.
-- Do not broaden route permissions yet.
-- Stop issuing the custom legacy session from the live login path.
-- Preserve a controlled source-level rollback path until R06.
-- Keep Auth.js session claims minimal.
-- Keep authentication errors generic to the browser.
-- Run dummy password verification for no-candidate paths.
-- Wire login throttling into live authentication.
-- Clear throttle state after successful authentication.
-- Record failed login attempts atomically.
-- Avoid holding DB transactions open during scrypt.
-- Keep credential material server-only.
-- Never put password hash into Auth.js token/session.
-- Never put password hash into browser-visible data.
-- Never log raw passwords.
-- Never log auth secrets.
-- Make logout use Auth.js authority.
-- Preserve login-page redirect UX where safe.
-- Preserve customer public-entry behavior.
-- Preserve coarse protection for internal staff routes.
-- Leave workspace resolution to R04.
-- Leave permission-specific route enforcement to R05.
-- Leave physical legacy cleanup to R06.
-
-# 1. Current Repository State Observed for Authoring
-- Current `main` observed at authoring: `c8bf5d84030b52f3030146ea4c1b4ab4630a5730`.
-- `FLOW_P02_R02_IMPLEMENTATION_SPEC.md` exists on `main`.
-- R02 specification status is `READY`.
-- R02 specification observed line count is `2,159`.
-- R02 implementation branch exists as `p02-r02-auth-fixtures`.
-- R02 branch head observed at authoring is `726568c18392f36d6b686c049c25bf1c885fcf73`.
-- R02 branch is materially ahead of its R01 implementation anchor.
-- R02 implementation PR exists as `#59`.
-- R02 implementation PR is open.
-- R02 implementation contains deterministic credential fixtures.
-- R02 implementation contains deterministic tenant fixtures.
-- R02 implementation contains deterministic branch fixtures.
-- R02 implementation contains authorization personas.
-- R02 implementation contains SQL authorization tests.
-- R02 implementation contains server integration tests.
-- R02 implementation includes `owner.a@flow.test`.
-- R02 implementation includes `staff.a1@flow.test`.
-- R02 implementation includes `staff.a2@flow.test`.
-- R02 implementation includes `kitchen.a1@flow.test`.
-- R02 implementation includes `cashier.a2@flow.test`.
-- R02 implementation includes `staff.b1@flow.test`.
-- R02 implementation includes a credential-valid no-membership user.
-- R02 implementation includes disabled-credential denial.
-- R02 implementation includes no-credential denial.
-- R02 implementation retains suspended-user denial.
-- R02 implementation retains invited/suspended/revoked membership denial.
-- R02 integration consumes the real R01 credential repository.
-- R02 integration consumes the real R01 password verifier.
-- R02 integration proves authentication eligibility can exist without workspace authority.
-- R03 can therefore be specified from real R02 code state.
-
-# 2. Current Live Authentication Baseline
-- Live login endpoint is `src/app/api/auth/login/route.ts`.
-- Live login endpoint accepts JSON email/password.
-- Live login currently calls `getInternalAuthConfig()`.
-- Live login currently calls `credentialsMatch()`.
-- Live login currently calls custom `createSession()`.
-- Current custom cookie is `foodflow_session`.
-- Current custom session duration is eight hours.
-- Current custom identity is `foodflow-internal`.
-- Current custom token uses JOSE.
-- Current custom token algorithm is HS256.
-- Current custom issuer is `foodflow`.
-- Current custom audience is `foodflow-internal`.
-- Current proxy reads `foodflow_session`.
-- Current proxy verifies the custom token directly.
-- Current proxy protects `/staff/:path*`.
-- Current proxy protects `/kitchen/:path*`.
-- Current proxy protects `/cashier/:path*`.
-- Current proxy protects `/admin/:path*`.
-- Current login form posts directly to `/api/auth/login`.
-- Current logout endpoint deletes the custom cookie.
-- Current auth library exports legacy config/session/token modules.
-- Current legacy development fallback credential remains in source.
-- `.env.example` labels FOODFLOW internal auth as temporary.
-- `.env.example` already contains `AUTH_SECRET`.
-- `.env.example` already contains `AUTH_TRUST_HOST=true`.
-- `next-auth@5.0.0-beta.32` is already installed.
-- `@auth/core@0.41.3` is already installed.
+# 1. Authoring State
+- Current main observed before documentation branch creation is `c8bf5d84030b52f3030146ea4c1b4ab4630a5730`.
+- Main remains specification and policy authority.
+- `FLOW_P02_R02_IMPLEMENTATION_SPEC.md` exists on main.
+- R02 specification status is READY.
+- R02 executable specification is 2,159 lines.
+- R02 implementation branch exists.
+- R02 implementation branch is `p02-r02-auth-fixtures`.
+- R02 branch head observed is `726568c18392f36d6b686c049c25bf1c885fcf73`.
+- R02 implementation PR is #59.
+- PR #59 is open at authoring time.
+- R02 branch contains meaningful implementation code.
+- R02 branch contains deterministic credential fixtures.
+- R02 branch contains deterministic authorization fixtures.
+- R02 branch contains database authorization tests.
+- R02 branch contains server integration tests.
+- R02 branch provides sufficient handoff evidence for R03 specification authoring.
+- No `p02-r03-*` implementation branch was observed before this document was authored.
+- No existing R03 executable specification was observed on main before this document was authored.
+# 2. Phase Objective
+- Phase 02 replaces temporary shared internal identity with real application users.
+- Phase 02 makes Auth.js the internal session authority.
+- Phase 02 derives access from active memberships.
+- Phase 02 preserves tenant isolation.
+- Phase 02 preserves branch isolation.
+- Phase 02 evaluates canonical permission codes.
+- Phase 02 keeps server authorization authoritative.
+- Phase 02 keeps database RLS as defense in depth.
+- Phase 02 handles inactive users fail-closed.
+- Phase 02 handles inactive memberships fail-closed.
+- Phase 02 handles credential disablement fail-closed.
+- Phase 02 separates authentication from authorization.
+- Phase 02 supports a real actor UUID across the server stack.
+- Phase 02 removes legacy shared authentication only after replacement is proven.
+- Phase 02 preserves customer public entry behavior.
+- Phase 02 avoids duplicating identity tables.
+- Phase 02 avoids duplicating membership models.
+- Phase 02 creates deterministic security regression coverage.
+# 3. Round Decomposition
+- R01 owns login identity normalization.
+- R01 owns pre-authentication least privilege.
+- R01 owns credential candidate lookup.
+- R01 owns scrypt verification primitives.
+- R01 owns login throttle persistence primitives.
+- R02 owns deterministic internal identities.
+- R02 owns deterministic password vectors.
+- R02 owns deterministic membership personas.
+- R02 owns deterministic role/permission personas.
+- R02 owns cross-tenant and cross-branch proof.
+- R03 owns live database credential authentication.
+- R03 owns Auth.js session authority cutover.
+- R04 owns workspace and AccessContext resolution.
+- R04 owns membership-change and revocation semantics.
+- R05 owns route and command permission enforcement.
+- R06 owns physical legacy-auth removal.
+- R06 owns final security acceptance.
+- R03 must not collapse the remaining round boundaries.
+# 4. R03 High-Impact Objective
+- Authenticate internal humans against database-backed credentials.
+- Return a real `app.users.id` as authenticated subject.
+- Make Auth.js issue the authoritative internal session.
+- Make Auth.js validate the authoritative internal session.
+- Make live login stop trusting shared environment credentials.
+- Make live protected-route authentication stop trusting the legacy cookie.
+- Wire R01 throttling into the live credential flow.
+- Run dummy KDF when no eligible credential exists.
+- Record wrong-password failures atomically.
+- Clear failure state after successful authentication.
+- Keep password derivation outside database transactions.
+- Keep tenant selection outside login.
+- Keep branch selection outside login.
+- Keep permissions outside session authority.
+- Keep roles outside session authority.
+- Make authenticated actor identity reusable by R04.
+- Preserve a source-level rollback path until R06.
+- Prevent legacy fallback from silently bypassing the new authority.
+# 5. Current Live Login Baseline
+- Current login route is `src/app/api/auth/login/route.ts`.
+- Current route accepts JSON email and password.
+- Current route calls `getInternalAuthConfig()`.
+- Current route calls `credentialsMatch()`.
+- Current route calls legacy `createSession()`.
+- Current route returns generic wrong-credential response.
+- Current route returns unavailable response when legacy config is missing.
+- Current route is not database-backed.
+- Current route does not identify a real user UUID.
+- Current route does not evaluate R01 credential candidates.
+- Current route does not use R01 password verifier.
+- Current route does not use R01 throttling.
+- Current route issues the legacy custom session.
+- Current route therefore remains the central R03 cutover surface.
+- R03 must replace authority without unrelated route redesign.
+- R03 must preserve safe request validation.
+- R03 must preserve generic browser failures.
+- R03 must prevent any legacy fallback after new verification fails.
+# 6. Current Legacy Session Baseline
+- Legacy cookie name is `foodflow_session`.
+- Legacy session duration is eight hours.
+- Legacy user ID is fixed as `foodflow-internal`.
+- Legacy session type is fixed as `INTERNAL`.
+- Legacy token implementation uses JOSE.
+- Legacy token algorithm is HS256.
+- Legacy issuer is `foodflow`.
+- Legacy audience is `foodflow-internal`.
+- Legacy signing secret comes from FOODFLOW session configuration.
+- Development mode has hard-coded fallback credentials.
+- Legacy server session helper reads the custom cookie.
+- Legacy server session helper verifies the custom token.
+- Legacy proxy reads the custom cookie directly.
+- Legacy proxy treats valid custom session as coarse authorization.
+- R03 must stop issuing this session live.
+- R03 must stop treating this cookie as authentication authority.
+- Legacy source files remain until R06 unless an unavoidable integration edit is required.
+- Legacy cookie may be cleared as transition hygiene but never trusted as fallback.
+# 7. Current Proxy Baseline
+- `src/proxy.ts` protects staff routes.
+- `src/proxy.ts` protects kitchen routes.
+- `src/proxy.ts` protects cashier routes.
+- `src/proxy.ts` protects admin routes.
+- Current proxy imports legacy cookie configuration.
+- Current proxy imports legacy token verification.
+- Current proxy redirects unauthenticated users to `/login`.
+- Current proxy preserves the requested local path in `next`.
+- Current proxy performs only a coarse authenticated/not-authenticated gate.
+- Current proxy does not evaluate memberships.
+- Current proxy does not evaluate permissions.
+- R03 must keep the gate coarse.
+- R03 must change only the authentication authority.
+- R04 will resolve workspace after authentication.
+- R05 will add permission-aware route enforcement.
+- R03 must not perform database credential queries in proxy.
+- R03 must follow the installed Auth.js proxy-compatible pattern.
+- R03 must preserve public customer routes.
+# 8. Current Login Form Baseline
+- Login form is a client component.
+- Login form captures email.
+- Login form captures password.
+- Login form trims email before submission.
+- Login form posts to `/api/auth/login`.
+- Login form uses JSON request body.
+- Login form displays generic inline error.
+- Login form prevents duplicate submit while pending.
+- Login form uses safe `nextPath` prop.
+- Login form refreshes after successful login.
+- Login form currently may show development credentials.
+- Development prefill is tied to the legacy demo model.
+- R03 should preserve visual design by default.
+- R03 should change only authentication integration behavior.
+- R03 must not expose test fixture credentials in production UI.
+- R03 must not expose provider internals.
+- R03 must preserve password field privacy.
+- R03 must preserve generic failure language.
+# 9. Installed Authentication Dependencies
+- `next-auth` is already installed.
+- Installed `next-auth` version is `5.0.0-beta.32`.
+- `@auth/core` is already installed.
+- Installed `@auth/core` version is `0.41.3`.
+- JOSE is already installed for legacy token code.
 - R03 must not reinstall Auth.js packages.
-- R03 must not upgrade Auth.js only for convenience.
-- Installed package types are implementation authority.
+- R03 must not upgrade Auth.js for convenience.
+- R03 must inspect installed exports and types.
+- R03 must not copy obsolete v4 patterns blindly.
+- R03 must not assume unreleased v5 behavior.
+- R03 should prefer supported built-in session behavior.
+- R03 should avoid a new database adapter by default.
+- R03 should avoid a second authentication library.
+- R03 should avoid a second cookie library.
+- R03 should avoid a second password hashing package.
+- Package-lock changes are not expected by default.
+- Any dependency change must be justified in the implementation PR.
+- Dependency changes must remain inside R03 scope.
+# 10. Next.js Runtime Constraints
 - Next.js version is `16.3.0`.
-- Implementation must read relevant local Next.js docs before proxy/route edits.
-
-# 3. R01 Authentication Primitives Available to R03
-- `normalizeLoginEmail(input)` exists.
-- R01 normalization trims whitespace.
-- R01 normalization lowercases email.
-- R01 input errors are typed internally.
-- `findActiveCredentialCandidateByEmail(email)` exists.
-- Credential lookup runs through auth transaction.
-- Credential lookup uses `flow_authenticator`.
-- Credential lookup returns only eligible active user credentials.
-- Disabled credentials are excluded.
-- Suspended users are excluded.
-- Candidate includes real `userId`.
-- Candidate includes `normalizedEmail`.
-- Candidate includes `passwordHash` server-side only.
-- Candidate includes algorithm `scrypt-v1`.
-- Candidate includes `passwordChangedAt`.
+- `apps/web/next-flow/AGENTS.md` requires reading local Next.js docs.
+- Implementation must inspect proxy guidance from installed docs.
+- Implementation must inspect App Router route-handler guidance.
+- Implementation must inspect server/client boundary guidance.
+- Implementation must inspect cookies behavior if directly touched.
+- Implementation must inspect redirect behavior if directly touched.
+- Implementation must not rely on generic historical Next.js assumptions.
+- Auth.js handler placement must compile under current App Router.
+- Proxy integration must be runtime-compatible.
+- Client login form cannot import server-only modules.
+- Server Auth.js config must remain server-only.
+- Build-time secret access must follow project deployment policy.
+- R03 must avoid introducing an edge-incompatible DB lookup into proxy.
+- Route handler exports must match installed framework expectations.
+- R03 must not rename unrelated App Router paths.
+- R03 build validation must cover the resulting auth routes.
+- Any Next.js-specific deviation must be documented in the PR.
+# 11. R01 Normalization Primitive
+- `normalizeLoginEmail(input)` already exists.
+- It is server-only.
+- It validates input type.
+- It enforces the configured maximum email length.
+- It trims surrounding whitespace.
+- It lowercases the identifier.
+- It rejects empty normalized input.
+- It rejects obviously invalid missing-`@` input.
+- R03 must reuse this helper.
+- R03 must not create a second email normalization rule.
+- R03 must not use locale-sensitive client behavior as authority.
+- Provider input normalization belongs to server code.
+- Case variants must resolve to the same identity key.
+- Whitespace variants must resolve to the same identity key.
+- Invalid email must fail without revealing account state.
+- Browser-side validation remains UX only.
+- Database normalized identity remains source of truth.
+- R03 tests must include normalization variants.
+# 12. R01 Credential Repository
+- `findActiveCredentialCandidateByEmail()` already exists.
+- The repository is server-only.
+- The repository invokes a private database function.
+- The repository uses the authentication transaction helper.
+- The transaction sets `flow_authenticator` locally.
+- The repository returns a real user UUID.
+- The repository returns normalized email.
+- The repository returns password hash only server-side.
+- The repository returns algorithm `scrypt-v1`.
+- The repository returns password-change timestamp.
+- Suspended users are excluded by database lookup.
+- Disabled credentials are excluded by database lookup.
+- Missing credentials produce no candidate.
+- Unknown email produces no candidate.
 - Candidate contains no tenant authority.
 - Candidate contains no branch authority.
-- `verifyPassword()` exists.
-- Password verification uses Node scrypt.
-- Password verification uses timing-safe comparison.
-- `performDummyPasswordVerification()` exists.
-- Dummy verification runs the KDF path.
-- `readLoginThrottle()` exists.
-- `recordLoginFailure()` exists.
-- `clearLoginFailures()` exists.
-- Throttle persistence is server-side.
-- Throttle mutation is atomic at DB boundary.
-- Auth DB role is transaction-local.
-- R03 must reuse these primitives.
-- R03 must not duplicate credential SQL in provider code.
-- R03 must not duplicate scrypt implementation.
-- R03 must not replace DB throttling with process memory.
-- R03 must not broaden pre-auth direct table access.
-
-# 4. R02 Deterministic Identity Contract Available to R03
+- R03 must not duplicate credential SQL.
+- R03 must not grant direct credential-table access.
+# 13. R01 Password Verifier
+- `verifyPassword()` already exists.
+- `performDummyPasswordVerification()` already exists.
+- Password verifier is server-only.
+- Password verifier accepts versioned `scrypt-v1` encoding.
+- Password verifier validates credential encoding.
+- Password verifier rejects unsupported algorithm.
+- Password verifier bounds password input length.
+- Password verifier derives with Node crypto scrypt.
+- Password verifier uses timing-safe byte comparison.
+- Dummy verification executes the KDF path.
+- R03 must reuse the real verifier for candidates.
+- R03 must reuse dummy verifier for no-candidate paths.
+- R03 must not replace scrypt with a fast digest.
+- R03 must not introduce plaintext comparison.
+- R03 must not expose encoding details.
+- R03 must not log hash, salt, or derived key.
+- R03 must run KDF outside long DB transaction.
+- Verification exceptions must fail closed.
+# 14. R01 Throttle Primitives
+- `readLoginThrottle()` already exists.
+- `recordLoginFailure()` already exists.
+- `clearLoginFailures()` already exists.
+- Digest validation expects 64 lowercase hex characters.
+- Throttle state includes failure count.
+- Throttle state includes window start.
+- Throttle state includes blocked-until timestamp.
+- Throttle state includes blocked boolean.
+- Failure recording is database-atomic.
+- Failure recording handles window reset.
+- Failure recording handles block threshold.
+- Existing block remains effective until expiry.
+- Clear removes/reset failure state through approved function.
+- R03 must not maintain throttle only in process memory.
+- R03 must not perform application read-modify-write increment.
+- R03 must not expose failure count to browser.
+- R03 must not expose exact block time by default.
+- Throttle database errors must fail closed.
+# 15. R02 Deterministic Tenant Fixtures
 - Tenant A ID is stable.
 - Tenant B ID is stable.
+- Restaurant A ID is stable.
+- Restaurant B ID is stable.
 - Branch A1 ID is stable.
 - Branch A2 ID is stable.
 - Branch B1 ID is stable.
+- Tenant A has multiple branches.
+- Tenant B remains isolated.
+- R03 does not select tenant during credential authentication.
+- R03 does not select branch during credential authentication.
+- R03 may use fixture IDs only in tests.
+- Application auth code must not hard-code fixture IDs.
+- Session claims must not bake fixture tenant IDs.
+- Session claims must not bake fixture branch IDs.
+- R04 later resolves membership-derived workspace.
+- R03 tests use tenants only to prove absence of authority leakage.
+- Existing tenant isolation tests must remain valid.
+# 16. R02 Deterministic User Fixtures
 - Owner A user ID is stable.
 - Staff A1 user ID is stable.
 - Staff A2 user ID is stable.
 - Kitchen A1 user ID is stable.
 - Cashier A2 user ID is stable.
 - Staff B1 user ID is stable.
-- No-membership user ID is stable.
-- Disabled-credential user ID is stable.
-- No-credential user ID is stable.
-- Suspended user ID is stable.
-- Existing inactive membership personas remain stable.
-- Owner A email is stable.
-- Staff A1 email is stable.
-- Staff A2 email is stable.
-- Kitchen A1 email is stable.
-- Cashier A2 email is stable.
-- Staff B1 email is stable.
-- No-membership email is stable.
-- Positive test passwords are stable synthetic fixtures.
-- R03 tests should import `tests/fixtures/identity.ts`.
-- Do not copy fixture constants into new application modules.
-- Do not create production-looking fixture identities.
-- Do not create a second credential fixture system.
-
-# 5. Phase 02 Objective
-- Replace temporary shared internal identity with real database users.
-- Make Auth.js the internal session authority.
-- Resolve workspace from active membership after authentication.
-- Resolve tenant context after authentication.
-- Resolve branch context after authentication.
-- Enforce permissions after AccessContext exists.
-- Keep RLS as defense in depth.
-- Handle inactive states fail-closed.
-- Remove temporary legacy auth only after replacement is proven.
-- Preserve customer public access.
-- Preserve tenant isolation.
-- Preserve branch isolation.
-- Preserve least privilege.
-- Preserve deterministic testability.
-
-# 6. Phase 02 Round Decomposition
-- R01 owns identity and pre-auth boundary.
-- R02 owns deterministic credentials and authorization contracts.
-- R03 owns Auth.js credential authentication.
-- R03 owns session authority cutover.
-- R04 owns workspace and AccessContext resolution.
-- R04 owns revocation/membership-change semantics.
-- R05 owns route permission enforcement.
-- R05 owns command permission enforcement.
-- R06 owns physical legacy auth removal.
-- R06 owns final security acceptance.
-- R03 must consume R01 primitives.
-- R03 must consume R02 fixtures.
-- R03 must not implement R04.
-- R03 must not implement R05.
-- R03 must not implement R06.
-
-# 7. R03 High-Impact Objective
-- Make one database user ID the authenticated subject.
-- Make Auth.js issue the authoritative session.
-- Make Auth.js validate the authoritative session.
-- Make Credentials provider call the R01 identity service.
-- Make throttle enforcement live.
-- Make unknown-user path run dummy KDF.
-- Make wrong-password path record throttle failure.
-- Make success path clear throttle state.
-- Make blocked subjects fail generically.
-- Replace custom-cookie reliance in protected-route authentication.
-- Keep a source-level compatibility boundary until R06.
-- Keep session free of tenant authority.
-- Keep session free of branch authority.
-- Keep session free of final permission authority.
-- Keep membership selection out of login.
-- Tie session to real user UUID.
-- Make authenticated actor consumable by R04.
-- Make session retrieval reusable server-side.
-- Make logout use Auth.js authority.
-- Keep login redirect deterministic.
-- Reject legacy shared credentials after cutover.
-- Reject stale legacy cookie as authority.
-- Test suspended/disabled/no-credential paths.
-- Test valid no-membership authentication.
-
-# 8. Definition of Authentication Success
-- Email passes project login input validation.
-- Password passes input bounds.
-- Throttle subject is not blocked.
-- Credential repository returns an eligible candidate.
-- Password verification returns true.
-- Auth.js authorize returns minimal user object.
-- Auth.js user ID equals real `app.users.id`.
-- Auth.js user email equals normalized DB login email.
-- Auth.js session is established.
-- No tenant is selected during login.
-- No branch is selected during login.
-- No role list is session authority.
-- No permission list is session authority.
-- No credential hash enters token/session.
-- Failure throttle state is cleared on successful verification.
-- Browser sees only success behavior.
-- Protected coarse gate recognizes Auth.js session.
-- R04 can later resolve workspace from session actor ID.
-
-# 9. Definition of Authentication Failure
-- Invalid request shape fails safely.
-- Invalid email fails generically.
-- Oversized password fails safely.
-- Unknown email does not reveal account absence.
-- Unknown email runs dummy KDF.
-- Suspended user does not authenticate.
-- Disabled credential does not authenticate.
-- Missing credential does not authenticate.
-- Wrong password does not authenticate.
-- Unsupported encoding fails closed.
-- Malformed encoding fails closed.
-- Blocked throttle subject does not authenticate.
-- DB failure does not trigger legacy fallback.
-- Throttle failure does not bypass throttling.
-- Auth.js configuration failure does not trigger legacy fallback.
-- Session issuance failure does not return success.
-- Browser error remains generic.
-- No status-specific identity leak.
-- No credential encoding leak.
-- No DB exception leak.
-
-# 10. Hard Entry Gate
-- This exact R03 spec must exist on current `main`.
-- Status must be `READY`.
-- Previous must be R02 spec.
-- Next must be R04 spec.
-- Current merge policy must be re-read.
-- Development README must be re-read.
-- Applicable `AGENTS.md` must be re-read.
+- Suspended A user ID is stable.
+- Disabled-credential A user ID is stable.
+- No-credential A user ID is stable.
+- No-membership A user ID is stable.
+- Invited-membership user ID remains stable.
+- Suspended-membership user ID remains stable.
+- Revoked-membership user ID remains stable.
+- R03 should import TypeScript fixture constants in tests.
+- R03 must not duplicate these UUIDs in application source.
+- R03 must not create production-like user fixtures.
+- R03 must preserve all existing fixture purposes.
+- R03 session subject must equal the real fixture UUID in tests.
+# 17. R02 Deterministic Email Fixtures
+- Owner email is `owner.a@flow.test`.
+- Staff A1 email is `staff.a1@flow.test`.
+- Staff A2 email is `staff.a2@flow.test`.
+- Kitchen A1 email is `kitchen.a1@flow.test`.
+- Cashier A2 email is `cashier.a2@flow.test`.
+- Staff B1 email is `staff.b1@flow.test`.
+- Suspended email is deterministic.
+- Disabled-credential email is deterministic.
+- No-credential email is deterministic.
+- No-membership email is deterministic.
+- Fixture domain is test-only.
+- R03 integration tests must reuse fixture emails.
+- Uppercase fixture variants must normalize.
+- Whitespace fixture variants must normalize.
+- Application code must not special-case `@flow.test`.
+- Production login must work through the same generic repository path.
+- Fixture email knowledge belongs to tests.
+- No fixture email should become tenant authority.
+# 18. R02 Deterministic Password Fixtures
+- Positive fixture passwords are test-only.
+- Positive passwords live in test fixture code.
+- Database stores only encoded credentials.
+- R03 tests may import test passwords.
+- Application code must not import test password constants.
+- Login UI must not expose all test passwords.
+- Production UI must not prefill fixture passwords.
+- Fixture passwords must never become environment defaults.
+- Password verification uses R01 scrypt primitive.
+- Wrong-password cases append or substitute deterministic test values.
+- Test passwords must not be logged.
+- Test passwords must not be placed in URLs.
+- Test passwords must not be serialized into sessions.
+- Test passwords must not be copied into PR descriptions.
+- R03 must not add new production credential fixtures.
+- R03 must preserve reproducible test behavior.
+- Credential tests must remain independent of insertion order.
+- Password fixtures do not imply workspace authority.
+# 19. Authentication / Authorization Separation
+- Authentication proves an identity.
+- Authorization determines permitted actions.
+- R03 owns authentication cutover.
+- R04 owns workspace/access context.
+- R05 owns permission enforcement.
+- Credentials provider must not require an active membership.
+- Credentials provider must not require a role.
+- Credentials provider must not require a permission.
+- Credentials provider must not choose a tenant.
+- Credentials provider must not choose a branch.
+- No-membership user may authenticate identity successfully.
+- Suspended user cannot authenticate because candidate is ineligible.
+- Disabled credential cannot authenticate.
+- Missing credential cannot authenticate.
+- Auth.js session alone is never full business authorization.
+- R03 proxy gate remains coarse authentication only.
+- R04 and R05 must not need to re-run password verification.
+- Session actor UUID becomes the handoff identity.
+# 20. Hard Entry Gate
+- Exact R03 specification must exist on current main.
+- R03 status must be READY.
+- Previous must reference R02 spec.
+- Next must reference R04 spec.
+- Current merge policy must be read from main.
+- Development README must be read from main.
+- Applicable AGENTS instructions must be read.
 - Relevant local Next.js docs must be read.
-- Installed Auth.js types must be inspected.
+- Installed Auth.js package exports must be inspected.
 - Latest R02 implementation branch must be identified.
-- R03 must branch from latest R02 lineage tip.
-- R03 must not branch from stale R01 code.
-- R03 must not branch from `main` merely because R02 PR is unmerged.
-- R02 deterministic fixtures must exist on parent.
-- R01 credential repository must exist on parent.
-- R01 password verifier must exist on parent.
-- R01 throttle primitives must exist on parent.
-- R02 no-membership positive credential must exist.
-- Do not create duplicate R03 implementation branch.
-
-# 11. Stop Conditions Before R03 Code
-- Stop if exact R03 spec is absent from `main`.
-- Stop if R03 status is not READY.
-- Stop if latest R02 lineage cannot be identified.
-- Stop if R02 lacks deterministic credentials.
-- Stop if R01 candidate repository is missing.
-- Stop if R01 verifier is missing.
-- Stop if R01 throttle primitives are missing.
-- Stop if Auth.js packages are unexpectedly missing.
-- Stop if production DB mutation would be required.
-- Stop if workspace UI becomes required.
-- Stop if permission-route cutover becomes required.
-- Stop if physical legacy deletion becomes required to continue.
-- Stop if unrelated product work becomes required.
-- Report exact blocker.
-- Do not silently broaden scope.
-
-# 12. In Scope — Auth.js Core Configuration
-- Define one canonical server Auth.js configuration.
+- R03 branch must descend from latest R02 lineage tip.
+- R03 must not descend from stale R01 code.
+- R03 must not default to main when R02 branch exists.
+- R02 deterministic credential fixtures must be present.
+- R01 credential repository must be present.
+- R01 password verifier must be present.
+- R01 throttle primitives must be present.
+- Duplicate R03 implementation branch must not be created.
+# 21. Entry Stop Conditions
+- Stop if R03 spec is absent from main.
+- Stop if R03 spec is not READY.
+- Stop if latest R02 branch cannot be identified.
+- Stop if R02 credential fixtures are missing.
+- Stop if R01 credential repository is missing.
+- Stop if R01 password verifier is missing.
+- Stop if R01 throttle module is missing.
+- Stop if installed Auth.js packages are unexpectedly absent.
+- Stop if required work would mutate production DB destructively.
+- Stop if required work depends on workspace chooser.
+- Stop if required work depends on permission-route cutover.
+- Stop if physical legacy deletion is required beyond integration needs.
+- Stop if unrelated product scope becomes necessary.
+- Stop if a newer R03 spec supersedes this document.
+- Stop if another active R03 branch already owns the round.
+- Report exact blocker without inventing scope.
+- Do not bypass specification authority.
+- Do not merge implementation PR from the development agent.
+# 22. In Scope — Auth.js Configuration
+- Create one canonical server Auth.js configuration.
 - Configure one internal Credentials provider.
-- Use installed `next-auth` API behavior.
-- Use `AUTH_SECRET` as session secret authority.
-- Use `AUTH_TRUST_HOST` only according to installed behavior.
+- Use installed next-auth behavior.
+- Use `AUTH_SECRET` as new session secret authority.
+- Respect `AUTH_TRUST_HOST` according to installed package behavior.
 - Do not enable OAuth.
-- Do not enable magic links.
-- Do not add a DB session adapter by default.
-- Prefer minimal supported session strategy.
-- Make real user ID available in server session.
-- Make normalized email available when safe.
-- Keep tenant out of session authority.
-- Keep branch out of session authority.
-- Keep role arrays out of session authority.
-- Keep permission arrays out of session authority.
-- Keep credential state out of session authority.
-- Keep password-change timestamp server-only unless explicitly needed.
-- Keep Auth.js config server-only.
-- Keep Credentials callback thin.
-- Delegate credential logic to a server auth orchestrator.
-- Avoid DB imports in client components.
-- Avoid duplicate Auth.js configs.
-
-# 13. In Scope — Credentials Provider
-- Provider receives email and password only.
-- Provider tolerates missing credentials object safely.
-- Provider validates email type.
-- Provider validates password type.
-- Provider delegates email normalization to R01 helper.
-- Provider delegates credential lookup to R01 repository.
-- Provider delegates password verification to R01 verifier.
-- Provider invokes dummy KDF when candidate is absent.
-- Provider checks throttle before accepting candidate.
-- Provider records failed attempts.
-- Provider clears failed attempts on success.
-- Provider returns minimal Auth.js user.
-- Returned ID is real user UUID.
-- Returned email is normalized email.
-- Returned user excludes password hash.
-- Returned user excludes tenant ID.
-- Returned user excludes branch ID.
-- Returned user excludes role IDs.
-- Returned user excludes permission codes.
-- Provider failure remains generic.
-- Provider must not reinterpret infrastructure failure as success.
-- Provider must never use legacy `credentialsMatch()` fallback.
-
-# 14. In Scope — Authentication Service Orchestrator
-- Create a focused server-only service.
-- Keep provider callback small.
-- Own throttle subject derivation.
-- Own throttle read.
-- Own candidate lookup.
-- Own dummy verification.
-- Own real verification.
-- Own failed-attempt recording.
-- Own success clearing.
-- Own safe result mapping.
-- Avoid one large DB transaction.
-- Avoid KDF inside DB transaction.
-- Failure recording uses short independent transaction.
-- Success clear uses short independent transaction.
-- Return deterministic internal result type.
-- Keep outward browser failure generic.
-- Make service independently testable.
-- Do not create a generic workflow engine.
-
-# 15. In Scope — Throttle Subject Derivation
-- Derive stable digest from normalized login identifier.
-- Never hash password into throttle subject.
-- Never use session token as throttle subject.
-- Do not make throttle key tenant-dependent.
-- Do not make throttle key branch-dependent.
-- Browser must not submit the digest as authority.
+- Do not enable email magic links.
+- Do not add a database adapter by default.
+- Prefer a supported minimal session strategy.
+- Keep configuration server-only.
+- Keep provider callback thin.
+- Delegate credential logic to identity server service.
+- Make real user UUID available to callbacks.
+- Keep normalized email as identity data only.
+- Keep tenant out of Auth.js authority.
+- Keep branch out of Auth.js authority.
+- Keep role and permission lists out of session authority.
+- Avoid duplicate Auth.js configuration files.
+# 23. In Scope — Credentials Provider
+- Accept email and password credentials only.
+- Treat credentials object as untrusted input.
+- Validate email type server-side.
+- Validate password type server-side.
+- Normalize email with R01 helper.
+- Bound password using R01 policy.
+- Derive throttle subject server-side.
+- Read throttle before successful authentication.
+- Reject blocked subject generically.
+- Lookup candidate through R01 repository.
+- Run dummy KDF when candidate is absent.
+- Run real verifier when candidate exists.
+- Record failed attempt on rejection according to policy.
+- Clear failure state on success.
+- Return minimal Auth.js user on success.
+- Return real application UUID as `id`.
+- Never return password hash from provider.
+- Never fall back to `credentialsMatch()`.
+# 24. In Scope — Authentication Orchestrator
+- Create a focused server-only orchestration service.
+- Keep Auth.js provider wiring thin.
+- Own normalized identifier processing.
+- Own throttle-subject derivation.
+- Own throttle read sequencing.
+- Own candidate lookup sequencing.
+- Own dummy-verification sequencing.
+- Own real-verification sequencing.
+- Own failure recording.
+- Own success throttle clearing.
+- Return a small discriminated result.
+- Keep password hash inside function scope.
+- Keep tenant/branch absent from result.
+- Keep membership absent from result.
+- Keep permissions absent from result.
+- Keep KDF outside DB transaction.
+- Avoid a generic workflow framework.
+- Make orchestration independently unit-testable.
+# 25. In Scope — Throttle Subject
+- Derive subject from normalized email.
 - Generate digest server-side.
-- Use a cryptographic digest with fixed-length output.
-- Output must satisfy R01 digest pattern.
-- Normalize before hashing.
-- Case variants must produce same subject after normalization.
-- Surrounding whitespace variants must produce same subject.
-- Different emails should produce different fixture digests.
-- Avoid new secret unless threat model justifies it.
-- Do not log digest unnecessarily.
-
-# 16. In Scope — Auth.js Route Surface
-- Add canonical Auth.js catch-all route expected by installed version.
-- Export handlers exactly as installed package requires.
-- Do not keep two live session issuers.
-- Decide whether `/api/auth/login` is retired or a compatibility wrapper.
-- If wrapper remains, it delegates only to new auth flow.
-- Wrapper must not call legacy `createSession()`.
-- Preserve login UX.
-- Make logout compatible with Auth.js sign-out.
-- If `/api/auth/logout` remains, it delegates to Auth.js authority.
-- R06 may delete obsolete endpoints later.
-- PR must record exact live endpoints.
-- Follow Auth.js CSRF semantics.
-- Do not invent conflicting custom CSRF tokens.
-- Constrain redirect/callback URLs.
-- Reject external redirect targets.
-- Preserve safe local `next` path.
-
-# 17. In Scope — Login UI Cutover
-- Keep existing visual design unless API integration requires narrow change.
-- Keep email field.
-- Keep password field.
-- Keep loading state.
-- Keep generic inline error.
-- Replace direct legacy session issuance flow.
-- Prefer Auth.js sign-in API supported by installed version.
-- Avoid exposing provider internals to UI.
-- Preserve safe `nextPath` redirect.
-- Sanitize next path as local route.
-- Reject arbitrary origin redirect.
-- Do not reveal account existence.
-- Do not reveal suspension state.
-- Do not reveal disabled credential state.
-- Do not reveal throttle count.
-- Development prefill must not preserve legacy shared authority.
-- Test credentials remain test-only.
-
-# 18. In Scope — Session Authority Cutover
-- Auth.js session becomes authoritative for new internal logins.
-- Protected coarse gate must read Auth.js auth state.
-- Server code needing only authentication uses canonical Auth.js server helper.
-- Live login must stop issuing `foodflow_session`.
-- Legacy cookie recognition is not preferred after cutover.
-- Physical legacy code remains until R06.
-- Legacy cookie must not override unauthenticated Auth.js result.
-- Session subject is real user UUID.
-- Session lifetime is explicit.
-- Session cookie security follows Auth.js secure defaults/config.
-- Do not mirror Auth.js token into custom cookie.
-- Do not create parallel identity cookie.
-- Do not store tenant in session as final authority.
-- Do not store branch in session as final authority.
-- R04 derives AccessContext later.
-- Session callbacks remain minimal.
-- Token callbacks remain minimal.
-- Session serialization must be tested.
-
-# 19. In Scope — Proxy / Protected Route Coarse Gate
-- Update proxy auth source from custom JOSE to Auth.js-compatible check.
-- Preserve protected route matchers.
-- `/staff/*` remains authentication-protected.
-- `/kitchen/*` remains authentication-protected.
-- `/cashier/*` remains authentication-protected.
-- `/admin/*` remains authentication-protected.
-- Do not enforce staff permissions in R03.
-- Do not enforce kitchen permissions in R03.
-- Do not enforce cashier permissions in R03.
-- Do not enforce admin permissions in R03.
-- R05 owns permission-specific routing.
-- Unauthenticated user redirects to login.
-- Redirect preserves safe local requested path.
-- Authenticated no-membership user remains only authenticated in R03.
-- R04 handles no-workspace state later.
-- Do not embed role names in proxy.
-- Avoid edge-incompatible DB queries.
-- Follow installed Auth.js proxy pattern.
-- Read Next.js 16.3 local docs.
-
-# 20. In Scope — Logout
-- Live logout invalidates Auth.js session.
-- Browser must no longer depend on deleting only legacy cookie.
-- Logout may clear legacy cookie as transition cleanup.
-- Legacy cookie cleanup is not authority.
-- Logout behavior remains deterministic.
-- Logout must not expose token.
-- Logout requires no tenant ID.
-- Logout requires no branch ID.
-- Logout works when already signed out.
-- Repeated logout is idempotent to user.
-- Protected route after logout redirects to login.
-- Stale legacy cookie must not restore auth.
-
-# 21. Out of Scope — Workspace / AccessContext
-- No workspace chooser page.
-- No multi-workspace UI.
-- No tenant selection in Credentials authorize.
-- No branch selection in Credentials authorize.
-- No final tenant claim authority in session.
-- No final branch claim authority in session.
-- No active membership selection during login.
-- No revocation product flow.
-- No membership-change invalidation design beyond basic auth.
-- No current-workspace cookie design.
-- R04 owns these concerns.
-
-# 22. Out of Scope — Route / Command Authorization
-- No per-route permission matrix enforcement.
-- No staff permission guard.
-- No kitchen permission guard.
-- No cashier permission guard.
-- No admin permission guard.
-- No command permission decorators.
-- No server-action authorization framework.
-- No permission cache.
-- No permission snapshot in session.
-- No role snapshot in session.
-- R05 owns these concerns.
-
-# 23. Out of Scope — Legacy Physical Removal
-- Do not delete `src/lib/auth/config.ts` solely due cutover.
-- Do not delete `src/lib/auth/session.ts` solely due cutover.
-- Do not delete `src/lib/auth/token.ts` solely due cutover.
-- Do not remove JOSE solely in R03.
-- Do not remove all FOODFLOW legacy env examples solely in R03.
-- Do not delete legacy tests without replacement.
-- Mark obsolete paths for R06.
-- R06 performs final physical removal.
-- R03 may remove live imports from legacy modules.
-- R03 may add narrow deprecation comments.
-- R03 may clear stale legacy cookie on login/logout.
-
-# 24. Out of Scope — Product Features
-- No customer auth.
-- No customer profile.
-- No cart work.
-- No order work.
-- No staff workflow expansion.
-- No kitchen feature expansion.
-- No payment feature expansion.
-- No realtime expansion.
-- No notifications expansion.
-- No voice expansion.
-- No unrelated UI redesign.
-- No unrelated dependency modernization.
-- No production DB reset.
-- No production secret rotation.
-
-# 25. Expected Files to CREATE
-- `apps/web/next-flow/src/auth.ts`
-- Responsibility: canonical Auth.js server configuration.
-- Export only server auth primitives supported by installed version.
-- Keep Credentials provider definition here or in one focused server module.
-- Do not duplicate configuration elsewhere.
-- `apps/web/next-flow/src/app/api/auth/[...nextauth]/route.ts`
-- Responsibility: Auth.js HTTP handler adapter.
-- Export exact installed-version handlers.
-- Do not add business logic into route adapter.
-- `apps/web/next-flow/src/modules/identity/server/authenticate-internal-user.ts`
-- Responsibility: authentication orchestration.
-- Own throttle/candidate/verifier composition.
-- Return minimal safe result.
-- `apps/web/next-flow/src/modules/identity/server/throttle-subject.ts`
-- Responsibility: deterministic throttle digest if separate helper is justified.
-- May be folded into orchestrator if cleaner.
-- `apps/web/next-flow/tests/unit/identity-authenticate-internal-user.test.ts`
-- Responsibility: service-level auth behavior.
-- Mock boundaries without weakening semantics.
-- `apps/web/next-flow/tests/unit/identity-throttle-subject.test.ts`
-- Responsibility: digest determinism if helper is separate.
-- `apps/web/next-flow/tests/integration/authjs-credentials-authentication.test.ts`
-- Responsibility: DB-backed credential flow against R02 fixtures.
-- `apps/web/next-flow/tests/integration/authjs-session.test.ts`
-- Responsibility: authoritative session behavior and legacy-cookie regression.
-- If an equivalent canonical file already exists at implementation time, reuse it.
-- Do not create duplicate abstractions only to satisfy names in this section.
-
-# 26. Expected Files to MODIFY
-- `apps/web/next-flow/src/app/(auth)/login/login-form.tsx`
-- Switch live login from legacy session endpoint to Auth.js-backed path.
-- Preserve UX and safe redirect.
-- `apps/web/next-flow/src/app/api/auth/login/route.ts`
-- Stop issuing custom legacy session.
-- Retain only as compatibility wrapper if justified.
-- `apps/web/next-flow/src/app/api/auth/logout/route.ts`
-- Delegate to Auth.js authority if retained.
-- Optionally clear stale legacy cookie.
-- `apps/web/next-flow/src/proxy.ts`
-- Replace legacy cookie verification with Auth.js coarse gate.
-- Preserve route matcher scope.
-- `apps/web/next-flow/src/modules/identity/server/index.ts`
-- Export new auth service only if useful.
-- `apps/web/next-flow/src/lib/auth/index.ts`
-- Stop presenting legacy auth as live primary surface.
-- Preserve required legacy exports until R06.
-- `apps/web/next-flow/.env.example`
-- Clarify Auth.js authority.
-- Keep legacy vars marked temporary/rollback-only if retained.
-- `apps/web/next-flow/tests/integration/auth-session.test.ts`
-- Extend/replace legacy-only assertions with Auth.js authority tests.
-- Preserve explicit legacy regression checks.
-- `apps/web/next-flow/package.json`
-- Modify scripts only if new integration tests require discovery.
-- No dependency addition by default.
-- `.github/workflows/stable-quality-gates.yml`
-- Modify only for narrow test discovery if required.
-- No workflow redesign.
-
-# 27. Files NOT to MODIFY by Default
-- `supabase/migrations/20260822120000_p02_r01_identity_pre_auth_boundary.sql`
-- Treat R01 migration as inherited authority.
-- `supabase/tests/database/p02_r01_identity_pre_auth_boundary.test.sql`
-- Preserve R01 security assertions.
-- `supabase/tests/database/p02_r02_identity_authorization_fixtures.test.sql`
-- Preserve R02 fixture/authorization assertions.
-- `supabase/seed.sql`
-- R02 already establishes deterministic credentials.
-- `apps/web/next-flow/src/server/db/authentication-transaction.ts`
-- Preserve transaction-local pre-auth role.
-- `apps/web/next-flow/src/server/db/transaction.ts`
-- Preserve tenant transaction semantics.
-- `apps/web/next-flow/src/modules/identity/server/credential-repository.ts`
-- Reuse candidate lookup contract.
-- `apps/web/next-flow/src/modules/identity/server/password-verifier.ts`
-- Reuse scrypt contract.
-- `apps/web/next-flow/src/modules/identity/server/login-throttle.ts`
-- Reuse throttle functions.
-- `apps/web/next-flow/tests/fixtures/identity.ts`
-- Reuse stable fixture constants.
-- Modify inherited files only for a concrete integration defect.
-- Explain any inherited-contract change in PR.
-
-# 28. Files to MOVE
-- No file move required by default.
-- Do not reorganize auth directories to mimic external tutorials.
-- Do not move identity server modules into route folders.
-- Do not move generated DB types.
-- Do not move R02 fixtures.
-- Reuse any existing canonical Auth.js file if discovered.
-
-# 29. Files to REMOVE
-- No physical legacy source removal required in R03.
-- Do not remove JOSE dependency in R03 by default.
-- Do not remove legacy config/session/token files in R03 by default.
-- Do not remove R02 fixtures.
-- Do not remove R01 throttle functions.
-- Do not remove `flow_authenticator`.
-- Physical cleanup is R06 scope.
-
-# 30. Database Change Policy
-- Default schema change: `NO`.
-- R01 owns credential schema.
-- R01 owns throttle schema.
-- R02 owns deterministic fixture data.
-- Auth.js Credentials does not inherently require new DB tables.
-- Do not add adapter tables by default.
-- Prefer Auth.js token/session strategy that needs no new schema.
-- Do not create duplicate users table.
-- Do not create duplicate credentials table.
-- Do not add tenant column to credential table.
-- Do not add branch column to credential table.
-- Do not add permissions to credential table.
-- Do not add session data to credential rows.
-- Any schema change requires explicit PR rationale.
-- Any migration must be forward-only.
-- Never rewrite historical migrations.
-- Production DB mutation remains prohibited.
-
-# 31. Auth.js Session Strategy Decision
-- Inspect installed `next-auth@5.0.0-beta.32`.
-- Inspect installed `@auth/core@0.41.3`.
-- Choose simplest supported session strategy.
-- Preferred strategy is Auth.js JWT session unless current package behavior requires otherwise.
-- Do not implement custom JOSE beside Auth.js.
-- Session subject maps to real user UUID.
-- Session user ID remains stable.
-- Session email may be normalized email.
-- Session excludes password hash.
-- Session excludes raw password.
-- Session excludes throttle digest.
-- Session excludes DB URL.
-- Session excludes AUTH_SECRET.
-- Session excludes FOODFLOW legacy secret.
-- Session excludes permission array as authority.
-- Session excludes tenant/branch as authority.
-- Session max age must be explicit or intentionally inherited.
-- Session rotation behavior must be understood.
-- Session callbacks must be deterministic.
-- Token callbacks must be deterministic.
-- Browser-visible session must stay minimal.
-
-# 32. Canonical Auth.js User Shape
-- `id` = real `app.users.id`.
-- `email` = normalized email.
-- `name` may be display-only if safely available.
-- Do not broaden pre-auth DB reads only for name.
-- Do not include password hash.
-- Do not include algorithm.
-- Do not include passwordChangedAt in browser session.
+- Use deterministic cryptographic digest.
+- Produce 64 lowercase hex characters.
+- Do not include password.
 - Do not include tenant ID.
 - Do not include branch ID.
+- Do not include session token.
+- Do not accept client-provided digest as authority.
+- Uppercase email variant produces same subject after normalization.
+- Whitespace variant produces same subject after normalization.
+- Different normalized emails produce different fixture subjects.
+- Keep subject creation free of database I/O.
+- Avoid unnecessary secret unless threat model requires it.
+- Do not log the digest routinely.
+- Do not expose digest to browser.
+- Validate output against R01 digest contract.
+- Unit-test determinism and boundaries.
+# 26. In Scope — Auth.js Route
+- Add canonical Auth.js route expected by installed package.
+- Use App Router route location supported by current version.
+- Export handlers exactly as installed types require.
+- Keep route adapter free of business logic.
+- Do not duplicate credential orchestration in route.
+- Do not expose internal error details.
+- Do not bypass Auth.js CSRF handling.
+- Do not introduce GET password submission.
+- Keep callback routing same-origin.
+- Keep redirect targets sanitized.
+- Do not trap auth callbacks behind protected proxy matcher.
+- Ensure route compiles under Next.js 16.3.
+- Preserve server-only imports.
+- Do not create OAuth callback logic.
+- Do not create email-provider callback logic.
+- Record exact route path in implementation PR.
+- Test successful credential route behavior.
+- Test rejected credential route behavior.
+# 27. In Scope — Login Endpoint Strategy
+- Decide whether legacy `/api/auth/login` is retired or becomes a wrapper.
+- Any retained wrapper must use new authority only.
+- Retained wrapper must not call `credentialsMatch()`.
+- Retained wrapper must not call legacy `createSession()`.
+- Retained wrapper must not issue `foodflow_session`.
+- Prefer the simplest installed-version-safe sign-in path.
+- Preserve generic failure response.
+- Preserve malformed request handling if route remains.
+- Preserve same-origin redirect safety.
+- Keep password out of URL.
+- Keep password out of response.
+- Do not create a second session issuer.
+- Record chosen strategy in PR.
+- Test chosen live path directly.
+- Keep compatibility code narrowly scoped.
+- R06 may delete obsolete endpoint later.
+- Do not preserve legacy fallback for convenience.
+- New database credential authority must be singular.
+# 28. In Scope — Login Form Cutover
+- Preserve existing email field.
+- Preserve existing password field.
+- Preserve accessible labels.
+- Preserve loading state.
+- Preserve generic error state.
+- Switch submission to Auth.js-backed flow.
+- Do not import server-only modules.
+- Keep credentials in request body only.
+- Never include password in query parameters.
+- Sanitize `nextPath` before use.
+- Reject external redirect targets.
+- Preserve safe local navigation.
+- Avoid exposing account existence.
+- Avoid exposing suspension state.
+- Avoid exposing disabled credential state.
+- Remove reliance on legacy shared-development authority.
+- Do not expose R02 passwords in production UI.
+- Keep visual redesign out of scope.
+# 29. In Scope — Session Authority
+- Auth.js becomes authoritative for newly authenticated internal users.
+- Session subject is real application user UUID.
+- Session email may be normalized identity email.
+- Session must not contain password.
+- Session must not contain password hash.
+- Session must not contain credential algorithm.
+- Session must not contain throttle state.
+- Session must not contain final tenant authority.
+- Session must not contain final branch authority.
+- Session must not contain final role authority.
+- Session must not contain final permission authority.
+- Session lifetime must be explicit.
+- Session retrieval must be reusable server-side.
+- Session verification must reject tampering.
+- Expired session must fail safely.
+- Legacy cookie must not override Auth.js unauthenticated state.
+- Session serialization must be tested.
+- R04 consumes user UUID from this session.
+# 30. In Scope — JWT / Session Callbacks
+- Persist real user ID minimally when required.
+- Expose real user ID to server session.
+- Keep normalized email if useful.
+- Do not store password hash.
+- Do not store tenant ID as authority.
+- Do not store branch ID as authority.
+- Do not store role codes as authority.
+- Do not store permission arrays as authority.
+- Do not store throttle digest.
+- Do not store credential disabled state.
+- Do not trust arbitrary client actor ID.
+- Do not trust arbitrary client email as identity update.
+- Keep callback behavior deterministic.
+- Keep callback database access minimal or absent.
+- Do not query credential table during every session read.
+- Do not mutate throttle during session read.
+- Unit-test callback claim minimality.
+- Type callbacks without broad `any` escapes.
+# 31. In Scope — Session Type Augmentation
+- Add module augmentation only if required.
+- Keep user ID typed as string.
+- Keep email standard where possible.
+- Do not add tenant field in R03.
+- Do not add branch field in R03.
+- Do not add membership field in R03.
+- Do not add roles field in R03.
+- Do not add permissions field in R03.
+- Do not add password-change field without clear need.
+- Place augmentation in canonical project type location.
+- Ensure tsconfig includes augmentation.
+- Avoid global untyped mutation.
+- Avoid duplicate declaration files.
+- Compile under installed next-auth types.
+- Keep browser-visible type surface minimal.
+- Record augmentation path in PR.
+- Test real user ID availability.
+- Preserve future R04 extensibility without predefining AccessContext.
+# 32. In Scope — Proxy Cutover
+- Replace legacy cookie verification as coarse auth source.
+- Use installed Auth.js-supported proxy pattern.
+- Preserve `/staff/:path*` matcher.
+- Preserve `/kitchen/:path*` matcher.
+- Preserve `/cashier/:path*` matcher.
+- Preserve `/admin/:path*` matcher.
+- Keep login route outside protected matcher.
+- Keep Auth.js callback route outside protected matcher.
+- Redirect unauthenticated user to login.
+- Preserve safe local requested path.
+- Reject unsafe redirect injection.
+- Do not query credential database in proxy.
+- Do not evaluate memberships in proxy.
+- Do not evaluate permissions in proxy.
+- Authenticated no-membership user remains only authenticated at this layer.
+- R04 handles no-workspace behavior.
+- R05 handles permission-route behavior.
+- Legacy cookie alone must not pass.
+# 33. In Scope — Logout Cutover
+- Live logout invalidates Auth.js session.
+- Logout must not rely only on deleting legacy cookie.
+- Logout may clear stale legacy cookie as hygiene.
+- Logout must not create a replacement legacy cookie.
+- Logout must not require password verification.
+- Logout must not require membership lookup.
+- Logout must not require tenant ID.
+- Logout must not require branch ID.
+- Logout must be safe when already signed out.
+- Repeated logout should be idempotent for the user.
+- Protected route after logout redirects to login.
+- Logout must not expose token.
+- Logout must not expose secret.
+- Choose Auth.js-supported signOut integration.
+- Record exact live logout path in PR.
+- Test valid-session logout.
+- Test no-session logout.
+- Test stale-legacy-cookie logout.
+# 34. Legacy Shared Credential Cutover
+- `FOODFLOW_INTERNAL_EMAIL` stops being login authority.
+- `FOODFLOW_INTERNAL_PASSWORD` stops being password authority.
+- Development fallback email stops being login authority.
+- Development fallback password stops being password authority.
+- New live login must not call `credentialsMatch()`.
+- Failed DB credential verification must not fall back.
+- Database unavailability must not fall back.
+- Auth.js configuration failure must not fall back.
+- Throttle failure must not fall back.
+- Wrong password must not fall back.
+- Unknown user must not fall back.
+- Legacy source can remain for R06 cleanup.
+- Legacy environment placeholders may remain marked obsolete.
+- Legacy tests must be replaced or reclassified deliberately.
+- Add explicit legacy shared-credential rejection test.
+- PR must state `LEGACY_SHARED_CREDENTIAL_AUTHORITY: NO`.
+- R06 performs physical deletion later.
+- Rollback requires deliberate source rollback, never runtime fallback.
+# 35. Legacy Cookie Cutover
+- `foodflow_session` stops being authoritative.
+- New successful login must not issue the legacy cookie.
+- Protected proxy must not accept legacy cookie alone.
+- Expired Auth.js session plus valid legacy cookie remains unauthenticated.
+- Tampered Auth.js session plus valid legacy cookie remains unauthenticated.
+- Auth.js session plus stale legacy cookie uses Auth.js authority.
+- Logout may delete stale legacy cookie.
+- Login success may delete stale legacy cookie if useful.
+- Legacy cookie cleanup is not authentication logic.
+- Legacy cookie value must never be copied into Auth.js token.
+- Legacy fixed user ID must not appear in new session.
+- Add legacy-cookie-only rejection test.
+- Add mixed-cookie precedence test.
+- Do not manually parse Auth.js cookie just to mimic legacy logic.
+- Use installed Auth.js verification helper where supported.
+- R06 deletes legacy cookie constants later.
+- PR must state `LEGACY_COOKIE_AUTHORITY` result.
+- Source-level legacy token code remains non-authoritative.
+# 36. Out of Scope — Workspace
+- No workspace chooser page.
+- No tenant selector page.
+- No branch selector page.
+- No tenant choice in Credentials authorize.
+- No branch choice in Credentials authorize.
+- No default branch inference from role.
+- No default tenant inference from email.
+- No membership selection during login.
+- No final AccessContext object.
+- No workspace cookie design.
+- No selected membership persistence.
+- No multi-workspace switching.
+- No membership revocation propagation design beyond basic session safety.
+- No membership versioning in session.
+- R04 owns all workspace semantics.
+- R03 only exposes authenticated actor UUID.
+- No-membership user remains valid authentication test.
+- Do not broaden R03 because UI needs a destination.
+# 37. Out of Scope — Permissions
+- No staff-route permission gate.
+- No kitchen-route permission gate.
+- No cashier-route permission gate.
+- No admin-route permission gate.
+- No server-action permission framework.
+- No command authorization decorator.
+- No permission cache.
+- No role cache.
+- No permission snapshot in session.
+- No role snapshot in session.
+- No navigation permission filtering.
+- No management UI authorization changes.
+- No permission editing UI.
+- No role editing UI.
+- R05 owns route and command authorization.
+- R03 proxy remains coarse authentication only.
+- Database RLS remains defense in depth.
+- Do not use role names as shortcut authority.
+# 38. Out of Scope — Physical Legacy Removal
+- Do not delete legacy auth config solely for cutover.
+- Do not delete legacy session helper solely for cutover.
+- Do not delete legacy token helper solely for cutover.
+- Do not remove JOSE dependency solely for cutover.
+- Do not remove all FOODFLOW legacy env entries solely for cutover.
+- Do not delete legacy tests without equivalent replacement.
+- Live imports may be removed from cutover surfaces.
+- Obsolete source may receive narrow deprecation comment.
+- Legacy cookie may be cleared on transition paths.
+- R06 owns physical source deletion.
+- R06 owns dependency cleanup.
+- R06 owns obsolete environment cleanup.
+- R06 owns final legacy search audit.
+- R03 should make R06 mechanical.
+- R03 should avoid adding new dependencies on legacy modules.
+- R03 should identify remaining legacy consumers in PR.
+- R03 must not keep legacy runtime fallback.
+- Rollback remains source-control operation.
+# 39. Out of Scope — Product Features
+- No customer authentication.
+- No customer profile.
+- No cart changes.
+- No order persistence changes.
+- No staff workflow expansion.
+- No kitchen workflow expansion.
+- No cashier feature expansion.
+- No payment feature expansion.
+- No SaaS billing work.
+- No realtime work.
+- No notification expansion.
+- No voice ordering work.
+- No unrelated UI redesign.
+- No unrelated component refactor.
+- No unrelated dependency upgrade.
+- No production database reset.
+- No production credential insertion.
+- No production secret rotation.
+# 40. Expected Files to Create
+- Create `apps/web/next-flow/src/auth.ts` if no canonical Auth.js config exists.
+- `src/auth.ts` owns Auth.js server configuration.
+- `src/auth.ts` owns Credentials provider wiring or imports it narrowly.
+- Create `src/app/api/auth/[...nextauth]/route.ts` if installed pattern requires it.
+- Auth route exports handlers only.
+- Create `src/modules/identity/server/authenticate-internal-user.ts`.
+- Authentication service composes R01 primitives.
+- Create `src/modules/identity/server/throttle-subject.ts` only if separation improves clarity.
+- Throttle helper may remain inside service if smaller.
+- Create unit test for authentication service.
+- Create throttle subject unit test if helper exists.
+- Create Auth.js credential integration test.
+- Create Auth.js session integration test.
+- Create type augmentation file only if required.
+- Reuse equivalent existing files if discovered at implementation time.
+- Do not duplicate canonical config.
+- Do not create a generic auth framework.
+- Record all created paths in implementation PR.
+# 41. Expected Files to Modify
+- Modify login form only for new auth integration.
+- Modify existing login route only if retained as compatibility wrapper.
+- Modify logout route only for Auth.js authority.
+- Modify proxy to use Auth.js coarse authentication.
+- Modify identity server index only if export is useful.
+- Modify legacy auth index to stop presenting legacy authority as primary.
+- Modify `.env.example` to clarify Auth.js live authority.
+- Keep legacy env vars clearly temporary if retained.
+- Modify auth-session tests to reflect new authority.
+- Modify package scripts only if test discovery requires it.
+- Modify workflow only for narrow test discovery if required.
+- Do not redesign workflow.
+- Do not change dependency versions by default.
+- Do not change seed by default.
+- Do not change schema by default.
+- Do not change R01 migration by default.
+- Do not change R02 SQL fixture tests by default.
+- Explain every inherited-file modification in PR.
+# 42. Files to Preserve
+- Preserve R01 migration history.
+- Preserve R01 credential lookup function.
+- Preserve R01 throttle functions.
+- Preserve R01 role grants.
+- Preserve R01 negative privilege tests.
+- Preserve R02 deterministic seed data.
+- Preserve R02 fixture TypeScript constants.
+- Preserve R02 authorization SQL tests.
+- Preserve R02 server integration tests.
+- Preserve R04 actor/RLS baseline tests.
+- Preserve tenant transaction helper.
+- Preserve authentication transaction helper.
+- Preserve password verifier.
+- Preserve credential repository.
+- Preserve login throttle adapter.
+- Preserve existing customer public routes.
+- Preserve existing protected matcher set.
+- Preserve deterministic fixture IDs.
+- Preserve canonical permission codes.
+# 43. Files Not to Move
+- Do not move R01 identity server modules.
+- Do not move R02 test fixture module.
+- Do not move generated DB types.
+- Do not move Supabase migrations.
+- Do not move SQL test directories.
+- Do not reorganize auth purely to match tutorials.
+- Do not move login UI without functional need.
+- Do not move proxy without framework requirement.
+- Do not rename legacy files before R06.
+- Do not create duplicate `auth` directories.
+- Do not split provider into unnecessary layers.
+- Keep server-only domain logic near identity server module.
+- Keep route adapter thin.
+- Keep client login code client-only.
+- Record unavoidable framework-driven moves.
+- Update imports deterministically if a move is unavoidable.
+- Avoid mixed move/refactor noise.
+- No file move is expected by default.
+# 44. Database Change Policy
+- Default schema change is NO.
+- Default new migration is NO.
+- Auth.js Credentials does not require a new user table.
+- Auth.js Credentials does not require a new credential table.
+- Default session strategy should avoid adapter tables.
+- Do not add tenant to credentials.
+- Do not add branch to credentials.
+- Do not add roles to credentials.
+- Do not add permissions to credentials.
+- Do not add session state to credentials.
+- Do not add duplicate normalized email column.
+- Do not rewrite historical migrations.
+- If schema change becomes necessary, use forward-only migration.
+- Any schema deviation must be justified prominently.
+- Clean local reset remains implementation validation.
+- Production DB mutation is prohibited.
+- Generated types should remain unchanged by default.
+- Unexpected generated type drift must be investigated.
+# 45. Auth.js Session Strategy
+- Inspect installed session strategy support.
+- Prefer JWT strategy if compatible and simplest.
+- Do not add session adapter by default.
+- Session strategy must be explicit in PR.
+- Session max age must be explicit.
+- Prefer approximately existing eight-hour internal experience unless security requires change.
+- Do not create custom JOSE token beside Auth.js.
+- Do not mirror Auth.js token into custom cookie.
+- Do not invent refresh-token subsystem.
+- Do not add remember-me behavior.
+- Do not add device management.
+- Do not add session database table without need.
+- Session read must be side-effect free.
+- Session read must not access password hash.
+- Session read must not mutate throttle.
+- Session read must not choose workspace.
+- Session expiry must be testable.
+- Expired session must not revive via legacy cookie.
+# 46. Canonical Auth.js User Shape
+- `id` is real application user UUID.
+- `email` is normalized identity email.
+- `name` is optional display-only data.
+- Do not broaden pre-auth data reads solely for name.
+- Do not include password.
+- Do not include password hash.
+- Do not include algorithm.
+- Do not include password-change timestamp in browser session by default.
+- Do not include tenant ID.
+- Do not include branch ID.
+- Do not include restaurant ID.
 - Do not include membership ID.
 - Do not include role ID.
-- Do not include permission array.
-- Do not include throttle state.
-- Do not include credential disabled state.
-- Do not include internal DB role.
-- User object must be serializable per installed Auth.js types.
-
-# 33. Credentials Input Contract
+- Do not include permission codes.
+- Do not include throttle digest.
+- Do not include blocked state.
+- User object must satisfy installed Auth.js types.
+- User object must be safely serializable.
+# 47. Credentials Input Contract
 - Credentials object may be absent.
 - Email may be absent.
 - Password may be absent.
 - Email may be non-string.
 - Password may be non-string.
-- Email may contain whitespace.
-- Email may contain uppercase.
+- Email may contain leading whitespace.
+- Email may contain trailing whitespace.
+- Email may contain uppercase characters.
 - Email may be empty.
 - Password may be empty.
-- Password may exceed maximum.
-- Malformed input must not crash provider.
-- Malformed input should avoid unnecessary DB calls.
-- Empty password fails.
-- Empty email fails.
-- Normalization uses R01 helper.
-- UI validation is not security authority.
-- Server validation is mandatory.
-- Browser failure remains generic.
-
-# 34. Throttle Evaluation Order
-- Normalize identifier.
-- Derive throttle subject digest.
+- Email may exceed configured limit.
+- Password may exceed configured limit.
+- Unexpected extra fields are ignored.
+- Invalid structure must not crash provider.
+- Invalid structure creates no session.
+- Server validation is authoritative.
+- Client validation is UX only.
+- Outward failure remains generic.
+# 48. Authentication Evaluation Order
+- Receive untrusted email/password.
+- Validate structural types.
+- Normalize email.
+- Validate password bounds.
+- Derive throttle subject.
 - Read throttle state.
-- If blocked, reject authentication.
-- Apply safe timing discipline for blocked/no-candidate paths.
-- Lookup candidate.
-- If no candidate, execute dummy password verification.
-- If candidate exists, verify real password.
-- On failure, record one failed attempt.
-- On success, clear failure state.
-- Only then return authenticated user.
-- Do not issue session before verification.
-- Do not record failure after success.
-- Do not hold DB transaction during scrypt.
-- Do not let later exceptions silently erase failure accounting.
-
-# 35. Blocked Login Semantics
+- Reject blocked state safely.
+- Lookup active credential candidate.
+- Execute dummy KDF if candidate absent.
+- Execute real KDF if candidate present.
+- Determine verification result.
+- Record one failure on rejected attempt according to policy.
+- Clear failure state on successful verification.
+- Build minimal user result.
+- Return user to Auth.js only after all security steps.
+- Let Auth.js issue session.
+- Never issue session before credential success.
+- Never invoke legacy fallback.
+# 49. Database Transaction Boundaries
+- Throttle read uses short authentication transaction.
+- Candidate lookup uses short authentication transaction.
+- Password KDF runs outside database transaction.
+- Failure recording uses short authentication transaction.
+- Success clear uses short authentication transaction.
+- Session issuance occurs outside credential DB transaction.
+- No tenant transaction occurs before identity is known.
+- No actor transaction occurs before identity is known.
+- No branch context is set during credential lookup.
+- No tenant context is set during credential lookup.
+- Authentication role remains transaction-local.
+- Do not use session-level `SET ROLE`.
+- Do not hold pool connection across network redirect.
+- Do not wrap entire Auth.js callback in one DB transaction.
+- Failure accounting must survive unrelated later exceptions.
+- Context leakage tests remain inherited.
+- Any transaction helper change requires regression proof.
+- Preserve rollback semantics.
+# 50. Throttle Block Semantics
 - `isBlocked=true` prevents authentication.
+- Blocked request creates no session.
+- Blocked request does not clear failures.
+- Blocked request does not use legacy fallback.
+- Browser does not receive exact failure count.
+- Browser does not receive exact block expiry by default.
+- Browser receives generic credential failure class.
+- Internal code may classify blocked state.
 - Blocked state must not reveal account existence.
-- Browser must not receive failure count.
-- Browser must not receive exact block expiry by default.
-- Internal logging may record blocked boolean.
-- Blocked request does not clear state.
-- Blocked request does not create session.
-- Blocked request does not fall back to legacy auth.
-- Test explicit observed times where possible.
-- Test exact expiry boundary.
-- After expiry normal verification may resume.
-- Successful verification after expiry may clear state.
-
-# 36. Unknown User Timing Discipline
-- Unknown lookup returns no candidate.
-- Unknown path must execute dummy verifier.
-- Use R01 dummy KDF primitive.
-- Do not short-circuit immediately on missing candidate.
-- Do not log raw unknown email by default.
-- Browser error matches wrong-password class.
+- Exact expiry boundary must be tested.
+- After expiry normal evaluation may resume.
+- Successful authentication after expiry clears state.
+- Existing active block must not be shortened accidentally.
+- Throttle subject is normalized-identifier based.
+- Tenant does not affect throttle identity.
+- Branch does not affect throttle identity.
+- Concurrent requests rely on DB atomicity.
+- Do not cache block state globally in process memory.
+# 51. Unknown User Semantics
+- Unknown email returns no credential candidate.
+- No candidate triggers dummy KDF.
+- Unknown path does not immediately short-circuit KDF.
+- Unknown path creates no session.
+- Unknown path uses generic outward failure.
+- Unknown path does not reveal account absence.
+- Unknown path may record throttle failure according to policy.
+- Unknown path never falls back to shared credentials.
+- Unknown email must not appear in routine logs.
+- Unknown path must not query memberships.
+- Unknown path must not query roles.
+- Unknown path must not query permissions.
+- Unknown path must not query tenant data.
+- Dummy KDF exceptions fail closed.
+- Unit tests must assert dummy verifier invocation.
+- Integration tests must assert no session.
+- Timing goal is removal of obvious zero-KDF oracle.
 - Do not claim perfect network constant-time behavior.
-- Prevent obvious no-KDF timing oracle.
-- Unit tests assert dummy verifier invocation.
-
-# 37. Wrong Password Semantics
-- Candidate exists.
-- Real verifier returns false.
-- Record one failure.
-- Return generic rejection.
-- Do not expose user ID.
-- Do not expose normalized email confirmation.
-- Do not expose remaining attempts.
-- Do not create Auth.js user.
-- Do not create Auth.js session.
-- Repeated failures eventually block.
-- Atomic DB function handles concurrent increments.
-- Do not read-modify-write count in application.
-
-# 38. Suspended User Semantics
-- R01 lookup returns no candidate for suspended user.
-- R03 treats it as generic invalid credentials.
-- Execute dummy KDF.
-- Do not query membership to explain status.
-- Do not expose suspension.
-- Do not create session.
-- Do not fall back to legacy auth.
-- Test R02 suspended fixture.
-
-# 39. Disabled Credential Semantics
-- R01 lookup returns no candidate.
-- Execute dummy KDF.
-- Browser sees generic rejection.
-- No session is created.
-- Do not re-enable credential.
-- No password reset workflow.
-- No direct credential table query.
-- Test R02 disabled fixture.
-
-# 40. Missing Credential Semantics
-- Active user without credential returns no candidate.
-- Execute dummy KDF.
-- Browser sees generic rejection.
-- No session.
-- Do not reveal user existence.
-- Test R02 no-credential fixture.
-
-# 41. No-Membership User Semantics
-- Credential lookup returns eligible candidate.
-- Password verification succeeds.
-- Authentication may succeed.
-- Auth.js user ID equals no-membership user UUID.
-- Do not reject only because membership absent.
-- Keep authentication separate from authorization.
-- Coarse proxy may treat user as authenticated.
-- R04 handles no-workspace state.
-- Do not synthesize membership.
-- Do not infer Tenant A from fixture naming.
-- Test valid Auth.js session with no membership authority.
-
-# 42. Successful Persona — Owner A
-- Email: `owner.a@flow.test`.
-- Password comes from R02 test fixture.
-- Real user ID comes from R02 fixture.
-- Credential repository must return candidate.
-- Password verifier must return true.
-- Auth.js session subject equals owner UUID.
-- Session must not include manager role as authority.
-- Session must not include Tenant A as authority.
-- Wrong password must fail.
-- Uppercase/space email must normalize.
-
-# 43. Successful Persona — Staff A1
-- Email: `staff.a1@flow.test`.
-- Real user ID comes from R02 fixture.
+# 52. Wrong Password Semantics
+- Eligible candidate exists.
+- Real password verifier runs.
+- Verifier returns false.
+- One failed attempt is recorded.
+- No Auth.js user is returned.
+- No Auth.js session is issued.
+- Browser receives generic failure.
+- Browser does not receive normalized email confirmation.
+- Browser does not receive user UUID.
+- Browser does not receive remaining attempts.
+- Password hash remains server-only.
+- Wrong password is not logged.
+- Repeated failures eventually block according to policy.
+- Concurrent failures rely on atomic DB function.
+- Provider must not record failure twice.
+- Provider must not call legacy matcher.
+- Tests verify failure count transition where practical.
+- Tests verify no session issuance.
+# 53. Suspended User Semantics
+- Suspended user is excluded by credential lookup.
+- Provider receives no candidate.
+- Dummy KDF executes.
+- No session is issued.
+- Browser receives generic failure.
+- Browser does not receive suspended-state message.
+- Login does not query membership to explain suspension.
+- Login does not reactivate user.
+- Login does not modify credential state.
+- Login does not fall back to shared credential.
+- R02 suspended fixture is authoritative test persona.
+- Unit path mirrors unknown-user security behavior.
+- Integration test uses deterministic suspended email.
+- Suspended status remains database authority.
+- No special suspension UI is added in R03.
+- No account recovery workflow is added.
+- No admin override is added.
+- Suspension logging remains non-enumerating.
+# 54. Disabled Credential Semantics
+- Disabled credential is excluded by credential lookup.
+- Provider receives no candidate.
+- Dummy KDF executes.
+- No session is issued.
+- Browser receives generic failure.
+- Browser does not receive disabled-state message.
+- Login does not re-enable credential.
+- Login does not update disabled timestamp.
+- Login does not read credential table directly.
+- Login does not fall back to shared credential.
+- R02 disabled fixture is authoritative test persona.
+- Integration test uses deterministic disabled email.
+- Credential disablement remains server/database authority.
+- No password reset is added.
+- No reactivation API is added.
+- No special error code leaks state.
+- Failure accounting follows chosen throttle policy.
+- Security logs exclude credential hash.
+# 55. Missing Credential Semantics
+- Active user may exist without credential.
+- Credential lookup returns no candidate.
+- Dummy KDF executes.
+- No session is issued.
+- Browser receives generic failure.
+- Browser does not learn user exists.
+- Login does not create a credential automatically.
+- Login does not synthesize password hash.
+- Login does not fall back to shared credentials.
+- R02 no-credential fixture is test authority.
+- Integration test verifies no session.
+- No registration flow is introduced.
+- No password enrollment flow is introduced.
+- No admin recovery flow is introduced.
+- Failure accounting follows policy.
+- No tenant lookup is performed.
+- No membership lookup is performed.
+- No permission lookup is performed.
+# 56. No-Membership User Semantics
+- No-membership user has valid credential.
+- Credential lookup returns candidate.
+- Real verifier succeeds for valid fixture password.
+- Auth.js authentication may succeed.
+- Session subject is real no-membership user UUID.
+- Session contains no tenant authority.
+- Session contains no branch authority.
+- Provider must not reject solely for missing membership.
+- Provider must not synthesize membership.
+- Provider must not infer Tenant A from fixture naming.
+- Coarse proxy may consider session authenticated.
+- R04 owns no-workspace behavior.
+- R04 may redirect to no-access/workspace state later.
+- R05 permission enforcement remains later.
+- R02 already proves no workspace authorization under tenant transaction.
+- R03 test must prove authentication/authorization separation.
+- No-membership success must not weaken database RLS.
+- Session must remain minimal.
+# 57. Owner A Positive Case
+- Use `owner.a@flow.test` fixture.
+- Use R02 owner test password.
+- Normalize email server-side.
+- Candidate user ID matches owner fixture UUID.
+- Password verifier returns true.
+- Authentication service returns authenticated result.
+- Auth.js user ID equals owner UUID.
+- Auth.js session user ID equals owner UUID.
+- Session email is normalized owner email.
+- Session excludes manager role authority.
+- Session excludes Tenant A authority.
+- Session excludes branch authority.
+- Session excludes permission list.
+- Successful auth clears throttle state.
+- Wrong owner password rejects.
+- Uppercase owner email authenticates after normalization.
+- Whitespace owner email authenticates after normalization.
+- Logout invalidates owner session.
+# 58. Staff A1 Positive Case
+- Use `staff.a1@flow.test` fixture.
+- Use R02 Staff A1 test password.
+- Candidate user ID matches Staff A1 UUID.
 - Valid password authenticates.
+- Session subject equals Staff A1 UUID.
 - Session excludes Branch A1 authority.
-- Session excludes staff permission array.
+- Session excludes staff permission list.
+- Provider does not call permission helper.
+- Provider does not call membership helper.
 - R04 later resolves Branch A1 membership.
 - R05 later enforces staff permissions.
-- Wrong password fails.
-
-# 44. Successful Persona — Staff A2
-- Email: `staff.a2@flow.test`.
+- Wrong password rejects.
+- Failure increments throttle.
+- Success clears throttle.
+- Legacy shared credential cannot impersonate Staff A1.
+- Legacy cookie cannot authorize Staff A1 route.
+- Session retrieval returns stable actor ID.
+- Tenant isolation remains DB responsibility later.
+# 59. Staff A2 Positive Case
+- Use `staff.a2@flow.test` fixture.
+- Use R02 Staff A2 test password.
+- Candidate user ID matches Staff A2 UUID.
 - Valid password authenticates.
 - Session subject equals Staff A2 UUID.
 - Session excludes Branch A2 authority.
-- Login does not infer sibling branches.
-- R04 later resolves membership.
-- Wrong password fails.
-
-# 45. Successful Persona — Kitchen A1
-- Email: `kitchen.a1@flow.test`.
+- Login does not infer sibling branch access.
+- Login does not query branch table.
+- R04 later resolves Branch A2 membership.
+- Wrong password rejects.
+- Success clears throttle.
+- Failed login creates no session.
+- Legacy shared credential cannot authenticate as Staff A2.
+- Session contains no role code.
+- Session contains no permissions.
+- Session remains valid identity independent of authorization.
+- Logout removes session authority.
+- Protected gate relies on Auth.js session only.
+# 60. Kitchen A1 Positive Case
+- Use `kitchen.a1@flow.test` fixture.
+- Use R02 Kitchen A1 test password.
+- Candidate user ID matches Kitchen A1 UUID.
 - Valid password authenticates.
 - Session subject equals Kitchen A1 UUID.
-- Session excludes kitchen permissions.
+- Session excludes kitchen permission list.
+- Session excludes Branch A1 authority.
+- Provider does not query kitchen domain tables.
 - Provider does not call permission helper.
-- R04 resolves branch later.
-- R05 enforces kitchen route later.
-- Wrong password fails.
-
-# 46. Successful Persona — Cashier A2
-- Email: `cashier.a2@flow.test`.
+- R04 later resolves branch.
+- R05 later enforces kitchen route permission.
+- Wrong password rejects.
+- Success clears throttle.
+- Legacy cookie cannot grant kitchen auth.
+- No kitchen feature changes occur.
+- No KDS changes occur.
+- Session minimality is asserted.
+- Logout invalidates session.
+# 61. Cashier A2 Positive Case
+- Use `cashier.a2@flow.test` fixture.
+- Use R02 Cashier A2 test password.
+- Candidate user ID matches Cashier A2 UUID.
 - Valid password authenticates.
 - Session subject equals Cashier A2 UUID.
-- Session excludes payment permissions.
+- Session excludes payment permission list.
+- Session excludes Branch A2 authority.
 - Provider does not query payment tables.
-- R04 resolves branch later.
-- R05 enforces cashier route later.
-- Wrong password fails.
-
-# 47. Successful Persona — Staff B1
-- Email: `staff.b1@flow.test`.
+- Provider does not call permission helper.
+- R04 later resolves branch.
+- R05 later enforces cashier permissions.
+- Wrong password rejects.
+- Success clears throttle.
+- Legacy cookie cannot grant cashier auth.
+- No payment workflow changes occur.
+- No payment credential changes occur.
+- Session minimality is asserted.
+- Logout invalidates session.
+# 62. Tenant B Staff Positive Case
+- Use `staff.b1@flow.test` fixture.
+- Use R02 Tenant B staff test password.
+- Candidate user ID matches Tenant B staff UUID.
 - Valid password authenticates.
-- Session subject equals Tenant B staff UUID.
-- Login does not choose Tenant B explicitly.
-- Session excludes tenant authority.
-- R04 resolves Tenant B workspace later.
-- Wrong password fails.
-
-# 48. Legacy Shared Credential Cutover Rule
-- `FOODFLOW_INTERNAL_EMAIL` stops being primary identity authority.
-- `FOODFLOW_INTERNAL_PASSWORD` stops being primary password authority.
-- `FOODFLOW_SESSION_SECRET` stops being live session-signing authority.
-- New live path must not call `credentialsMatch()`.
-- New live path must not call legacy `createSession()`.
-- Proxy must not rely on legacy `verifySession()` as authority.
-- Configured shared credential must not authenticate without DB credential.
-- Development fallback `admin@foodflow.local` must not be live authority.
-- Legacy source may remain for R06 cleanup.
-- Successful Auth.js login may clear stale legacy cookie.
-- Legacy cookie must not override failed Auth.js state.
-- Add legacy credential rejection test.
-- R06 removes code/env/dependency later.
-
-# 49. Auth.js Secret Contract
+- Login does not pass Tenant B ID.
+- Session does not store Tenant B as authority.
+- Session does not store Branch B1 as authority.
+- Provider does not inspect Tenant A.
+- Provider does not query authorization catalog.
+- R04 later resolves Tenant B membership.
+- R02 cross-tenant tests remain regression authority.
+- Wrong password rejects.
+- Success clears throttle.
+- No Tenant A data is loaded during login.
+- Session subject remains globally stable user UUID.
+- Legacy shared credential cannot impersonate Tenant B staff.
+- Protected coarse gate accepts only valid Auth.js session.
+- Logout invalidates session.
+# 63. Auth.js Secret Contract
 - `AUTH_SECRET` is server-only.
-- `.env.example` keeps placeholder only.
-- No production fallback secret.
-- Missing production secret fails safely.
-- Preview uses independent secret.
-- Local development follows project secret policy.
-- Do not automatically reuse legacy session secret.
-- Never log AUTH_SECRET.
-- Never expose AUTH_SECRET to client.
-- Never prefix AUTH_SECRET with NEXT_PUBLIC.
-- Secret rotation productization is outside R03.
-
-# 50. Redirect Safety Contract
-- `next` must be same-origin local path.
-- Reject absolute external URL.
-- Reject protocol-relative URL.
-- Reject javascript scheme.
-- Invalid path falls back to safe internal route.
-- Preserve query only for safe local path.
-- Avoid redirect loop to login.
-- Successful sign-in uses sanitized destination.
-- Failed sign-in remains on login UI.
-- Proxy stores only safe requested path.
-- Password must never appear in redirect URL.
-
-# 51. Server / Client Boundary
+- `.env.example` contains placeholder only.
+- Production must not use hard-coded fallback secret.
+- Preview secret is configured externally.
+- Production secret is configured externally.
+- Local secret follows project development policy.
+- Do not reuse FOODFLOW legacy secret silently.
+- Do not expose AUTH_SECRET to browser.
+- Do not prefix AUTH_SECRET with NEXT_PUBLIC.
+- Do not log AUTH_SECRET.
+- Do not include AUTH_SECRET in error response.
+- Do not include AUTH_SECRET in PR text.
+- Missing required production secret fails safely.
+- Session issuance must not continue without valid Auth.js configuration.
+- Secret rotation UX is out of scope.
+- Multi-key rotation design is out of scope.
+- Implementation PR records configuration requirements without values.
+- R06 removes obsolete legacy secret configuration later.
+# 64. Redirect Safety
+- `next` destination must be local same-origin path.
+- Absolute external URLs are rejected.
+- Protocol-relative URLs are rejected.
+- JavaScript schemes are rejected.
+- Empty destination uses safe internal default.
+- Login destination must not create self-loop.
+- Preserve query parameters only for safe local route.
+- Never include password in redirect.
+- Never include credential hash in redirect.
+- Never include session token in redirect.
+- Proxy-generated redirect must be sanitized.
+- Login-form success redirect must be sanitized.
+- Auth.js callback URL must be constrained.
+- Invalid encoded path falls back safely.
+- Tests cover allowed staff path.
+- Tests cover allowed kitchen path.
+- Tests cover rejected external URL.
+- Tests cover login self-loop avoidance.
+# 65. Server / Client Boundary
 - Credential repository remains server-only.
 - Password verifier remains server-only.
-- Auth orchestrator remains server-only.
-- Auth.js secret remains server-only.
+- Authentication orchestrator remains server-only.
+- Auth.js configuration remains server-only.
 - Database URL remains server-only.
-- Throttle state remains server-only.
-- Client login sends password only to server auth endpoint.
-- Client must not import identity server modules.
-- Client bundle must not include test passwords.
-- Client bundle must not include DB IDs solely for auth.
-- Client bundle must not include AUTH_SECRET.
-- Client bundle must not include legacy session secret.
-- Browser session exposes minimal safe identity only.
-
-# 52. Error Taxonomy
-- Preserve existing typed identity errors.
-- Add orchestration error only if useful.
-- Distinguish invalid input internally.
-- Distinguish credential rejection internally.
+- Auth secret remains server-only.
+- Throttle functions remain server-only.
+- Client form submits only user-provided credentials.
+- Client code must not import database modules.
+- Client code must not import credential repository.
+- Client code must not import password verifier.
+- Client bundle must not include fixture passwords.
+- Client bundle must not include credential hashes.
+- Client bundle must not include Auth.js secret.
+- Browser session exposes only minimal identity.
+- Browser-provided actor ID is never trusted.
+- Browser-provided tenant ID is never login authority.
+- Browser-provided branch ID is never login authority.
+# 66. Error Taxonomy
+- Reuse existing identity input error where appropriate.
+- Reuse credential encoding error internally.
+- Reuse unsupported algorithm error internally.
+- Reuse authentication database error internally.
+- Reuse authentication throttle error internally.
+- Add orchestration error only if it improves handling.
+- Distinguish rejected credentials internally without enumeration externally.
 - Distinguish blocked state internally.
-- Distinguish DB failure internally.
-- Distinguish throttle failure internally.
-- Distinguish Auth.js configuration failure internally.
-- Browser gets small generic error set.
-- Never expose EmailNotFound error.
-- Never expose SuspendedUser error.
-- Never expose DisabledCredential error.
-- Never expose DB stack.
-- Never expose Auth.js secret/config details.
-- Never expose credential encoding.
-
-# 53. Logging Requirements
+- Distinguish operational infrastructure failure internally.
+- Browser gets generic credential rejection.
+- Browser gets generic unavailable failure for infrastructure where appropriate.
+- Do not expose EmailNotFound error.
+- Do not expose SuspendedUser error.
+- Do not expose DisabledCredential error.
+- Do not expose DB stack trace.
+- Do not expose Auth.js configuration details.
+- Do not expose credential encoding.
+- Tests assert redaction.
+# 67. Logging Contract
 - Never log raw password.
 - Never log password hash.
 - Never log scrypt salt.
@@ -994,658 +1295,604 @@
 - Never log full Auth.js token.
 - Never log full legacy token.
 - Avoid raw login email in routine logs.
-- Prefer correlation ID if available.
-- Safe field: operation name.
-- Safe field: generic outcome class.
-- Safe field: blocked boolean.
-- Safe field: internal error class.
-- Do not log account existence.
-
-# 54. CSRF and Request Integrity
-- Follow installed Auth.js Credentials CSRF semantics.
-- Do not invent a second conflicting CSRF system.
-- Compatibility route must not bypass Auth.js integrity controls.
-- Credential submit remains POST.
-- Do not accept passwords by GET.
-- Do not put password in URL.
-- Do not put password in redirect query.
-- Do not put credential in analytics.
-- Validate content type if custom endpoint remains.
-- Malformed JSON fails safely if custom endpoint remains.
-- Tests target actual live login path.
-
-# 55. Cookie Requirements
+- Safe logging may include operation name.
+- Safe logging may include generic outcome class.
+- Safe logging may include blocked boolean.
+- Safe logging may include internal error class.
+- Use correlation identifier if already available.
+- Do not log whether an email exists.
+- Do not log remaining throttle attempts.
+- Tests inspect error strings where practical.
+# 68. CSRF and Request Integrity
+- Follow installed Auth.js Credentials CSRF behavior.
+- Do not invent a second conflicting CSRF token.
+- Credentials submit remains POST.
+- Password must never be accepted through GET.
+- Password must never appear in URL.
+- Password must never be added to analytics.
+- Compatibility login route must not bypass Auth.js integrity controls.
+- Malformed request fails safely.
+- Unexpected content shape fails safely.
+- Auth.js callback route remains outside protected matcher.
+- Same-origin redirect behavior must be preserved.
+- Do not trust client callback URL blindly.
+- Do not trust client actor ID.
+- Do not trust client tenant ID.
+- Do not trust client branch ID.
+- Do not trust client role.
+- Do not trust client permission list.
+- Integration tests exercise actual live route behavior.
+# 69. Cookie Contract
 - Auth.js owns authoritative session cookie.
-- Do not create second authoritative custom cookie.
-- Authoritative cookie must be HttpOnly according to Auth.js defaults.
-- Secure in production.
-- SameSite appropriate for same-origin app.
-- Cookie path covers protected routes.
-- Cookie value contains no plaintext credential.
-- Legacy cookie is not authoritative after cutover.
-- Login may clear stale legacy cookie.
+- Do not create a parallel authoritative custom cookie.
+- Authoritative cookie uses HttpOnly behavior supported by Auth.js.
+- Authoritative cookie is secure in production.
+- SameSite follows safe same-origin behavior.
+- Cookie path covers protected internal routes.
+- Cookie value contains no plaintext password.
+- Cookie value contains no plaintext secret.
+- Avoid hard-coding Auth.js cookie name unless required.
+- Legacy cookie is non-authoritative after cutover.
+- Successful login may clear stale legacy cookie.
 - Logout may clear stale legacy cookie.
 - Proxy must not trust stale legacy cookie.
-- Add stale-legacy-cookie-only rejection test.
-- Avoid hard-coding Auth.js cookie name unless installed API requires it.
-
-# 56. Session Expiration
-- Define intended session max age.
-- Prefer approximately current eight-hour internal UX unless security design chooses otherwise.
-- Document chosen max age.
-- Expired Auth.js session fails coarse gate.
-- Expired session must not fall back to legacy cookie.
-- Session refresh follows Auth.js behavior.
-- Do not invent refresh token flow.
-- Do not add remember-me UI.
-- Do not add device-session management.
-- Test expiry where practical.
-
-# 57. Password-Changed Semantics
-- R01 candidate includes `passwordChangedAt`.
-- Do not expose it to browser.
-- Use for invalidation only if implementation has clear need.
-- Keep any use server/token-only.
-- Do not add complexity only because field exists.
-- R04/R06 may handle broader revocation semantics.
+- Legacy token cannot be converted by copying bytes.
+- Session tests inspect authority behavior rather than implementation trivia.
+- Tampered authoritative cookie is rejected.
+- Expired authoritative cookie is rejected.
+- Mixed-cookie precedence favors Auth.js authority.
+# 70. Session Expiration
+- Define session max age explicitly.
+- Prefer existing eight-hour experience unless stronger rationale exists.
+- Record chosen max age in PR.
+- Expired session is unauthenticated.
+- Expired session does not use legacy fallback.
+- Session refresh follows installed Auth.js behavior.
+- Do not invent refresh token subsystem.
+- Do not add remember-me option.
+- Do not add permanent sessions.
+- Do not add device management.
+- Do not add manual token refresh endpoint.
+- Session expiry must not require membership lookup.
+- Session expiry must not mutate credentials.
+- Logout after expiry remains safe.
+- Tests cover expiry if practical with deterministic time.
+- Browser must not receive secret expiry internals.
+- R04 may later add revocation semantics independently.
+- R06 performs final security acceptance.
+# 71. Password-Changed Timestamp
+- Candidate includes `passwordChangedAt`.
+- Browser session must not expose it by default.
+- Provider does not need it for basic verification.
+- Use it only if a clear session invalidation design is required.
+- Do not add complexity solely because field exists.
 - No password-change UI in R03.
-- No password reset in R03.
+- No password reset UI in R03.
 - No credential rotation migration in R03.
-
-# 58. Database Transaction Boundaries
-- Throttle read uses short auth transaction.
-- Candidate lookup uses short auth transaction.
-- Password KDF runs outside DB transaction.
-- Failure record uses short auth transaction.
-- Success clear uses short auth transaction.
-- Session issuance does not hold DB transaction.
-- No tenant transaction during credential lookup.
-- No actor transaction before identity is known.
-- No long transaction across redirect callback.
-- No session-level DB role mutation.
-- Preserve `SET LOCAL ROLE flow_authenticator` semantics.
-- Regression test context leakage if transaction code changes.
-
-# 59. Concurrency Requirements
-- Concurrent wrong passwords must not lose increments.
-- R03 relies on atomic R01 throttle function.
+- No forced password reset flow in R03.
+- No password history in R03.
+- No password policy redesign in R03.
+- Keep value server-only.
+- Do not log it as credential detail unless operationally necessary.
+- R04/R06 may use it for revocation semantics later.
+- Any use must be documented in PR.
+- Tests should not depend on incidental timestamp value.
+- Credential eligibility remains repository authority.
+- Password verification remains R01 primitive.
+# 72. Concurrency Requirements
+- Concurrent wrong passwords must not lose failure increments.
+- R03 relies on atomic R01 database function.
 - Do not cache failure count in memory.
-- Do not read then write failure count in app.
-- Concurrent success/failure must follow safe DB semantics.
-- Session is issued only for verified request.
-- Duplicate client submit must not corrupt authority.
-- Client duplicate-submit prevention is UX only.
-- Server correctness must stand independently.
-- Logout remains idempotent.
-
-# 60. Idempotency Requirements
+- Do not perform app-level read-modify-write.
+- Duplicate client submit may create distinct attempts.
+- Client submit lock remains UX only.
+- Server correctness must survive concurrent requests.
+- Session is issued only for the verified request.
+- Success clearing must not create privilege.
+- Failure after successful verification must not corrupt another user.
+- Throttle subject is per normalized identity.
+- Different users do not share subject accidentally.
+- Database transactions remain short.
+- KDF work remains outside transaction.
+- Auth.js callbacks must not mutate shared globals.
+- Logout is idempotent.
+- Session reads are side-effect free.
+- Tests cover atomicity through inherited R01 behavior and targeted service cases.
+# 73. Idempotency Requirements
 - Credential lookup is read-only.
-- Dummy KDF has no persistent side effect.
-- Wrong password increments once per authorize attempt.
-- Avoid double failure recording across service/provider catches.
-- Successful login clears failure state once.
+- Dummy KDF is side-effect free.
+- Wrong-password attempt records exactly once.
+- Provider and service must not both record same failure.
+- Success clears throttle exactly once logically.
 - Repeated clear is harmless.
 - Session callbacks do not mutate credentials.
-- Session reads do not alter throttle.
+- Session reads do not mutate throttle.
+- Session reads do not select workspace.
 - Repeated logout is safe.
-- Compatibility retries do not issue legacy session.
-- Add test for duplicate failure accounting.
-
-# 61. Performance Requirements
-- Do not expand membership graph during login.
+- Compatibility route retries do not issue legacy session.
+- Redirect retries do not create tenant authority.
+- Auth.js callback retry behavior must not duplicate domain writes.
+- There are no domain writes in R03 login beyond throttle state.
+- No audit-domain expansion is required.
+- Tests assert single failure-recorder invocation in unit scope.
+- Tests assert no failure record after successful password.
+- Tests isolate throttle state between cases.
+# 74. Performance Requirements
+- Do not load membership graph during login.
 - Do not load permission catalog during login.
 - Do not load all branches during login.
-- Do not query tenant tables during credential lookup.
-- One candidate lookup per normal authorize attempt.
-- One real KDF per candidate attempt.
-- One dummy KDF per no-candidate attempt.
-- One throttle read per authorize attempt.
-- One throttle write on failure or clear on success.
-- Keep DB transactions short.
-- Use Node crypto scrypt.
+- Do not query tenant table during credential lookup.
+- Normal authorize performs one candidate lookup.
+- Candidate path performs one real KDF.
+- No-candidate path performs one dummy KDF.
+- Authorize reads throttle once under normal design.
+- Failure path records one throttle mutation.
+- Success path clears throttle once.
+- Database transactions stay short.
 - Do not cache credential hashes.
 - Keep session claims small.
-- Keep proxy auth check inexpensive.
-
-# 62. Failure Case — DATABASE_URL Unavailable
+- Keep proxy authentication check inexpensive.
+- Do not query database from proxy unless installed Auth.js design absolutely requires and supports it.
+- Avoid unnecessary adapter tables.
+- Avoid N+1 queries.
+- Performance optimization must not weaken security.
+# 75. Failure — Database Unavailable
 - Authentication must not succeed.
-- Do not fall back to legacy shared credentials.
-- Browser receives generic unavailable/failure behavior.
-- Internal log may classify DB unavailable.
-- No password is logged.
+- Legacy shared credentials must not be used.
 - No session is issued.
-- Retry only when infrastructure recovers.
-
-# 63. Failure Case — AUTH_SECRET Missing
-- Auth.js configuration must fail safely.
+- Browser receives safe generic unavailable/failure behavior.
+- Internal code may classify DB unavailable.
+- Password is not logged.
+- Email existence is not inferred.
+- No tenant query fallback.
+- No cached credential fallback.
+- No hard-coded fallback user.
+- Throttle integrity failure remains fail-closed.
+- Retry occurs only through normal later request.
+- Existing session validation behavior remains separate.
+- Logout should not depend on database credential lookup.
+- Tests mock repository failure.
+- Tests assert no authenticated result.
+- Tests assert no legacy fallback call.
+- PR documents operational failure behavior.
+# 76. Failure — Auth.js Configuration
+- Missing required Auth.js secret fails safely.
+- Invalid configuration does not issue session.
 - Do not hard-code fallback secret.
 - Do not reuse legacy secret silently.
-- Do not issue a session.
-- Browser must not see secret/config details.
-- Production startup/runtime should surface safe operator error.
-
-# 64. Failure Case — Credential Repository Throws
+- Do not expose config details to browser.
+- Do not expose secret in logs.
+- Do not fall back to legacy session issuer.
+- Do not accept unsigned session.
+- Do not bypass provider verification.
+- Login returns safe failure.
+- Proxy treats unverifiable session as unauthenticated.
+- Existing valid sessions follow Auth.js configuration semantics.
+- Test configuration failure where practical.
+- Deployment docs retain placeholder-only values.
+- No secret migration is performed by code.
+- Production configuration remains external.
+- R06 removes obsolete legacy configuration later.
+- PR states required variables without values.
+# 77. Failure — Credential Repository Error
 - No session is issued.
-- No legacy credential fallback.
-- Preserve internal error category.
-- Browser receives generic failure.
-- Do not pretend user simply has wrong password if operational handling needs distinction internally.
-- Do not leak DB exception.
-
-# 65. Failure Case — Throttle Read Throws
-- Fail closed.
+- Do not treat repository error as credential success.
+- Do not run legacy fallback.
+- Do not expose SQL error.
+- Preserve typed internal database error.
+- Browser receives generic safe failure.
+- Password remains unlogged.
+- Candidate hash remains unavailable to client.
+- Failure recording behavior follows explicit orchestrator decision.
+- Do not query credentials directly as retry shortcut.
+- Do not switch database role broadly.
+- Unit test mocks repository throw.
+- Integration failure may be simulated only safely.
+- Session callback is never reached on failure.
+- Proxy remains unaffected by attempted login failure.
+- Existing session is not silently replaced.
+- PR records failure handling.
+- No production mutation occurs.
+# 78. Failure — Throttle Read Error
+- Authentication fails closed.
+- Do not assume not blocked.
+- Do not issue session.
+- Do not use legacy fallback.
 - Do not bypass throttle.
-- Do not authenticate.
-- Do not create session.
-- Browser sees generic failure.
-- Log safe throttle error category.
-
-# 66. Failure Case — Failure Recording Throws
-- Do not silently claim secure failure accounting succeeded.
-- Do not issue a session for wrong password regardless.
-- Surface safe internal operational failure.
+- Preserve typed throttle error internally.
+- Browser receives generic safe failure.
+- Password is not logged.
+- Failure count is not guessed.
+- No direct throttle table read fallback.
+- No process-memory fallback.
+- Unit test mocks throttle read failure.
+- Test asserts candidate verification is not accepted.
+- Test asserts no session result.
+- Retry occurs after infrastructure recovery.
+- PR documents fail-closed behavior.
+- R01 database grants remain unchanged.
+- No production repair action is automated.
+# 79. Failure — Failure Recording Error
+- Wrong password still does not authenticate.
+- No session is issued.
+- Do not claim failure accounting succeeded.
+- Do not silently ignore throttle persistence error.
+- Do not use legacy fallback.
+- Preserve typed error internally.
 - Browser remains generic.
-- Do not retry in a way that double-counts without idempotency design.
-
-# 67. Failure Case — Success Clear Throws
-- Decide fail-closed vs proceed with explicit security rationale.
-- Preferred default is fail-closed for deterministic throttle integrity.
-- Do not silently ignore persistent security-state error.
-- No legacy fallback.
-- PR must record chosen behavior.
-- Tests must cover chosen behavior.
-
-# 68. Failure Case — Password Verifier Throws
-- Do not create session.
-- Do not expose encoding error.
+- Avoid automatic retry that double-counts without design.
+- No password logging.
+- No direct table-write fallback.
+- Unit test mocks failure recorder throw.
+- Test asserts authenticated result is impossible.
+- Operator evidence stays secret-safe.
+- Database transaction remains short.
+- No tenant context is introduced.
+- No branch context is introduced.
+- PR documents exact behavior.
+- R01 atomic function remains authority.
+# 80. Failure — Success Clear Error
+- Decide behavior explicitly before implementation completion.
+- Preferred default is fail-closed for throttle integrity.
+- Do not silently ignore persistent security-state failure.
+- Do not use legacy fallback.
+- Do not leak throttle state.
+- Do not leak account existence.
+- If fail-closed, no session is issued.
+- If implementation chooses otherwise, security rationale is mandatory.
+- Chosen behavior must have unit coverage.
+- Chosen behavior must be documented in PR.
+- Success clear remains short DB transaction.
+- Do not hold session issuance transaction open.
+- No tenant/branch context is required.
+- Repeated clear remains harmless.
+- Password remains unlogged.
+- No direct throttle-table mutation is allowed.
+- R04/R06 may revisit broader revocation behavior.
+- Document validation requires this decision point to remain explicit.
+# 81. Failure — Password Verifier Error
+- No session is issued.
 - Do not downgrade algorithm.
-- Do not try legacy password matcher.
-- Browser sees generic failure.
-- Internal error category remains safe.
-
-# 69. Failure Case — Auth.js Handler Throws
-- Do not issue legacy session.
-- Browser sees generic auth failure.
-- Do not expose stack/secret.
-- Preserve safe operator evidence.
-- Retry only through normal user action or infrastructure recovery.
-
-# 70. Failure Case — Proxy Auth Helper Throws
-- Fail closed to unauthenticated or safe error path.
-- Never trust legacy cookie as fallback.
-- Never query credentials in proxy.
-- Avoid redirect loop.
-- Preserve safe requested path where possible.
-
-# 71. Failure Case — Logout Handler Throws
-- Do not expose token.
-- Do not expose secret.
-- Do not create new session.
-- Return safe error/redirect behavior.
-- Repeated retry must remain safe.
-
-# 72. Failure Case — Malformed next Path
-- Reject external origin.
-- Reject unsafe scheme.
-- Use safe default internal route.
-- Do not include credentials in redirect.
-- Avoid login self-loop.
-
-# 73. Failure Case — Legacy Cookie Only
-- Treat as unauthenticated after preferred cutover.
-- Redirect protected routes to login.
-- Do not resurrect old fixed user ID.
-- Logout may clear cookie.
-- Add regression test.
-
-# 74. Failure Case — Tampered Auth.js Session
-- Treat as unauthenticated.
-- Do not parse user ID from unverified client value.
-- Do not fall back to legacy cookie.
-- Do not expose verification details.
-- Add session rejection test.
-
-# 75. Rollback Strategy
-- R03 changes live auth authority.
-- Keep source-level legacy code until R06.
-- Rollback is explicit source-controlled owner action.
-- Never automatic runtime fallback.
-- Stale legacy cookie is not rollback mechanism.
-- R02 DB credentials remain testable.
+- Do not use plaintext comparison.
+- Do not use legacy matcher.
+- Do not expose encoding error.
+- Do not expose salt.
+- Do not expose hash.
+- Browser receives generic failure.
+- Preserve typed internal verification error.
+- Failure accounting behavior must be explicit.
+- Malformed credential encoding remains fail-closed.
+- Unsupported algorithm remains fail-closed.
+- Oversized password remains input failure.
+- Unit tests cover thrown verifier.
+- Integration tests cover malformed fixture only if safe.
+- Do not mutate credential row automatically.
+- No password migration occurs in R03.
+- PR records any unexpected encoding incompatibility.
+# 82. Failure — Auth.js Handler Error
+- No legacy session is issued.
+- No custom cookie is issued as fallback.
+- Browser receives generic auth failure.
+- Secret is not exposed.
+- Token is not exposed.
+- Stack trace is not exposed to client.
+- Existing unrelated sessions are not fabricated.
+- Login form resets pending state safely.
+- Retry requires normal user action.
+- Proxy continues to trust only valid Auth.js session.
+- Unit/integration tests cover safe mapping where practical.
+- Error logging uses safe category.
+- No password in logs.
+- No tenant selection occurs.
+- No permission check occurs.
+- No domain write occurs beyond possible throttle state.
+- PR documents any framework-specific exception behavior.
+- R06 cleanup is unaffected.
+# 83. Failure — Proxy Auth Error
+- Protected request must fail closed.
+- Do not trust legacy cookie fallback.
+- Do not query credential table.
+- Do not create session.
+- Prefer redirect to login or safe framework error according to supported pattern.
+- Avoid redirect loops.
+- Preserve safe local requested path when possible.
+- Do not expose token details.
+- Do not expose secret details.
+- Public customer routes remain unaffected.
+- Auth callback routes remain reachable.
+- Tests cover invalid session behavior.
+- Tests cover legacy-cookie-only behavior.
+- Tests cover safe redirect.
+- R05 permission logic remains absent.
+- R04 workspace logic remains absent.
+- Proxy stays lightweight.
+- Framework-supported auth helper is preferred.
+# 84. Failure — Logout
+- Logout failure does not create new session.
+- Logout failure does not create legacy cookie.
+- Logout failure does not expose token.
+- Logout failure does not expose secret.
+- Logout does not run password verification.
+- Logout does not require tenant context.
+- Logout does not require branch context.
+- Repeated logout remains safe.
+- Already-signed-out state remains safe.
+- Stale legacy cookie may be cleaned independently.
+- Browser receives safe failure or redirect behavior.
+- Protected route must not become more permissive.
+- Tests cover no-session logout.
+- Tests cover valid-session logout.
+- Tests cover stale-legacy-cookie cleanup if implemented.
+- No database credential mutation occurs.
+- PR documents live sign-out path.
+- R06 may remove compatibility endpoint later.
+# 85. Failure — Unsafe Redirect
+- Absolute external URL is rejected.
+- Protocol-relative URL is rejected.
+- JavaScript scheme is rejected.
+- Malformed URL is rejected safely.
+- Empty value uses safe default.
+- Login self-loop uses safe default.
+- Password never appears in redirect.
+- Session token never appears in redirect.
+- Credential hash never appears in redirect.
+- Query preservation is limited to safe local path.
+- Proxy and login form use the same safety contract where practical.
+- Client cannot override origin.
+- Auth.js callback URL follows same-origin policy.
+- Tests cover malicious values.
+- Tests cover valid local values.
+- Failure does not authenticate user incorrectly.
+- Redirect safety remains separate from credential validity.
+- No open redirect is accepted.
+# 86. Rollback Strategy
+- R03 changes live authentication authority.
+- Legacy source remains until R06.
+- Runtime automatic fallback is prohibited.
+- Rollback is explicit source-control action.
+- Legacy cookie is not rollback mechanism.
+- Legacy shared credentials are not rollback mechanism.
+- R02 database credentials remain intact.
+- R01 authentication primitives remain intact.
 - Default R03 has no destructive DB migration.
-- Rollback is primarily application-level.
-- PR must describe live switch points.
-
-# 76. Suggested Authentication Service API
-```ts
-export type AuthenticateInternalUserResult =
-  | { status: "authenticated"; user: { id: string; email: string } }
-  | { status: "rejected" }
-  | { status: "blocked" };
-```
-```ts
-export async function authenticateInternalUser(input: {
-  email: unknown;
-  password: unknown;
-}): Promise<AuthenticateInternalUserResult>
-```
-- Exact syntax may differ.
-- Result must not expose hash.
-- Result must not expose tenant.
-- Result must not expose branch.
-- Result must not expose membership.
-- Provider maps success to Auth.js user.
-- Provider maps rejection/blocked generically.
-- Infrastructure errors remain distinct internally.
-
-# 77. Suggested Throttle Subject API
-```ts
-export function createLoginThrottleSubject(normalizedEmail: string): string
-```
-- Return 64 lowercase hex chars when SHA-256 is used.
-- Input must follow canonical normalization.
-- Do not accept browser-provided digest.
-- Test deterministic output.
-- Test normalized case/space equivalence.
-- Keep helper server-only if used only by auth internals.
-
-# 78. Suggested Auth.js Configuration Shape
-```ts
-const authConfig = {
-  providers: [Credentials({ authorize: async (credentials) => {/* delegate */} })],
-  callbacks: {
-    jwt: async (...) => {/* persist real user id minimally */},
-    session: async (...) => {/* expose real user id minimally */},
-  },
-};
-```
-- Exact exports follow installed package.
-- Do not copy stale v4 examples blindly.
-- Do not configure OAuth.
-- Keep callbacks minimal.
-- Keep auth service separate from provider wiring.
-
-# 79. Session Type Augmentation
-- Add focused module augmentation if required for `session.user.id`.
-- Prefer existing project type path if present.
-- Do not add tenant to session types in R03.
-- Do not add branch to session types in R03.
-- Do not add permissions to session types in R03.
-- Keep user ID as string.
-- Successful internal user email should be normalized.
-- Ensure declaration is included by tsconfig.
-- Do not use global `any` to bypass types.
-
-# 80. Existing Login Endpoint Decision
-- Option A: login form uses Auth.js signIn directly.
-- Option B: custom login route delegates to new Auth.js/auth service path.
-- Choose simplest installed-version-safe option.
-- Neither option may call `credentialsMatch()`.
-- Neither option may call legacy `createSession()`.
-- Neither option may issue `foodflow_session`.
-- PR records chosen option.
-- Tests target chosen live path.
-- R06 may delete compatibility endpoint.
-
-# 81. Existing Logout Endpoint Decision
-- Option A: UI uses Auth.js signOut directly.
-- Option B: custom logout route delegates to Auth.js signOut.
-- Compatibility endpoint may clear legacy cookie.
-- Compatibility endpoint is not authority.
-- Choose simplest supported path.
-- PR records chosen path.
-- Test protected route after logout.
-
-# 82. Existing Proxy Decision
-- Use Auth.js-supported proxy/middleware wrapper.
-- Avoid manual Auth.js cookie parsing.
-- Avoid custom Auth.js token decryption.
-- Avoid DB queries in edge/proxy if incompatible.
-- Coarse gate checks auth only.
-- Keep matcher unchanged unless framework syntax requires change.
-- Preserve safe redirect.
-- PR records runtime pattern.
-- R05 adds permission-aware enforcement later.
-
-# 83. Development Fixture Behavior
-- R02 test credentials belong to tests.
-- Do not display all test passwords in production UI.
-- Do not ship production demo account.
-- Reassess legacy development credential prefill.
-- Local prefill must not remain legacy auth authority.
-- Prefer fixture knowledge in test helpers.
-- Remove login-page dependency on legacy config if present.
-- Do not add new hard-coded production fallback.
-- `.env.example` contains no real password.
-
-# 84. Environment Variable Changes
-- `AUTH_SECRET` becomes required live session authority.
-- `AUTH_TRUST_HOST` follows installed Auth.js behavior.
-- `APP_URL` remains app origin.
-- `DATABASE_URL` remains credential lookup runtime DB.
-- `DATABASE_DIRECT_URL` remains tooling-only.
-- `FOODFLOW_INTERNAL_EMAIL` becomes legacy/rollback-only if retained.
-- `FOODFLOW_INTERNAL_PASSWORD` becomes legacy/rollback-only if retained.
-- `FOODFLOW_SESSION_SECRET` becomes legacy/rollback-only if retained.
-- R06 removes obsolete legacy vars later.
-- Do not add OAuth client IDs.
-- Do not add SMTP secrets.
-- Do not add password pepper by default.
-- Document local setup without secrets.
-
-# 85. Dependency Policy
-- Default no new dependency.
-- `next-auth` already installed.
-- `@auth/core` already installed.
-- JOSE remains until R06 if legacy code still imports it.
-- Node crypto exists.
-- Kysely exists.
-- Vitest exists.
-- Do not add bcrypt.
-- Do not add argon2.
-- Do not add another session library.
-- Do not add auth validation package only for convenience.
-- Lockfile remains unchanged by default.
-- Any dependency change requires PR justification.
-
-# 86. Database Role Requirements
-- `flow_authenticator` remains NOLOGIN.
-- `flow_authenticator` remains NOBYPASSRLS.
-- Provider does not use DB owner for direct credential reads.
-- Credential lookup stays behind approved function.
-- Throttle stays behind approved functions.
-- No direct credential-table select grant.
-- No direct throttle-table select grant.
-- No broad user-table select grant.
-- No domain-table grants to pre-auth role.
-- Session callbacks do not misuse pre-auth role for tenant operations.
-- R04 uses authenticated actor for workspace queries.
-
-# 87. RLS Requirements
-- Do not weaken R01 RLS/privilege boundary.
-- Do not weaken R04 RLS baseline.
-- Do not add BYPASSRLS.
-- Do not add broad grants for callbacks.
-- Login needs no tenant RLS context.
-- No actor context exists before credential verification.
-- Auth.js user ID becomes actor candidate after login.
-- No tenant context fabricated during login.
-- R02 authorization tests remain valid.
-- R04 self-elevation tests remain valid.
-- No-membership user proves auth/RLS separation.
-
-# 88. SECURITY DEFINER Requirements
-- Do not create new SECURITY DEFINER function by default.
-- Reuse R01 auth functions.
-- If unavoidable, fixed search_path is mandatory.
-- Revoke public execute.
-- Grant least privilege.
-- Avoid dynamic SQL.
-- Return minimal data.
-- Add negative privilege test.
-- Prefer application composition over DB surface expansion.
-
-# 89. Authentication / Authorization Separation
-- Authentication asks who proved valid credential.
-- Authorization asks what actor may do.
-- R03 owns authentication.
-- R04/R05 own authorization behavior.
-- Credentials provider does not require role.
-- Credentials provider does not require branch.
-- Provider does not require staff permission.
-- Provider does not require admin permission.
-- No-membership fixture may authenticate.
-- Suspended user cannot authenticate due candidate eligibility.
-- Disabled credential cannot authenticate.
-- Membership state is not role gate in provider.
-- Tests must reflect inherited contract.
-
-# 90. Session Claim Policy
-- User subject = real user UUID.
-- Email = normalized email.
-- Optional name = display-only.
-- No tenant ID.
-- No branch ID.
-- No restaurant ID.
-- No membership ID.
-- No role code.
-- No permission array.
-- No password hash.
-- No credential algorithm.
-- No throttle digest.
-- No blocked flag.
-- No internal DB role.
-- No legacy fixed user ID.
-
-# 91. Session Consumer Contract
-- Server can obtain authenticated user ID.
-- Server can distinguish unauthenticated.
-- Server must not treat session existence as full authorization.
-- R04 can accept authenticated user ID.
-- R05 combines actor + AccessContext + permission checks later.
-- UI may display generic authenticated identity.
-- UI must not assume workspace from session alone.
-- Proxy may use session for coarse auth only.
-- Domain commands must not be authorized only by session existence.
-
-# 92. Legacy Cookie Transition Matrix
-- No cookie => unauthenticated.
-- Valid legacy cookie only => unauthenticated after preferred cutover.
-- Invalid legacy cookie only => unauthenticated.
-- Valid Auth.js session only => authenticated.
-- Auth.js session + stale legacy cookie => Auth.js governs.
-- Expired Auth.js + valid legacy cookie => unauthenticated.
-- Logout clears Auth.js authority.
-- Logout may clear stale legacy cookie.
-- Successful login does not issue `foodflow_session`.
-- Failed login issues no session.
-
-# 93. Credentials Provider Test — Valid Owner
-- Input owner fixture email/password.
-- Expected authenticated.
-- Expected real owner user ID.
-- Expected normalized owner email.
-- Expected no password hash in result.
-- Expected throttle clear on success.
-
-# 94. Credentials Provider Test — Valid Staff A1
-- Input Staff A1 fixture email/password.
-- Expected authenticated.
-- Expected real Staff A1 user ID.
-- Expected no branch claim authority.
-- Expected no permission array.
-- Expected throttle clear.
-
-# 95. Credentials Provider Test — Valid Kitchen
-- Input Kitchen A1 fixture email/password.
-- Expected authenticated.
-- Expected real Kitchen A1 user ID.
-- Expected no kitchen permission array in session.
-- Expected no tenant claim authority.
-- Expected throttle clear.
-
-# 96. Credentials Provider Test — Valid Cashier
-- Input Cashier A2 fixture email/password.
-- Expected authenticated.
-- Expected real Cashier A2 user ID.
-- Expected no payment permission claims.
-- Expected no branch claim authority.
-- Expected throttle clear.
-
-# 97. Credentials Provider Test — Valid Tenant B Staff
-- Input Staff B1 fixture email/password.
-- Expected authenticated.
-- Expected Tenant B staff user UUID.
-- Expected no Tenant B claim authority in session.
-- R04 resolves workspace later.
-- Wrong password still rejects.
-
-# 98. Credentials Provider Test — Valid No-Membership User
-- Input no-membership fixture email/password.
-- Expected authenticated identity.
-- Expected real no-membership UUID.
-- Expected no tenant/branch authority.
-- Provider must not query membership as gate.
-- R04 handles no workspace later.
-
-# 99. Credentials Provider Test — Wrong Password
-- Candidate exists.
-- Real verifier returns false.
-- Expected rejected.
-- Expected one failure record.
-- Expected no session.
-- Expected generic outward error.
-
-# 100. Credentials Provider Test — Unknown Email
-- Candidate absent.
-- Dummy verifier invoked.
-- Expected rejected.
-- Expected no account-existence leak.
-- Expected failure accounting according to policy.
-- Expected no session.
-
-# 101. Credentials Provider Test — Suspended User
-- Candidate absent due status.
-- Dummy verifier invoked.
-- Expected rejected.
-- Expected no suspension leak.
-- Expected no session.
-
-# 102. Credentials Provider Test — Disabled Credential
-- Candidate absent due disabled credential.
-- Dummy verifier invoked.
-- Expected rejected.
-- Expected no credential-state leak.
-- Expected no session.
-
-# 103. Credentials Provider Test — Missing Credential
-- Candidate absent.
-- Dummy verifier invoked.
-- Expected rejected.
-- Expected no user-existence leak.
-- Expected no session.
-
-# 104. Credentials Provider Test — Invalid Input
-- Null credentials rejected safely.
-- Missing email rejected safely.
-- Missing password rejected safely.
-- Non-string email rejected safely.
-- Non-string password rejected safely.
-- Empty email rejected safely.
-- Empty password rejected safely.
-- Oversized email rejected safely.
-- Oversized password rejected safely.
-- No crash.
-- No session.
-
-# 105. Credentials Provider Test — Blocked Subject
-- Throttle reports blocked.
-- Expected no authentication.
-- Expected no session.
-- Expected generic outward error.
-- Expected no legacy fallback.
-- Expected no throttle clear.
-
-# 106. Authentication Service Unit Tests
-- Candidate lookup not called for structurally invalid email when avoidable.
-- Throttle evaluated for valid normalized identifier.
-- Dummy verifier called when candidate null.
-- Real verifier called when candidate exists.
-- Failure recorder called exactly once for wrong password.
-- Failure recorder behavior for no-candidate follows policy.
-- Success clear called exactly once after valid password.
-- Success clear not called on failure.
-- Service returns real user ID on success.
-- Service returns normalized email.
-- Service never returns hash.
-- Service never returns tenant/branch.
-- DB errors remain safe internal errors.
-- Throttle errors remain safe internal errors.
-- Duplicate failure accounting is prevented.
-
-# 107. Throttle Subject Unit Tests
-- Owner email produces expected fixed-length digest.
-- Same normalized email is deterministic.
-- Uppercase/whitespace normalization yields same digest.
-- Different fixture emails yield different digest.
-- Empty normalized input is rejected upstream.
-- Output matches R01 digest regex.
-- Browser cannot supply authoritative digest.
-- Helper does not log email.
-
-# 108. Auth.js Callback Unit Tests
-- JWT callback preserves real user ID.
-- JWT callback does not preserve password hash.
-- JWT callback does not store tenant ID.
-- JWT callback does not store branch ID.
-- JWT callback does not store permissions.
+- Application-level revert should restore previous live wiring if owner chooses.
+- Any new Auth.js route can be reverted with source change.
+- Any proxy cutover can be reverted with source change.
+- Environment secrets remain externally managed.
+- No production credential rewrite is required for rollback.
+- PR must identify live switch points.
+- PR must identify retained legacy source paths.
+- R06 should not start until R03/R04/R05 security path is stable.
+- Rollback plan must never weaken tenant/RLS boundaries.
+# 87. Suggested Authentication Service Contract
+- Export one server-only authentication function.
+- Input contains unknown email and password values.
+- Normalize email internally.
+- Reject malformed inputs safely.
+- Return authenticated result with minimal user object.
+- Return rejected result for invalid credentials.
+- Return blocked result internally if useful.
+- Throw typed infrastructure errors when appropriate.
+- Do not return password hash.
+- Do not return tenant ID.
+- Do not return branch ID.
+- Do not return membership.
+- Do not return roles.
+- Do not return permissions.
+- Provider maps only authenticated result to Auth.js user.
+- Provider maps rejection generically.
+- Service can be unit-tested without UI.
+- Exact type syntax may adapt to installed conventions.
+# 88. Suggested Throttle Subject Contract
+- Export helper only if separation improves testing.
+- Input is normalized email string.
+- Output is fixed 64-character lowercase hex digest.
+- SHA-256 is acceptable for deterministic subject derivation.
+- Do not include password.
+- Do not include secret by default.
+- Do not include tenant.
+- Do not include branch.
+- Do not expose helper to client.
+- Do not accept arbitrary precomputed digest from browser.
+- Same normalized input returns same output.
+- Case/whitespace variants normalize before helper.
+- Different fixture emails produce distinct outputs.
+- Output matches R01 validation regex.
+- Unit tests use deterministic expected values where useful.
+- No database access is required.
+- No logging is required.
+- Helper may remain private to orchestrator if simpler.
+# 89. Suggested Auth.js Configuration Contract
+- One Credentials provider is configured.
+- Credentials fields are email and password.
+- `authorize` delegates to authentication service.
+- `authorize` returns minimal user on success.
+- `authorize` returns rejection according to installed Auth.js contract.
+- Session strategy is explicit.
+- Session max age is explicit.
+- JWT callback propagates real user ID minimally.
+- Session callback exposes real user ID minimally.
+- No tenant claim is added.
+- No branch claim is added.
+- No permission array is added.
+- No role array is added.
+- No password data is added.
+- AUTH_SECRET is used through supported configuration.
+- Auth handler exports follow installed version.
+- Server helper is exported for R04 consumption.
+- Exact API shape follows installed package, not this illustrative contract.
+# 90. Unit Test Matrix — Orchestrator
+- Valid owner authenticates.
+- Valid staff authenticates.
+- Valid kitchen authenticates.
+- Valid cashier authenticates.
+- Valid Tenant B staff authenticates.
+- Valid no-membership user authenticates.
+- Wrong password rejects.
+- Unknown email rejects.
+- Suspended user rejects.
+- Disabled credential rejects.
+- Missing credential rejects.
+- Blocked subject rejects.
+- No-candidate invokes dummy verifier.
+- Candidate invokes real verifier.
+- Wrong password records one failure.
+- Success clears throttle once.
+- Infrastructure errors never return authenticated result.
+- Result never exposes password hash.
+# 91. Unit Test Matrix — Input
+- Missing credentials object rejects safely.
+- Missing email rejects safely.
+- Missing password rejects safely.
+- Non-string email rejects safely.
+- Non-string password rejects safely.
+- Empty email rejects safely.
+- Whitespace-only email rejects safely.
+- Empty password rejects safely.
+- Email at configured max is handled deterministically.
+- Email over configured max rejects.
+- Password at configured max is handled deterministically.
+- Password over configured max rejects.
+- Leading email whitespace normalizes.
+- Trailing email whitespace normalizes.
+- Uppercase email normalizes.
+- Unexpected extra credential fields are ignored.
+- Invalid input creates no session result.
+- Invalid input leaks no account state.
+# 92. Unit Test Matrix — Throttle
+- First failure yields expected state through adapter/service contract.
+- Repeated failure increments once per attempt.
+- Threshold failure blocks.
+- Active block rejects authentication.
+- Expired block allows re-evaluation.
+- Success clears existing failures.
+- No-candidate failure follows chosen throttle policy.
+- Wrong-password failure follows chosen throttle policy.
+- Case variants share normalized subject.
+- Whitespace variants share normalized subject.
+- Different users have different subjects.
+- Throttle read error fails closed.
+- Failure recording error never authenticates.
+- Success clear error follows documented behavior.
+- Provider does not double-record failures.
+- KDF does not run inside a long DB transaction.
+- Concurrency relies on R01 atomic function.
+- Tests isolate mutable throttle state.
+# 93. Unit Test Matrix — Session Callbacks
+- JWT callback stores real user ID only as identity addition.
 - Session callback exposes real user ID.
-- Session callback exposes normalized email only as identity.
-- Missing/invalid subject fails safely.
-- Arbitrary client actor ID cannot override token subject.
-- Callback does not query credential table.
-- Callback does not mutate throttle state.
-
-# 109. Auth.js Route Integration Tests
-- Valid owner credential creates session.
-- Valid staff credential creates session.
-- Valid kitchen credential creates session.
-- Valid cashier credential creates session.
-- Valid Tenant B staff credential creates session.
-- Valid no-membership credential creates session.
-- Wrong password creates no session.
-- Unknown email creates no session.
-- Suspended user creates no session.
-- Disabled credential creates no session.
-- Missing credential creates no session.
-- Blocked subject creates no session.
-- Malformed request creates no session.
-- Successful session can be retrieved.
-- Session ID matches fixture user ID.
+- Normalized email remains identity-only data.
+- Password is absent.
+- Password hash is absent.
+- Credential algorithm is absent.
+- Tenant ID is absent.
+- Branch ID is absent.
+- Membership ID is absent.
+- Role codes are absent.
+- Permission codes are absent.
+- Throttle digest is absent.
+- Client-provided actor override is ignored.
+- Client-provided permission override is ignored.
+- Missing subject fails safely.
+- Invalid subject fails safely.
+- Session read is side-effect free.
+- Callback types compile without broad `any`.
+# 94. Integration Test Matrix — Credentials
+- Owner fixture authenticates through real repository/verifier.
+- Staff A1 fixture authenticates.
+- Staff A2 fixture authenticates.
+- Kitchen A1 fixture authenticates.
+- Cashier A2 fixture authenticates.
+- Staff B1 fixture authenticates.
+- No-membership fixture authenticates identity.
+- Wrong password does not authenticate.
+- Unknown email does not authenticate.
+- Suspended fixture does not authenticate.
+- Disabled-credential fixture does not authenticate.
+- No-credential fixture does not authenticate.
+- Uppercase/whitespace email normalizes.
+- Valid result uses real user UUID.
+- Valid result exposes no credential hash.
+- Failed result creates no Auth.js session.
+- Successful result clears throttle.
+- Tests do not issue legacy session.
+# 95. Integration Test Matrix — Session
+- Valid credential creates authoritative Auth.js session.
+- Session can be retrieved server-side.
+- Session user ID matches fixture UUID.
+- Session email is normalized where exposed.
+- Session contains no password.
+- Session contains no hash.
+- Session contains no tenant authority.
+- Session contains no branch authority.
+- Session contains no roles.
+- Session contains no permissions.
+- Tampered session is rejected.
+- Expired session is rejected where practical.
+- Legacy cookie alone is rejected.
+- Auth.js session plus stale legacy cookie uses Auth.js authority.
+- Expired Auth.js session plus legacy cookie remains unauthenticated.
 - Logout invalidates session.
-- Tampered session rejected.
-- Legacy cookie alone rejected.
-
-# 110. Login UI Integration Tests
-- Email field required.
-- Password field required.
-- Submit disabled/loading during request.
-- Generic error on invalid credentials.
-- No account-state-specific text.
-- Successful sign-in redirects to safe next path.
-- External next path rejected.
-- Loading state resets on failure.
+- Repeated session read is side-effect free.
+- No-membership session remains identity-only.
+# 96. Integration Test Matrix — Login UI / Route
+- Email field is required.
+- Password field is required.
+- Submit enters loading state.
+- Duplicate UI submit is suppressed while pending.
+- Valid fixture credential succeeds.
+- Invalid credential displays generic error.
+- Suspended user displays generic error.
+- Disabled credential displays generic error.
+- Unknown email displays generic error.
 - Network failure displays generic error.
+- Successful login redirects to safe next path.
+- External next path is rejected.
 - Password never appears in URL.
-- Browser never receives password hash.
-- Login response does not grant tenant/branch authority.
-- Legacy shared credential no longer silently works.
-
-# 111. Proxy Integration Tests
-- Unauthenticated `/staff` redirects.
-- Unauthenticated `/kitchen` redirects.
-- Unauthenticated `/cashier` redirects.
-- Unauthenticated `/admin` redirects.
+- Response never includes password hash.
+- Legacy shared credential no longer authenticates.
+- Successful login does not issue legacy authoritative cookie.
+- Failed login issues no authoritative session.
+- Visual redesign is not required for passing tests.
+# 97. Integration Test Matrix — Proxy
+- Unauthenticated staff route redirects to login.
+- Unauthenticated kitchen route redirects to login.
+- Unauthenticated cashier route redirects to login.
+- Unauthenticated admin route redirects to login.
 - Auth.js-authenticated owner passes coarse gate.
 - Auth.js-authenticated staff passes coarse gate.
-- Auth.js-authenticated no-membership user follows documented coarse-auth behavior.
-- Legacy cookie only cannot pass.
-- Tampered Auth.js session cannot pass.
-- Redirect preserves safe path.
-- Proxy does not evaluate permissions.
+- Auth.js-authenticated kitchen passes coarse gate.
+- Auth.js-authenticated cashier passes coarse gate.
+- Authenticated no-membership user follows documented coarse-auth behavior.
+- Legacy cookie alone does not pass.
+- Tampered Auth.js session does not pass.
+- Expired Auth.js session does not pass.
+- Safe requested path is preserved.
+- External redirect injection is rejected.
 - Proxy does not query credentials.
-
-# 112. Logout Integration Tests
-- Authenticated user can sign out.
-- Session absent after sign-out.
+- Proxy does not evaluate permissions.
+- Public customer route remains unaffected.
+- Auth callback route remains reachable.
+# 98. Integration Test Matrix — Logout
+- Authenticated owner can sign out.
+- Authenticated staff can sign out.
+- Session is absent after sign-out.
 - Protected route redirects after sign-out.
-- Repeated sign-out safe.
-- Stale legacy cookie may be cleared.
-- Logout needs no membership.
-- Logout exposes no token.
-- Logout creates no new session.
-
-# 113. Database Regression Tests
+- Repeated sign-out is safe.
+- Sign-out with no session is safe.
+- Sign-out with stale legacy cookie is safe.
+- Sign-out may clear stale legacy cookie.
+- Sign-out does not require password.
+- Sign-out does not require membership.
+- Sign-out does not require tenant.
+- Sign-out does not require branch.
+- Sign-out exposes no token.
+- Sign-out exposes no secret.
+- Sign-out creates no legacy session.
+- Sign-out creates no replacement Auth.js session.
+- Compatibility logout path delegates to new authority if retained.
+- R06 may delete compatibility route later.
+# 99. Security Regression Matrix
 - R01 credential lookup tests remain valid.
 - R01 throttle tests remain valid.
 - R01 least-privilege tests remain valid.
@@ -1655,1111 +1902,31 @@ const authConfig = {
 - R02 cross-tenant tests remain valid.
 - R02 cross-branch tests remain valid.
 - R04 actor/RLS baseline remains valid.
-- No broad grant is added.
-- No historical migration edited.
-- Clean reset reproduces fixtures.
-
-# 114. Security Negative Matrix — Client Data
-- Client cannot read password hash.
-- Client cannot read raw password after submission.
-- Client cannot read AUTH_SECRET.
-- Client cannot read DATABASE_URL.
-- Client cannot inject authoritative actor ID.
-- Client cannot inject tenant authority at login.
-- Client cannot inject branch authority at login.
-- Client cannot inject role authority at login.
-- Client cannot inject permission authority at login.
-
-# 115. Security Negative Matrix — Legacy Authority
-- Legacy shared email/password cannot create authoritative session.
-- Legacy fallback dev credential cannot create authoritative session.
-- Legacy cookie alone cannot authenticate protected route.
-- Legacy token cannot override Auth.js unauthenticated state.
-- Legacy fixed user ID cannot appear as new session subject.
-- Legacy session secret is not new session authority.
-
-# 116. Security Negative Matrix — Database Privilege
-- `flow_authenticator` cannot directly read credential table.
-- `flow_authenticator` cannot directly read throttle table.
-- `flow_authenticator` cannot broadly read users.
-- `flow_authenticator` cannot read FoodFlow orders.
-- `flow_authenticator` cannot read payments.
-- `flow_authenticator` cannot read audit events.
-- Approved credential lookup remains executable.
-- Approved throttle functions remain executable.
-- No BYPASSRLS.
-
-# 117. Security Negative Matrix — Identity Enumeration
-- Unknown email does not receive unique message.
-- Suspended email does not receive unique message.
-- Disabled credential does not receive unique message.
-- Missing credential does not receive unique message.
-- Wrong password receives same generic class.
-- Blocked state does not reveal account existence.
-- Logs avoid account-existence detail in normal path.
-
-# 118. Security Negative Matrix — Session Claims
-- Session contains no password.
-- Session contains no hash.
-- Session contains no credential algorithm.
-- Session contains no throttle digest.
-- Session contains no tenant authority.
-- Session contains no branch authority.
-- Session contains no role authority.
-- Session contains no permission authority.
-- Session contains real user ID only as identity authority.
-
-# 119. R02 Fixture Consumption Rules
-- Import TypeScript fixture constants from `tests/fixtures/identity.ts`.
-- Avoid duplicating UUID literals in new Node tests.
-- SQL tests may continue stable literals when needed.
-- Keep passwords only in test code.
-- Do not move test passwords to application source.
-- Do not expose test passwords in production login UI.
-- Preserve Tenant A/B isolation.
-- Preserve Branch A1/A2 separation.
-- Preserve no-membership persona.
-
-# 120. Test Isolation Rules
-- Tests must not depend on order.
-- Throttle tests isolate mutated subject.
-- Do not use real user emails.
-- Use deterministic fixture identities.
-- Avoid persistent session state between tests.
-- Destroy DB runtime after DB integration suite.
-- Clear cookies/session client state between auth tests.
-- Parallel tests must not share throttle subject unless intentional.
-- Cleanup must not broaden DB privileges.
-
-# 121. Throttle Test Cleanup
-- Use approved server clear helper where possible.
-- Do not grant application direct delete on throttle table.
-- SQL setup may use existing test owner conventions.
-- Clean blocked state after threshold tests.
-- Do not contaminate valid-login tests.
-- Use unique digest when isolation requires.
-- Do not weaken grants for cleanup convenience.
-
-# 122. Infrastructure Failure Tests
-- Mock candidate repository failure.
-- Mock throttle-read failure.
-- Mock failure-record failure.
-- Mock success-clear failure.
-- Mock password verifier error.
-- Mock missing Auth.js configuration where practical.
-- Assert no authenticated result.
-- Assert no legacy fallback.
-- Assert generic outward behavior.
-- Assert secrets absent from error strings.
-- Assert password absent from logs if logger tested.
-
-# 123. Input Boundary Tests
-- Email length zero.
-- Email whitespace only.
-- Email at configured max.
-- Email over configured max.
-- Password length zero.
-- Password at configured max.
-- Password over configured max.
-- Email non-string.
-- Password non-string.
-- Credentials null.
-- Missing email.
-- Missing password.
-- Unicode handling remains deterministic per R01 helper.
-- Do not introduce second inconsistent validator.
-
-# 124. Redirect Boundary Tests
-- `/staff` accepted.
-- `/staff?x=1` accepted.
-- `/kitchen/orders` accepted.
-- Absolute external URL rejected.
-- Protocol-relative URL rejected.
-- Javascript scheme rejected.
-- Empty next uses default.
-- `/login` next avoids self-loop.
-- Malformed encoding fails safely.
-- Query contains no password.
-
-# 125. Session Serialization Tests
-- Real user ID survives into server session.
-- Normalized email survives into session identity.
-- Password absent.
-- Hash absent.
-- Tenant ID absent.
-- Branch ID absent.
-- Permissions absent.
-- Roles absent.
-- Throttle state absent.
-- Legacy `foodflow-internal` ID absent for new sessions.
-
-# 126. Session Tamper Tests
-- Modified token rejected.
-- Wrong signature rejected.
-- Expired token rejected.
-- Missing user ID rejected or unauthenticated.
-- Non-string user ID fails safely.
-- Arbitrary actor injection rejected.
-- Legacy token is not Auth.js authority.
-- Verification failure leaks no secret.
-
-# 127. App Router Server Usage
-- Prefer server Auth.js helper in server components/routes.
-- Client session is not security authority.
-- Server route handlers re-check session.
-- Never trust client-provided user ID.
-- Never trust client email as post-login authority.
-- Never pass raw token into client props.
-- Follow Next.js 16.3 docs.
-
-# 128. Auth.js Version Safety
-- Inspect actual package exports.
-- Inspect Credentials provider types.
-- Inspect handler export pattern.
-- Inspect server `auth()` support.
-- Inspect proxy/middleware support.
-- Inspect signIn/signOut APIs.
-- Do not assume v4 API.
-- Do not assume future v5 API.
-- Record installed versions in PR.
-- Keep lockfile compatible.
-
-# 129. Next.js 16.3 Safety
-- Read local `node_modules/next/dist/docs/`.
-- Confirm proxy convention.
-- Confirm route handler behavior.
-- Confirm cookies/request APIs if touched.
-- Avoid deprecated middleware assumptions.
-- Avoid auth-page rendering surprises.
-- Build must compile App Router auth routes.
-- Keep client/server boundaries valid.
-
-# 130. R03 Schema Decision Record
-- Default `SCHEMA_CHANGED: NO`.
-- Default `NEW_MIGRATION: NO`.
-- If adapter tables become necessary, justify before implementing.
-- Do not create duplicate users table.
-- Do not create OAuth account tables for no OAuth provider.
-- Do not add tenant/branch columns to session storage.
-- Any deviation is prominent in PR.
-
-# 131. R03 Dependency Decision Record
-- Default `PACKAGE_DEPENDENCIES_CHANGED: NO`.
-- Default `PACKAGE_LOCK_CHANGED: NO`.
-- Auth.js already installed.
-- Node crypto already installed with runtime.
-- Existing tests are sufficient.
-- No new hashing package.
-- No new cookie package.
-- No new auth package.
-- Any deviation requires rationale.
-
-# 132. R03 Live Behavior Decision Record
-- `AUTHJS_LIVE_CUTOVER: YES`.
-- `DATABASE_CREDENTIAL_AUTHORITY: YES`.
-- `LEGACY_SHARED_CREDENTIAL_AUTHORITY: NO`.
-- `LEGACY_SOURCE_PHYSICAL_REMOVAL: NO`.
-- `LEGACY_COOKIE_AUTHORITY: NO` preferred.
-- `WORKSPACE_RESOLUTION: NO`.
-- `PERMISSION_ROUTE_CUTOVER: NO`.
-- `PRODUCTION_DB_MODIFIED: NO`.
-- `CUSTOMER_AUTH_CHANGED: NO`.
-
-# 133. Implementation Order — 01
-- Re-fetch current main.
-- Read current policy.
-- Read current README.
-- Read exact R03 spec.
-- Identify latest R02 branch.
-- Record exact parent SHA.
-
-# 134. Implementation Order — 02
-- Read local Next.js auth/proxy docs.
-- Inspect installed next-auth exports.
-- Inspect installed @auth/core exports.
-- Inspect current login route.
-- Inspect current logout route.
-- Inspect current proxy.
-
-# 135. Implementation Order — 03
-- Re-read R01 normalization helper.
-- Re-read R01 credential repository.
-- Re-read R01 password verifier.
-- Re-read R01 throttle module.
-- Re-read R02 identity fixtures.
-- Re-read R02 integration tests.
-
-# 136. Implementation Order — 04
-- Define canonical Auth.js config.
-- Define minimal Auth.js user/session types.
-- Define session strategy.
-- Define session max age.
-- Define live login integration path.
-- Define live logout integration path.
-
-# 137. Implementation Order — 05
-- Implement throttle subject derivation.
-- Add digest tests.
-- Implement auth orchestrator.
-- Add orchestrator unit tests.
-- Preserve no-KDF oracle mitigation.
-- Preserve atomic failure recording.
-
-# 138. Implementation Order — 06
-- Wire Credentials provider.
-- Add Auth.js handlers.
-- Add JWT/session callbacks.
-- Ensure real user ID propagation.
-- Ensure minimal session claims.
-- Ensure no legacy fallback.
-
-# 139. Implementation Order — 07
-- Cut login form to new flow.
-- Retire legacy live session issuance.
-- Sanitize redirect behavior.
-- Preserve generic errors.
-- Preserve loading UX.
-- Add login-path integration tests.
-
-# 140. Implementation Order — 08
-- Cut logout to Auth.js.
-- Clear stale legacy cookie if chosen.
-- Cut proxy coarse auth to Auth.js.
-- Preserve matcher routes.
-- Add session/proxy/logout tests.
-- Add legacy-cookie rejection tests.
-
-# 141. Implementation Order — 09
-- Run R01 regressions.
-- Run R02 regressions.
-- Run R04 RLS regressions.
-- Run auth unit tests.
-- Run auth integration tests.
-- Run application quality/build.
-
-# 142. Implementation Order — 10
-- Open/update exactly one R03 PR.
-- Record exact parent/head SHA.
-- Record session strategy.
-- Record live endpoint choices.
-- Record validation results truthfully.
-- Stop without merging implementation PR.
-
-# 143. Validation Commands — Application
-```bash
-cd apps/web/next-flow
-npm ci
-npm run lint
-npm run typecheck
-npm run test
-npm run test:integration
-npm run build:next
-```
-- Use current scripts from implementation parent as authority.
-- Do not fabricate outcomes.
-- Record actual implementation results in PR.
-- Document validation does not depend on GitHub Actions.
-
-# 144. Validation Commands — Database
-```bash
-./apps/web/next-flow/node_modules/.bin/supabase start
-./apps/web/next-flow/node_modules/.bin/supabase db reset --local
-./apps/web/next-flow/node_modules/.bin/supabase test db --local
-./apps/web/next-flow/node_modules/.bin/supabase db lint --local --schema app,foodflow,payments,audit,private --level warning --fail-on error
-```
-- R03 normally adds no schema.
-- Clean reset proves inherited fixtures/RLS remain reproducible.
-- R01/R02/R04 DB tests remain required implementation regressions.
-
-# 145. Validation Commands — Generated Types
-```bash
-cd apps/web/next-flow
-npm run db:verify-types
-```
-- Run generation only when current workflow requires it.
-- R03 should not alter generated DB types by default.
-- Unexpected generated diff in no-schema-change round must be investigated.
-
-# 146. Validation Vocabulary
-- `PASS`.
-- `FAIL`.
-- `NOT RUN`.
-- `BLOCKED`.
-- `NOT APPLICABLE`.
-- Do not call unrun work PASS.
-- Do not suppress implementation failures.
-- These results are implementation evidence, not document validation authority.
-
-# 147. Definition of Done — Auth.js Core
-- [ ] Canonical Auth.js config exists.
-- [ ] Installed API verified.
-- [ ] Credentials provider is internal provider for R03.
-- [ ] AUTH_SECRET is live session secret authority.
-- [ ] Real DB user ID is session subject.
-- [ ] Session shape minimal.
-- [ ] No tenant authority in session.
-- [ ] No branch authority in session.
-- [ ] No permissions in session.
-- [ ] No password/hash in session.
-
-# 148. Definition of Done — Credential Verification
-- [ ] R01 normalization reused.
-- [ ] R01 candidate repository reused.
-- [ ] R01 real verifier reused.
-- [ ] R01 dummy verifier reused.
-- [ ] Unknown user runs dummy KDF.
-- [ ] Wrong password records failure.
-- [ ] Success clears failure state.
-- [ ] Blocked subject cannot authenticate.
-- [ ] No legacy credential fallback.
-- [ ] No long DB transaction around KDF.
-
-# 149. Definition of Done — Live Login
-- [ ] Login UI uses Auth.js-backed path.
-- [ ] Legacy custom login no longer issues authoritative custom session.
-- [ ] Shared env credential no longer primary authority.
-- [ ] R02 fixture credentials authenticate in integration tests.
-- [ ] Generic error behavior preserved.
-- [ ] Safe redirect preserved.
-- [ ] No password leaks to URL/log/session.
-
-# 150. Definition of Done — Session Cutover
-- [ ] Auth.js session is authoritative.
-- [ ] Protected coarse gate uses Auth.js auth state.
-- [ ] New login does not issue `foodflow_session`.
-- [ ] Legacy cookie alone does not authenticate.
-- [ ] Session contains real user ID.
-- [ ] Tampered session rejected.
-- [ ] Expired session rejected where practical.
-- [ ] Logout invalidates Auth.js session.
-
-# 151. Definition of Done — Scope Discipline
-- [ ] No workspace chooser.
-- [ ] No tenant selector.
-- [ ] No branch selector.
-- [ ] No final AccessContext.
-- [ ] No permission-specific proxy logic.
-- [ ] No command permission framework.
-- [ ] No physical legacy deletion.
-- [ ] No customer auth.
-- [ ] No unrelated product work.
-- [ ] No production DB mutation.
-
-# 152. Definition of Done — Security
-- [ ] No secret committed.
-- [ ] No password logged.
-- [ ] No hash logged.
-- [ ] No token logged.
-- [ ] No account enumeration response.
-- [ ] Dummy KDF path active.
-- [ ] Throttle enforced.
-- [ ] flow_authenticator remains narrow.
-- [ ] No broad grants.
-- [ ] No tenant/permission session authority.
-- [ ] Legacy cookie authority disabled.
-
-# 153. Definition of Done — Tests
-- [ ] Auth service unit tests.
-- [ ] Throttle digest tests.
-- [ ] Auth.js provider/integration tests.
-- [ ] Session tests.
-- [ ] Login live-path tests.
-- [ ] Proxy coarse-gate tests.
-- [ ] Logout tests.
-- [ ] Legacy credential rejection test.
-- [ ] Legacy cookie rejection test.
-- [ ] R01 regressions.
-- [ ] R02 fixture/authorization regressions.
-- [ ] R04 RLS/self-elevation regressions.
-
-# 154. Definition of Done — Quality
-- [ ] Lint PASS.
-- [ ] Typecheck PASS.
-- [ ] Unit tests PASS.
-- [ ] Integration tests PASS.
-- [ ] Next build PASS.
-- [ ] Clean DB reset PASS.
-- [ ] SQL tests PASS.
-- [ ] DB lint PASS.
-- [ ] Generated type verification PASS or truthful blocker.
-- [ ] PR records exact outcomes.
-
-# 155. Implementation PR Required Metadata
-- `Specification: FLOW_P02_R03_IMPLEMENTATION_SPEC.md`.
-- `Phase: 02`.
-- `Round: 03`.
-- `Previous: FLOW_P02_R02_IMPLEMENTATION_SPEC.md`.
-- `Next Specification: FLOW_P02_R04_IMPLEMENTATION_SPEC.md`.
-- `IMPLEMENTATION_PARENT_BRANCH`.
-- `IMPLEMENTATION_PARENT_SHA`.
-- `IMPLEMENTATION_BRANCH`.
-- `IMPLEMENTATION_HEAD_SHA`.
-- `AUTHJS_VERSION`.
-- `AUTH_CORE_VERSION`.
-- `SESSION_STRATEGY`.
-- `LIVE_LOGIN_PATH`.
-- `LIVE_LOGOUT_PATH`.
-- `PROXY_AUTH_SOURCE`.
-- `LEGACY_COOKIE_AUTHORITY`.
-- `SCHEMA_CHANGED`.
-- `NEW_MIGRATION`.
-- `PACKAGE_DEPENDENCIES_CHANGED`.
-- `PRODUCTION_DB_MODIFIED`.
-- `AUTHJS_LIVE_CUTOVER`.
-- `LEGACY_AUTH_PHYSICALLY_REMOVED`.
-
-# 156. Implementation PR Required Summary
-- State Auth.js API pattern used.
-- State Credentials provider delegation.
-- State throttle-subject design.
-- State blocked behavior.
-- State unknown-user dummy KDF behavior.
-- State session claims.
-- State login cutover.
-- State logout cutover.
-- State proxy cutover.
-- State legacy credential behavior.
-- State legacy cookie behavior.
-- State no-membership behavior.
-- State validation results.
-- State R04/R05/R06 deferrals.
-
-# 157. Implementation PR Merge Control
-- Implementation PR merge is owner-controlled.
-- Development agent must not merge R03 implementation PR.
-- Development agent must not enable auto-merge.
-- Development agent stops after implementation/validation/PR update.
-- Specification automation may merge only documentation spec PR.
-- Do not confuse spec merge with implementation merge.
-
-# 158. R04 Handoff Objective
-- R04 receives stable authenticated user ID from Auth.js.
-- R04 receives normalized email when needed as identity/display data.
-- R04 receives no password/hash.
-- R04 resolves active memberships.
-- R04 resolves available tenants.
-- R04 resolves available branches.
-- R04 creates AccessContext.
-- R04 handles no-membership session.
-- R04 handles membership changes/revocation.
-- R04 defines workspace selection persistence.
-- R03 leaves these concerns unimplemented but enabled.
-
-# 159. R04 Required Inherited State
-- Auth.js live authentication works.
-- Auth.js server session helper works.
-- Session subject is real user UUID.
-- DB credentials are authoritative.
-- Legacy shared credentials are not live authority.
-- R02 deterministic memberships remain available.
-- R02 roles/permissions remain available.
-- R01 DB transaction helpers remain available.
-- Tenant/branch are not permanently baked into auth identity.
-- Permission list is not final session authority.
-
-# 160. R05 Future Boundary
-- R05 later enforces route permissions.
-- R05 later enforces command permissions.
-- R03 must not preempt R05.
-- Coarse authentication proxy is valid R03 output.
-- R05 consumes R04 AccessContext and permission helpers.
-- R03 session alone is never full authorization.
-
-# 161. R06 Future Boundary
-- R06 deletes legacy auth files.
-- R06 removes unused FOODFLOW internal vars.
-- R06 removes unused legacy session secret.
-- R06 removes JOSE if no longer used.
-- R06 removes obsolete compatibility endpoints.
-- R06 performs final security acceptance.
-- R03 should make R06 deletion mechanical.
-
-# 162. Explicit Prohibitions — Auth
-- NO shared env credential fallback.
-- NO hard-coded Auth.js secret.
-- NO OAuth provider.
-- NO social login.
-- NO magic link.
-- NO password reset.
-- NO MFA.
-- NO second user table.
-- NO second credential table.
-- NO custom parallel session JWT.
-- NO password hash in session.
-- NO tenant permission snapshot in session.
-- NO broad DB owner auth path.
-- NO browser-provided actor authority.
-
-# 163. Explicit Prohibitions — Scope
-- NO workspace chooser.
-- NO final AccessContext.
-- NO route permission cutover.
-- NO command permission cutover.
-- NO legacy physical deletion.
-- NO customer auth.
-- NO order work.
-- NO kitchen feature work.
-- NO payment feature work.
-- NO realtime feature work.
-- NO voice work.
-- NO unrelated UI refactor.
-- NO unrelated dependency upgrade.
-
-# 164. Explicit Prohibitions — Data / Security
-- NO plaintext password storage.
-- NO reversible password encryption.
-- NO fast digest replacing scrypt.
-- NO production password fixture.
-- NO production user fixture.
-- NO raw password logs.
-- NO hash logs.
-- NO session token logs.
-- NO AUTH_SECRET logs.
-- NO DATABASE_URL logs.
-- NO BYPASSRLS grant.
-- NO broad private-table grant.
-- NO historical migration rewrite.
-
-# 165. Explicit Prohibitions — Delivery
-- NO direct implementation push to main.
-- NO implementation PR merge by agent.
-- NO implementation auto-merge.
-- NO fabricated validation.
-- NO hiding implementation failures.
-- NO starting R04 implementation from this documentation task.
-- NO duplicate R03 implementation branches.
-
-# 166. File Review Checklist — Repository / Environment
-- [ ] `apps/web/next-flow/package.json`.
-- [ ] `apps/web/next-flow/package-lock.json`.
-- [ ] `apps/web/next-flow/.env.example`.
-- [ ] `apps/web/next-flow/AGENTS.md`.
-- [ ] Current tsconfig.
-- [ ] Current Next.js local docs.
-- [ ] Installed next-auth package exports/types.
-- [ ] Installed @auth/core package exports/types.
-
-# 167. File Review Checklist — Live Auth
-- [ ] `src/app/(auth)/login/page.tsx`.
-- [ ] `src/app/(auth)/login/login-form.tsx`.
-- [ ] `src/app/api/auth/login/route.ts`.
-- [ ] `src/app/api/auth/logout/route.ts`.
-- [ ] `src/lib/auth/index.ts`.
-- [ ] `src/lib/auth/config.ts`.
-- [ ] `src/lib/auth/session.ts`.
-- [ ] `src/lib/auth/token.ts`.
-- [ ] `src/proxy.ts`.
-
-# 168. File Review Checklist — R01 Identity
-- [ ] `src/modules/identity/server/index.ts`.
-- [ ] `src/modules/identity/server/email.ts`.
-- [ ] `src/modules/identity/server/errors.ts`.
-- [ ] `src/modules/identity/server/policy.ts`.
-- [ ] `src/modules/identity/server/credential-repository.ts`.
-- [ ] `src/modules/identity/server/password-verifier.ts`.
-- [ ] `src/modules/identity/server/login-throttle.ts`.
-- [ ] `src/modules/identity/server/types.ts`.
-- [ ] `src/server/db/authentication-transaction.ts`.
-
-# 169. File Review Checklist — R02 Fixtures / Tests
-- [ ] `tests/fixtures/identity.ts`.
-- [ ] `tests/integration/identity-authorization-contract.test.ts`.
-- [ ] `supabase/tests/database/p02_r02_identity_authorization_fixtures.test.sql`.
-- [ ] `supabase/seed.sql`.
-- [ ] R01 SQL auth tests.
-- [ ] R04 actor/RLS tests.
-
-# 170. Current Behavior Assertions to Re-Verify
-- [ ] Login form still targets legacy route before R03 edits.
-- [ ] Login route still uses legacy credential matcher before R03 edits.
-- [ ] Legacy cookie remains `foodflow_session` before R03 edits.
-- [ ] Proxy still verifies legacy token before R03 edits.
-- [ ] Auth.js packages remain installed.
-- [ ] AUTH_SECRET placeholder remains present.
-- [ ] R01 repository returns real user UUID.
-- [ ] R01 verifier supports scrypt-v1.
-- [ ] R01 dummy verifier exists.
-- [ ] R01 throttle helpers exist.
-- [ ] R02 positive fixtures exist.
-- [ ] R02 no-membership fixture exists.
-- [ ] R02 denial fixtures exist.
-
-# 171. Session Security Checklist
-- [ ] HttpOnly authoritative cookie.
-- [ ] Secure in production.
-- [ ] SameSite appropriate.
-- [ ] No duplicate custom authoritative cookie.
-- [ ] No secret in client.
-- [ ] Real user UUID claim.
-- [ ] No tenant claim authority.
-- [ ] No branch claim authority.
-- [ ] No permission claim authority.
-- [ ] No password/hash.
-- [ ] Intentional expiry.
-- [ ] Tamper rejection tested.
-- [ ] Legacy cookie non-authoritative.
-
-# 172. Credential Security Checklist
-- [ ] Normalize with R01 helper.
-- [ ] Bound password input.
-- [ ] Read throttle before acceptance.
-- [ ] Use R01 repository.
-- [ ] Use R01 scrypt verifier.
-- [ ] Use R01 dummy verifier.
-- [ ] Record failure atomically.
-- [ ] Clear success state.
-- [ ] No direct credential table read.
-- [ ] No legacy fallback.
-- [ ] Generic outward errors.
-- [ ] No credential logging.
-
-# 173. Authentication / Authorization Boundary Checklist
-- [ ] Provider does not query membership as login gate.
-- [ ] Provider does not query permissions.
-- [ ] Provider does not choose tenant.
-- [ ] Provider does not choose branch.
-- [ ] Session does not contain final workspace.
-- [ ] No-membership user can authenticate identity.
-- [ ] R04 handoff uses real actor ID.
-- [ ] R05 remains permissions owner.
-
-# 174. Failure Safety Checklist
-- [ ] DB unavailable => no fallback.
-- [ ] Auth secret unavailable => no fallback.
-- [ ] Throttle unavailable => fail closed.
-- [ ] Candidate error => no session.
-- [ ] Verifier error => no session.
-- [ ] Auth.js error => no legacy session.
-- [ ] Proxy auth error => unauthenticated/safe.
-- [ ] Logout error => no secret leak.
-- [ ] Invalid redirect => safe fallback.
-
-# 175. Test Quality Checklist
-- [ ] Tests assert behavior, not trivia.
-- [ ] Security tests include negative paths.
-- [ ] Deterministic fixtures reused.
-- [ ] No test-order dependency.
-- [ ] Throttle state isolated.
-- [ ] Legacy credential rejection explicit.
-- [ ] Legacy cookie rejection explicit.
-- [ ] Session minimality explicit.
-- [ ] Cross-tenant authorization remains regression-tested.
-- [ ] Document correctness does not depend on GitHub Actions.
-
-# 176. High-Impact Code Priority
-- Priority 1: database credential authority.
-- Priority 2: Auth.js session authority.
-- Priority 3: throttle enforcement.
-- Priority 4: dummy KDF no-candidate path.
-- Priority 5: real user UUID session subject.
-- Priority 6: legacy live authority disabled.
-- Priority 7: proxy coarse-auth cutover.
-- Priority 8: logout cutover.
-- Priority 9: regression coverage.
-- Priority 10: clean R04 handoff.
-
-# 177. Deferred Lower-Priority Work
-- OAuth.
-- MFA.
-- Password reset.
-- Workspace selector.
-- Revocation UI.
-- Permission navigation.
-- Role management UI.
-- Member invitation UX.
-- Customer auth.
-- Audit dashboard.
-- Auth analytics.
-- Remember-me.
-- Device management.
-
-# 178. R03 Final Acceptance Matrix — Authority
-- Database credential is live authority: `YES`.
-- Auth.js is session authority: `YES`.
-- Real `app.users.id` is session subject: `YES`.
-- Shared env credential is fallback: `NO`.
-- Legacy cookie is authoritative: `NO`.
-- Legacy source physically deleted: `NO`.
-- Unknown user runs dummy KDF: `YES`.
-- Wrong password records failure: `YES`.
-- Success clears failure state: `YES`.
-- Blocked subject authenticates: `NO`.
-
-# 179. R03 Final Acceptance Matrix — Identity States
-- Suspended user authenticates: `NO`.
-- Disabled credential authenticates: `NO`.
-- No-credential user authenticates: `NO`.
-- Unknown user authenticates: `NO`.
-- No-membership valid credential authenticates identity: `YES`.
-- Tenant selected during login: `NO`.
-- Branch selected during login: `NO`.
-- Permissions stored as final session authority: `NO`.
-
-# 180. R03 Final Acceptance Matrix — Scope
-- Workspace AccessContext implemented: `NO`.
-- Permission route cutover implemented: `NO`.
-- Legacy auth physically removed: `NO`.
-- Production DB modified: `NO`.
-- New auth dependency required: `NO by default`.
-- Customer auth changed: `NO`.
-- Implementation merged by agent: `NO`.
-
-# 181. R03 End State
-- R03 branch contains live Auth.js Credentials authentication.
-- R03 branch contains Auth.js session authority.
-- R03 branch authenticates R02 deterministic fixture identities.
-- R03 branch preserves authentication/authorization separation.
-- R03 branch no longer uses shared legacy credentials for new login.
-- R03 branch no longer uses legacy custom cookie as authoritative coarse auth.
-- R03 branch retains legacy source for R06 deletion clarity.
-- R03 leaves tenant/branch resolution to R04.
-- R03 leaves route/command permission enforcement to R05.
-- R03 leaves physical legacy cleanup to R06.
-- R03 implementation PR remains owner-controlled.
-- R04 can consume stable R03 session actor identity.
-
-# 182. Required Next Specification
-```text
-FLOW_P02_R04_IMPLEMENTATION_SPEC.md
-```
-- R04 spec must be authored from actual R03 implementation state.
-- Do not infer exact R04 diff before R03 exists.
-- R04 consumes real Auth.js session user ID.
-- R04 resolves active memberships.
-- R04 resolves available workspaces.
-- R04 defines AccessContext.
-- R04 defines membership-change/revocation semantics.
-- R04 must not reimplement password verification.
-
-# 183. Development Gate
-```text
-READ CURRENT MAIN
-→ VERIFY P02/R03 READY
-→ IDENTIFY LATEST P02/R02 LINEAGE TIP
-→ CREATE ONE P02/R03 IMPLEMENTATION BRANCH
-→ IMPLEMENT AUTH.JS CREDENTIALS + SESSION CUTOVER
-→ VALIDATE IMPLEMENTATION
-→ OPEN/UPDATE ONE R03 IMPLEMENTATION PR
-→ STOP
-→ OWNER CONTROLS IMPLEMENTATION MERGE
-```
-- Specification authority remains `main`.
-- Implementation lineage remains latest round branch.
-- Documentation automation does not implement R03.
-- Implementation agent does not merge R03 PR.
-- Next spec task re-inspects actual state.
-
-# 184. Final Implementation Agent Checklist — Authority
-- [ ] Read current main policy.
-- [ ] Read current main README.
-- [ ] Read exact R03 spec.
-- [ ] Confirm latest R02 branch.
-- [ ] Confirm exact R02 parent SHA.
-- [ ] Read Next.js 16.3 local docs.
-- [ ] Inspect installed Auth.js API.
-- [ ] Reuse R01 identity primitives.
-- [ ] Reuse R02 fixtures.
-
-# 185. Final Implementation Agent Checklist — Core Auth
-- [ ] Implement canonical Auth.js config.
-- [ ] Implement thin Credentials provider.
-- [ ] Implement auth orchestrator.
-- [ ] Implement throttle subject derivation.
-- [ ] Enforce throttle.
-- [ ] Use dummy KDF on no candidate.
-- [ ] Use real scrypt verifier on candidate.
-- [ ] Return real user UUID.
-- [ ] Keep session claims minimal.
-
-# 186. Final Implementation Agent Checklist — Cutover
-- [ ] Cut live login authority.
-- [ ] Cut live logout authority.
-- [ ] Cut coarse proxy auth authority.
-- [ ] Disable legacy shared credential fallback.
-- [ ] Disable legacy cookie authority.
-- [ ] Keep physical legacy removal for R06.
-- [ ] Keep workspace work for R04.
-- [ ] Keep permission route work for R05.
-
-# 187. Final Implementation Agent Checklist — Quality
-- [ ] Add unit tests.
-- [ ] Add integration tests.
-- [ ] Add session tests.
-- [ ] Add legacy authority regressions.
-- [ ] Run application validation commands.
-- [ ] Run DB regressions.
-- [ ] Record truthful outcomes.
-- [ ] Open/update one R03 PR.
-- [ ] Do not merge implementation PR.
-
-# 188. Document Validation Contract
-- Validate Phase is `02`.
-- Validate Round is `03`.
-- Validate Status is `READY`.
-- Validate Previous is R02 spec.
-- Validate Next is R04 spec.
-- Validate authority source is main.
-- Validate implementation parent is latest R02 lineage.
-- Validate scope is Auth.js Credentials + session cutover.
-- Validate R04/R05/R06 boundaries are explicit.
-- Validate current code assumptions against observed R02 branch.
-- Validate files are existing or clearly planned CREATE targets.
-- Validate security plan is explicit.
-- Validate failure plan is explicit.
-- Validate test plan is explicit.
-- Validate handoff is explicit.
-- GitHub Actions are not document validation authority.
-
-# 189. Document Line-Count Contract
-- Final document must be at least 1,800 lines.
-- Final document must be at most 2,500 lines.
-- Do not pad with blank lines.
-- Do not duplicate prose for count.
-- Do not split sentences artificially for count.
-- Every line must improve implementation precision or validation quality.
-- Count final file before PR.
-- Recount final file before merge.
-- Record actual count in spec PR.
-
-# 190. Additional Credential Input Cases
-- Email with leading spaces.
-- Email with trailing spaces.
-- Email with uppercase domain.
-- Email with uppercase local portion.
-- Email at maximum length.
-- Email above maximum length.
-- Password at maximum length.
-- Password above maximum length.
-- Password containing Unicode.
-- Password containing null-like characters as string data.
-- Missing credentials object.
-- Unexpected extra credential fields.
-- Provider ignores untrusted extra fields.
-
-# 191. Additional Throttle Cases
-- First failure creates count one.
-- Second failure increments once.
-- Failure at limit blocks.
-- Failure after window resets window.
-- Existing active block remains active.
-- Exact block expiry reopens evaluation.
-- Successful auth clears state.
-- Unknown user can be throttled consistently.
-- Case variants share normalized subject.
-- Whitespace variants share normalized subject.
-- Concurrent failures rely on DB atomicity.
-
-# 192. Additional Session Cases
-- Fresh valid session resolves user ID.
-- Session without email still must not invent tenant.
-- Session callback cannot accept client actor override.
-- Token callback cannot accept client permission override.
-- Repeated session read is side-effect free.
-- Session read does not query password hash.
-- Session read does not modify throttle.
-- Session read does not select workspace.
-- Session expiry is deterministic.
-- Logout after expiry remains safe.
-
-# 193. Additional Proxy Cases
-- Login route itself is not protected by proxy matcher.
-- Auth.js callback route must not be trapped by internal matcher.
-- Public customer routes remain unaffected.
-- Protected internal route preserves same-origin redirect.
-- Query parameters survive safe redirect.
-- External redirect injection rejected.
-- Proxy does not use FOODFLOW legacy token as fallback.
-- Proxy does not fetch DB credentials.
-- Proxy does not decide permissions.
-- Proxy behavior is compatible with deployment runtime.
-
-# 194. Additional Logout Cases
-- Logout with valid Auth.js session.
-- Logout with no Auth.js session.
-- Logout with stale legacy cookie.
-- Logout with Auth.js + stale legacy cookie.
-- Logout repeated twice.
-- Logout does not require DB credential lookup.
-- Logout does not require membership lookup.
-- Logout does not expose token.
-- Logout does not issue replacement legacy cookie.
-
-# 195. Additional Legacy Regression Cases
-- Legacy `credentialsMatch()` has no live caller in login path.
-- Legacy `createSession()` has no live caller in login path.
-- Legacy `verifySession()` has no live protected-route authority.
-- Legacy dev fallback does not authenticate.
-- Legacy env email/password alone do not authenticate.
-- Legacy secret alone cannot mint accepted Auth.js session.
-- Legacy cookie alone cannot pass protected route.
-- Legacy files remain source-visible for R06 removal plan.
-
-# 196. Additional Error Redaction Cases
-- Error string excludes raw password.
-- Error string excludes hash.
-- Error string excludes AUTH_SECRET.
-- Error string excludes DB URL.
-- Error string excludes full token.
-- Error string excludes credential encoding.
-- Browser error excludes suspended state.
-- Browser error excludes disabled state.
-- Browser error excludes user existence.
-- Browser error excludes internal role names.
-
-# 197. Additional Auth.js Type Safety
-- Avoid `as any` for session user ID.
-- Avoid unchecked credentials cast.
-- Narrow credentials fields explicitly.
-- Type provider user ID as string.
-- Type session user extension centrally.
-- Keep server result union discriminated if used.
-- Type infrastructure errors safely.
-- Do not serialize Date unless needed.
-- Do not leak internal candidate type to client.
-
-# 198. Additional Build Safety
-- Auth.js config must compile under Next.js 16.3.
-- Proxy import must be runtime-compatible.
-- Route handler exports must match App Router.
-- Client login form must not import server-only module.
-- Server-only package boundary must remain valid.
-- Test aliases must resolve.
-- No circular auth import between config/provider and legacy auth index.
-- Build must not require production secrets at compile time unless expected by current deployment policy.
-
-# 199. Additional Security Review
-- No open redirect.
-- No account enumeration.
-- No throttle bypass.
-- No legacy fallback.
-- No credential hash exposure.
-- No direct credential table grant.
-- No session role inflation.
-- No tenant claim authority.
-- No branch claim authority.
-- No permission claim authority.
-- No production fixture secrets.
-- No auth debug logs with sensitive fields.
-
-# 200. Additional R04 Handoff Requirements
-- R04 can call canonical Auth.js server helper.
-- R04 receives one authenticated user UUID.
-- R04 does not need to parse legacy JWT.
-- R04 does not need shared internal config.
-- R04 can query memberships post-auth.
-- R04 can distinguish no-membership user.
-- R04 can later invalidate access on membership changes.
-- R04 can preserve tenant/branch separation.
-- R04 does not re-run password verification for each request.
-
-# 201. Additional R05 Handoff Requirements
-- R05 receives authenticated actor from Auth.js/R04.
-- R05 receives AccessContext from R04.
-- R05 can evaluate canonical permission codes.
-- R05 need not parse legacy fixed user ID.
-- R05 need not trust client role.
-- R05 need not trust session permission array.
-- R05 can preserve DB RLS defense in depth.
-
-# 202. Additional R06 Handoff Requirements
-- Legacy shared auth has no live authority.
-- Legacy source references are easy to enumerate.
-- Legacy env vars are marked obsolete.
-- Legacy cookie is non-authoritative.
-- Legacy JOSE path is unused by live auth.
-- R06 can delete without redesigning authentication.
-- R06 can remove dependency if no other consumer.
-- R06 can perform final acceptance against Auth.js path.
-
-# 203. Implementation Evidence — Required Paths
-- Record Auth.js config path.
-- Record Auth.js handler path.
-- Record auth orchestrator path.
-- Record throttle subject helper path.
-- Record login UI path changed.
-- Record login compatibility endpoint status.
-- Record logout path changed.
-- Record proxy path changed.
-- Record type augmentation path if created.
-- Record new test paths.
-
-# 204. Implementation Evidence — Required Decisions
-- Record session strategy.
-- Record session max age.
-- Record credentials-provider API pattern.
-- Record login live API path.
-- Record logout live API path.
-- Record proxy Auth.js integration pattern.
-- Record legacy cookie authority status.
-- Record legacy shared credential authority status.
-- Record no-membership auth behavior.
-- Record success-clear failure behavior.
-
-# 205. Implementation Evidence — Required Security Statements
-- `PASSWORD_HASH_EXPOSED_TO_CLIENT: NO`.
-- `PASSWORD_LOGGED: NO`.
-- `AUTH_SECRET_EXPOSED: NO`.
-- `LEGACY_FALLBACK_ENABLED: NO`.
-- `TENANT_IN_SESSION_AS_AUTHORITY: NO`.
-- `BRANCH_IN_SESSION_AS_AUTHORITY: NO`.
-- `PERMISSIONS_IN_SESSION_AS_AUTHORITY: NO`.
-- `DIRECT_CREDENTIAL_TABLE_GRANT: NO`.
-- `BYPASSRLS_ADDED: NO`.
-
-# 206. Implementation Evidence — Required Scope Statements
-- `AUTHJS_LIVE_CUTOVER: YES`.
-- `LEGACY_AUTH_PHYSICALLY_REMOVED: NO`.
-- `WORKSPACE_ACCESS_CONTEXT_IMPLEMENTED: NO`.
-- `ROUTE_PERMISSION_CUTOVER: NO`.
-- `CUSTOMER_AUTH_CHANGED: NO`.
-- `PRODUCTION_DB_MODIFIED: NO`.
-- `NEW_MIGRATION: NO` by default.
-- `PACKAGE_DEPENDENCIES_CHANGED: NO` by default.
-
-# 207. Implementation Evidence — Required Validation Statements
-- Lint result.
-- Typecheck result.
-- Unit-test result.
-- Integration-test result.
-- Next build result.
-- DB reset result.
-- DB SQL-test result.
-- DB lint result.
-- Generated-type verification result.
-- Any blocker exactly named.
-
-# 208. Final Document State
-- Phase is P02.
-- Round is R03.
-- Status is READY.
-- Previous is P02/R02.
-- Next is P02/R04.
-- Scope is Auth.js Credentials authentication + session authority cutover.
-- Document validation is content/state-based.
-- GitHub Actions are not document validation authority.
-- Implementation parent is latest R02 branch.
-- Implementation merge is owner-controlled.
-- This spec authorizes no implementation work by the documentation automation.
-
-# 209. Final Gate Summary
-- R02 branch provides deterministic database credentials.
-- R01 provides least-privilege credential verification primitives.
-- R03 may therefore cut live login to Auth.js.
-- R03 must keep authentication separate from authorization.
-- R03 must disable legacy live auth authority.
-- R03 must leave workspace to R04.
-- R03 must leave permissions to R05.
-- R03 must leave physical cleanup to R06.
-- R03 implementation agent stops at PR.
-- Owner controls integration.
-
-# 210. End of Specification
-- Required implementation spec filename: `FLOW_P02_R03_IMPLEMENTATION_SPEC.md`.
-- Required implementation branch pattern: `p02-r03-*`.
-- Recommended implementation branch: `p02-r03-authjs-session-cutover`.
-- Required next spec: `FLOW_P02_R04_IMPLEMENTATION_SPEC.md`.
-- Document status: `READY`.
-- Document validation authority: document content + observed repository state.
-- GitHub Actions validation gate for this document: `NO`.
-- Implementation work performed by this specification automation: `NO`.
-- Implementation PR merge by implementation agent: `NO`.
+- No broad credential table grant is added.
+- No broad throttle table grant is added.
+- No BYPASSRLS is added.
+- No historical migration is rewritten.
+- No production secret is committed.
+- No raw credential is logged.
+- Legacy cookie authority is rejected.
+- Legacy shared credential authority is rejected.
+- Session claims remain minimal.
+# 100. Final Delivery, DoD, Handoff
+- Implementation PR must reference `FLOW_P02_R03_IMPLEMENTATION_SPEC.md`.
+- Implementation PR must record Phase `02` and Round `03`.
+- Implementation PR must record implementation parent branch and SHA.
+- Implementation PR must record implementation head SHA.
+- Implementation PR must record installed Auth.js versions.
+- Implementation PR must record session strategy and max age.
+- Implementation PR must record live login path.
+- Implementation PR must record live logout path.
+- Implementation PR must record proxy auth source.
+- Implementation PR must state `AUTHJS_LIVE_CUTOVER: YES`.
+- Implementation PR must state `LEGACY_SHARED_CREDENTIAL_AUTHORITY: NO`.
+- Implementation PR must state `LEGACY_COOKIE_AUTHORITY: NO`.
+- Implementation PR must state `LEGACY_AUTH_PHYSICALLY_REMOVED: NO`.
+- Implementation PR must state `WORKSPACE_ACCESS_CONTEXT_IMPLEMENTED: NO`.
+- Implementation PR must state `ROUTE_PERMISSION_CUTOVER: NO`.
+- Implementation PR must state `PRODUCTION_DB_MODIFIED: NO`.
+- Implementation agent must not merge or enable auto-merge.
+- R04 may be specified only after actual R03 implementation state is sufficient for reliable workspace/AccessContext planning.
