@@ -217,14 +217,6 @@ jobs:
           DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
         run: npm run db:generate
 
-      - name: Capture generated database types
-        if: steps.scope.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: r02-generated-database-types
-          path: apps/web/next-flow/src/server/db/generated/database.ts
-          if-no-files-found: error
-
       - name: Verify generated type drift
         if: steps.scope.outputs.run == 'true'
         working-directory: apps/web/next-flow
