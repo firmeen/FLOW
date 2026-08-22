@@ -7,7 +7,6 @@
 ---
 
 ## Metadata
-
 - Phase: `02`
 - Round: `02`
 - Status: `READY`
@@ -28,3760 +27,1664 @@
 - Original specification merge SHA: `d3fe600a1544e254c10b812418034b0a17d984c7`
 - Amendment reason: `Original R02 specification was approximately 473 lines and did not satisfy the current executable-spec depth contract.`
 - Amendment implementation-state observation: `No p02-r01* or p02-r02* implementation branch was found at amendment authoring time.`
-- Amendment current-round observation: `P02/R01 remains the earliest not-started implementation round; this R02 document may exist on main but does not authorize skipping R01.`
+- Amendment current-round observation: `P02/R01 remains the earliest not-started implementation round; this R02 document does not authorize skipping R01.`
 
 ---
 
-# 0. Document Authority and Amendment Intent
+# 0. Amendment Intent
+- Replace the shallow R02 document with an implementation-ready contract.
+- Increase useful implementation detail without adding filler.
+- Preserve the same Phase, Round, Previous, Next, and product scope.
+- Keep R02 focused on deterministic identity fixtures and authorization proof.
+- Keep R03 live Auth.js cutover explicitly out of scope.
+- Keep R04 workspace/access-context behavior explicitly out of scope.
+- Keep R05 route/command authorization explicitly out of scope.
+- Keep R06 legacy-auth removal explicitly out of scope.
+- Make fixture identity, credential, role, permission, membership, and RLS behavior explicit.
+- Make positive and negative validation equally explicit.
+- Make code impact concentrated around the highest-risk identity/authorization surfaces.
+- Make the handoff to R03 deterministic.
 
-This file is the executable specification for Phase 02 Round 02.
-
-This revision replaces the shallow R02 document with a deep implementation contract.
-
-The purpose is not to make the file long for appearance.
-
-The purpose is to remove implementation ambiguity before R02 begins.
-
-The document must be usable by a development agent without guessing:
-
-- which fixtures must exist;
-- which identities must exist;
-- which credential states must exist;
-- which tenants must exist;
-- which branches must exist;
-- which roles must exist;
-- which permission mappings must exist;
-- which memberships must exist;
-- which positive cases must pass;
-- which negative cases must fail;
-- which database boundaries must remain unchanged;
-- which server helpers may be introduced;
-- which files may be modified;
-- which files should not be modified;
-- which tests must be added;
-- which regressions must remain green;
-- which scope belongs to R03 instead;
-- which evidence must be recorded in the implementation PR.
-
-The specification must stay within R02 scope.
-
-The specification must not pre-implement R03 through prose.
-
-The specification must not redefine R01 architecture.
-
-The specification must consume the final R01 implementation handoff when R01 actually exists.
-
-The implementation agent must re-audit the latest R01 branch before writing R02 code.
-
-The implementation agent must prefer actual current code over authoring-time assumptions.
-
----
-
-# 1. Current Repository State at Amendment Authoring
-
-The current `main` SHA observed before this amendment branch was created is:
-
-```text
-d3fe600a1544e254c10b812418034b0a17d984c7
-```
-
-That commit merged the original P02/R02 specification.
-
-The original P02/R02 file was approximately 473 lines.
-
-The current depth policy requires 1,800–2,500 lines for executable round specs.
-
-The existing R02 file is therefore too shallow under the current policy.
-
-Repository branch search at amendment authoring time found:
-
-```text
-p02-r01* implementation branch: NONE
-p02-r02* implementation branch: NONE
-```
-
-Therefore:
-
-```text
-P02/R01 implementation state = NOT STARTED
-P02/R02 implementation state = NOT STARTED
-```
-
-This matters because R02 implementation must not start from `main` merely because this spec exists.
-
-R02 must eventually branch from the latest approved R01 implementation branch.
-
-Until R01 implementation exists and has a stable handoff:
-
-```text
-R02 SPEC MAY EXIST
-R02 IMPLEMENTATION MUST NOT START
-```
-
-This document is therefore a prepared executable authority document.
-
-It does not alter current round detection.
-
-The earliest unfinished round remains authoritative for execution state.
-
----
+# 1. Current Repository State
+- Current main observed before amendment branch creation: `d3fe600a1544e254c10b812418034b0a17d984c7`.
+- That commit merged the original R02 spec.
+- Original R02 spec was approximately 473 lines.
+- Current executable-spec depth policy requires 1,800–2,500 lines.
+- `p02-r01*` implementation branch search returned none at amendment authoring time.
+- `p02-r02*` implementation branch search returned none at amendment authoring time.
+- P02/R01 implementation therefore remains NOT STARTED.
+- P02/R02 implementation therefore remains NOT STARTED.
+- R02 spec may exist on main without making R02 the current implementation round.
+- R02 implementation must not begin until R01 implementation lineage exists.
+- This amendment changes documentation authority only.
+- This amendment does not create implementation code.
 
 # 2. Phase 02 Objective
+- Replace shared prototype internal identity authority with real application users.
+- Preserve customer public-entry behavior.
+- Use database-backed credentials for internal human identity.
+- Use Auth.js as eventual internal session authority.
+- Derive access from active memberships.
+- Preserve tenant isolation.
+- Preserve branch isolation.
+- Resolve permissions from role-permission relationships.
+- Enforce authorization server-side.
+- Preserve RLS as defense in depth.
+- Handle inactive/revoked/suspended state fail-closed.
+- Remove legacy shared auth only after the replacement path is proven.
 
-Phase 02 establishes one coherent internal human identity and authorization path.
-
-The target path is:
-
-```text
-LOGIN IDENTIFIER
-→ PRE-AUTH LOOKUP
-→ PASSWORD VERIFICATION
-→ REAL app.users.id
-→ AUTH.JS SESSION
-→ ACTIVE MEMBERSHIP
-→ TENANT / BRANCH ACCESS CONTEXT
-→ PERMISSION CHECK
-→ ACTOR-AWARE DB TRANSACTION
-→ RLS DEFENSE IN DEPTH
-→ REVOCATION / INVALIDATION
-```
-
-Phase 02 must remove shared-prototype authentication authority.
-
-Phase 02 must preserve customer public-entry boundaries.
-
-Phase 02 must keep authorization server-side.
-
-Phase 02 must keep tenant isolation database-enforced.
-
-Phase 02 must keep branch isolation database-enforced.
-
-Phase 02 must keep inactive actors fail-closed.
-
-Phase 02 must keep inactive memberships fail-closed.
-
-Phase 02 must keep revoked memberships fail-closed.
-
-Phase 02 must keep permission mapping explicit.
-
-Phase 02 must avoid role-name checks as the only authority.
-
-Phase 02 must create stable test identities.
-
-Phase 02 must create stable credential verification cases.
-
-Phase 02 must create stable authorization denial cases.
-
-Phase 02 must create enough deterministic state for Auth.js cutover.
-
----
-
-# 3. Phase 02 Six-Round Boundary
-
-The intended decomposition is:
-
-```text
-P02/R01
-Identity + Pre-Authentication Boundary
-
-P02/R02
-Deterministic Credential Fixtures
-+ Authorization Contract Verification
-
-P02/R03
-Auth.js Credentials Authentication
-+ Session Authority Cutover
-
-P02/R04
-Workspace / AccessContext Resolution
-+ Revocation / Membership Change Semantics
-
-P02/R05
-Route + Command Authorization
-+ Permission Enforcement Integration
-
-P02/R06
-Atomic Legacy Auth Removal
-+ Security Acceptance
-```
-
-R01 builds secure pre-auth machinery.
-
-R02 builds deterministic actors and proves authorization contracts.
-
-R03 connects real credential verification to Auth.js.
-
-R04 resolves workspace and session access context.
-
-R05 enforces routes and commands by permission.
-
-R06 removes temporary shared auth and performs acceptance.
-
-R02 must not collapse this sequence.
-
----
+# 3. Phase 02 Round Decomposition
+- R01 = identity and pre-authentication boundary.
+- R02 = deterministic credential fixtures and authorization contract proof.
+- R03 = Auth.js Credentials authentication and session authority cutover.
+- R04 = workspace/access context and revocation semantics.
+- R05 = route and command permission enforcement.
+- R06 = atomic legacy-auth removal and security acceptance.
+- R02 must consume R01 primitives rather than reinvent them.
+- R02 must prepare stable personas for R03.
+- R02 must prepare stable membership states for R04.
+- R02 must prepare stable permission expectations for R05.
+- R02 must preserve legacy auth until later cutover.
+- R02 must not collapse Phase 02 sequencing.
 
 # 4. R02 High-Impact Objective
-
-R02 must transform the existing synthetic R04 authorization fixtures into a Phase-02-quality deterministic identity test contract.
-
-R02 must not merely add more seed rows.
-
-R02 must make identity state reproducible.
-
-R02 must make credential state reproducible.
-
-R02 must make role state reproducible.
-
-R02 must make permission state reproducible.
-
-R02 must make membership state reproducible.
-
-R02 must make tenant/branch denial reproducible.
-
-R02 must make future Auth.js integration tests deterministic.
-
-R02 must ensure fixture identifiers become intentional contract data.
-
-R02 must ensure test passwords are clearly test-only.
-
-R02 must ensure hashes are deterministic or deterministically generated.
-
-R02 must ensure no production secret is required.
-
-R02 must ensure no production data is required.
-
-R02 must ensure clean reset creates the same logical state.
-
-R02 must ensure later rounds do not invent new identity semantics.
-
-R02 must leave the live login/session authority unchanged.
-
----
+- Turn existing synthetic authorization fixtures into a deterministic Phase-02 identity contract.
+- Give later rounds stable test users.
+- Give later rounds stable synthetic emails.
+- Give later rounds stable credential vectors.
+- Give later rounds stable tenant and branch relationships.
+- Give later rounds stable role assignments.
+- Give later rounds stable permission assignments.
+- Give later rounds stable membership states.
+- Give later rounds stable denial personas.
+- Prove authorization semantics through SQL and server integration tests.
+- Preserve R01 least privilege.
+- Preserve R04 actor/RLS semantics.
 
 # 5. R02 Completion Shape
-
-The completed R02 branch should provide:
-
-```text
-DETERMINISTIC TENANT A
-+
-DETERMINISTIC TENANT B
-+
-DETERMINISTIC BRANCH A1
-+
-DETERMINISTIC BRANCH A2
-+
-DETERMINISTIC BRANCH B1
-+
-DETERMINISTIC ACTIVE OWNER/MANAGER
-+
-DETERMINISTIC BRANCH STAFF
-+
-DETERMINISTIC KITCHEN ACTOR
-+
-DETERMINISTIC CASHIER ACTOR
-+
-DETERMINISTIC CROSS-TENANT ACTOR
-+
-DETERMINISTIC INACTIVE USER
-+
-DETERMINISTIC INVITED MEMBERSHIP
-+
-DETERMINISTIC SUSPENDED MEMBERSHIP
-+
-DETERMINISTIC REVOKED MEMBERSHIP
-+
-DETERMINISTIC DISABLED CREDENTIAL
-+
-DETERMINISTIC NO-CREDENTIAL USER
-+
-DETERMINISTIC SUPPORTED PASSWORD HASHES
-+
-ROLE/PERMISSION CONTRACT
-+
-TENANT-WIDE MEMBERSHIP CONTRACT
-+
-EXACT-BRANCH MEMBERSHIP CONTRACT
-+
-CROSS-TENANT DENIAL CONTRACT
-+
-CROSS-BRANCH DENIAL CONTRACT
-+
-SELF-ELEVATION DENIAL CONTRACT
-+
-RLS CONTRACT
-+
-PRE-AUTH LOOKUP CONTRACT
-+
-REUSABLE TEST FIXTURE CONSTANTS
-```
-
-R02 should make R03 a thin integration step.
-
-R03 should not need to create new test personas to prove login behavior.
-
----
+- Deterministic Tenant A.
+- Deterministic Tenant B.
+- Deterministic Branch A1.
+- Deterministic Branch A2.
+- Deterministic Branch B1.
+- Deterministic owner/manager actor.
+- Deterministic branch staff actors.
+- Deterministic kitchen actor.
+- Deterministic cashier actor.
+- Deterministic suspended user.
+- Deterministic invited/suspended/revoked memberships.
+- Deterministic disabled/no-credential/no-membership cases.
 
 # 6. Hard Execution Gate
-
-R02 implementation must not begin simply because this file is `READY`.
-
-Before R02 implementation starts:
-
-- [ ] this exact spec exists on current `main`;
-- [ ] `Status = READY`;
-- [ ] current merge/branch policy is re-read from `main`;
-- [ ] P02/R01 implementation branch exists;
-- [ ] P02/R01 contains meaningful implementation code;
-- [ ] R01 handoff is stable enough to consume;
-- [ ] R01 pre-auth role/function names are re-read;
-- [ ] R01 normalized-email design is re-read;
-- [ ] R01 credential encoding contract is re-read;
-- [ ] R01 throttle design is re-read;
-- [ ] R01 identity server module paths are re-read;
-- [ ] R01 relevant tests are re-read;
-- [ ] R02 has no existing active implementation branch;
-- [ ] R02 branch parent is the latest R01 implementation branch;
-- [ ] no later main change superseded this spec;
-- [ ] no production database action is required.
-
-If R01 implementation branch is absent:
-
-```text
-R02 = NOT STARTED
-STOP
-```
-
-If R01 branch exists but contains no meaningful implementation:
-
-```text
-R02 = BLOCKED BY R01
-STOP
-```
-
-If R01 code diverges materially from this spec's assumptions:
-
-```text
-RE-AUDIT R02 SPEC
-AMEND DOCUMENT IF NEEDED
-THEN IMPLEMENT
-```
-
----
-
-# 7. Authority vs Implementation Lineage
-
-Policy/spec authority comes from `main`.
-
-Implementation code lineage comes from the latest round branch.
-
-For R02 the intended path is:
-
-```text
-main
-  └── contains R02 spec authority
-
-p02-r01-...
-  └── latest implementation code baseline
-       └── p02-r02-credential-fixtures-authorization-contracts
-```
-
-Do not create R02 from `main` when R01 implementation exists only on its branch.
-
-Do not require R01 merge merely to create the R02 child branch when current policy permits branch-chain continuation.
-
-Do not use a stale R01 branch if a newer approved R01 lineage tip exists.
-
-Record the exact R01 parent branch and SHA in the R02 implementation PR.
-
----
-
-# 8. In Scope
-
-R02 owns deterministic internal identity fixtures.
-
-R02 owns deterministic credential fixtures.
-
-R02 owns deterministic test-only credential input values.
-
-R02 owns deterministic test-only password hashes or generation strategy.
-
-R02 owns fixture identity constants.
-
-R02 owns fixture tenant constants.
-
-R02 owns fixture branch constants.
-
-R02 owns fixture role constants.
-
-R02 owns fixture membership constants.
-
-R02 owns fixture permission expectations.
-
-R02 owns active user positive cases.
-
-R02 owns suspended user denial cases.
-
-R02 owns invited membership denial cases.
-
-R02 owns suspended membership denial cases.
-
-R02 owns revoked membership denial cases.
-
-R02 owns disabled credential denial cases.
-
-R02 owns no-credential denial cases.
-
-R02 owns cross-tenant denial cases.
-
-R02 owns cross-branch denial cases.
-
-R02 owns tenant-wide vs branch-scoped semantics verification.
-
-R02 owns role/permission mapping verification.
-
-R02 owns self-elevation regression verification.
-
-R02 owns pre-auth lookup verification against deterministic fixtures.
-
-R02 owns reusable test fixture helpers when useful.
-
-R02 owns fixture reset reproducibility.
-
-R02 owns test naming conventions used by R03–R06.
-
----
-
-# 9. Out of Scope
-
-R02 must not cut the live login route over to database credentials.
-
-R02 must not create the final Auth.js Credentials provider.
-
-R02 must not create the final Auth.js route handler.
-
-R02 must not replace `foodflow_session`.
-
-R02 must not remove custom JOSE session logic.
-
-R02 must not remove `FOODFLOW_INTERNAL_*` variables.
-
-R02 must not add Google OAuth.
-
-R02 must not add social login.
-
-R02 must not create workspace chooser UI.
-
-R02 must not create tenant chooser UI.
-
-R02 must not create branch chooser UI.
-
-R02 must not create AccessContext product behavior.
-
-R02 must not implement live session revocation.
-
-R02 must not implement route-level permission enforcement.
-
-R02 must not implement command-level permission enforcement.
-
-R02 must not remove legacy auth.
-
-R02 must not add customer account authentication.
-
-R02 must not implement customer persistence.
-
-R02 must not implement staff operational workflows.
-
-R02 must not implement kitchen routing.
-
-R02 must not implement realtime.
-
-R02 must not implement payments.
-
-R02 must not implement billing.
-
-R02 must not implement voice ordering.
-
-R02 must not mutate production data.
-
----
-
-# 10. Existing Database Baseline to Preserve
-
-The current repository already contains `app.organizations`.
-
-The current repository already contains `app.restaurants`.
-
-The current repository already contains `app.branches`.
-
-The current repository already contains `app.users`.
-
-The current repository already contains `app.roles`.
-
-The current repository already contains `app.permissions`.
-
-The current repository already contains `app.role_permissions`.
-
-The current repository already contains `app.memberships`.
-
-The current repository already contains `private.user_credentials`.
-
-The current repository already contains `private.login_throttles`.
-
-The current repository already contains R04 actor authorization helpers.
-
-The current repository already contains tenant/branch RLS policies.
-
-R02 must reuse these tables.
-
-R02 must not create parallel identity tables.
-
-R02 must not create parallel role tables.
-
-R02 must not create parallel membership tables.
-
-R02 must not create a second permission catalog.
-
----
-
-# 11. Existing Seed Baseline to Reuse
-
-Current `supabase/seed.sql` already contains synthetic Tenant A.
-
-Current `supabase/seed.sql` already contains synthetic Tenant B.
-
-Current seed contains Restaurant A.
-
-Current seed contains Restaurant B.
-
-Current seed contains Branch A1.
-
-Current seed contains Branch A2.
-
-Current seed contains Branch B1.
-
-Current seed contains R04 synthetic users.
-
-Current seed contains an R04 tenant-wide manager.
-
-Current seed contains an R04 Branch A1 staff actor.
-
-Current seed contains an R04 Branch A2 staff actor.
-
-Current seed contains an R04 suspended user.
-
-Current seed contains invited membership state.
-
-Current seed contains suspended membership state.
-
-Current seed contains revoked membership state.
-
-Current seed contains Tenant B staff.
-
-Current seed contains R04 manager/staff roles.
-
-Current seed contains role-permission mappings.
-
-Current seed does not currently seed real passwords.
-
-R02 should extend this baseline deliberately.
-
-R02 should avoid destroying useful R04 fixture identity continuity.
-
----
-
-# 12. Existing Tenant and Branch Constants
-
-Current Tenant A ID:
-
-```text
-00000000-0000-0000-0000-0000000000a1
-```
-
-Current Restaurant A ID:
-
-```text
-00000000-0000-0000-0000-0000000000a2
-```
-
-Current Branch A1 ID:
-
-```text
-00000000-0000-0000-0000-0000000000a3
-```
-
-Current Branch A2 ID:
-
-```text
-00000000-0000-0000-0000-0000000000ac
-```
-
-Current Tenant B ID:
-
-```text
-00000000-0000-0000-0000-0000000000b1
-```
-
-Current Restaurant B ID:
-
-```text
-00000000-0000-0000-0000-0000000000b2
-```
-
-Current Branch B1 ID:
-
-```text
-00000000-0000-0000-0000-0000000000b3
-```
-
-R02 should reuse these stable IDs unless R01 code demonstrates a concrete reason not to.
-
----
-
-# 13. Existing R04 User Constants
-
-Tenant A manager:
-
-```text
-30000000-0000-4000-8000-0000000000a1
-```
-
-Tenant A Branch A1 staff:
-
-```text
-30000000-0000-4000-8000-0000000000a2
-```
-
-Tenant A Branch A2 staff:
-
-```text
-30000000-0000-4000-8000-0000000000a3
-```
-
-Suspended user:
-
-```text
-30000000-0000-4000-8000-0000000000a4
-```
-
-Invited-membership user:
-
-```text
-30000000-0000-4000-8000-0000000000a5
-```
-
-Suspended-membership user:
-
-```text
-30000000-0000-4000-8000-0000000000a6
-```
-
-Revoked-membership user:
-
-```text
-30000000-0000-4000-8000-0000000000a7
-```
-
-Tenant B staff:
-
-```text
-30000000-0000-4000-8000-0000000000b1
-```
-
-R02 should preserve these actors when they remain compatible with final R01 identity normalization.
-
----
-
-# 14. Existing R04 Role Constants
-
-Tenant A manager role:
-
-```text
-50000000-0000-4000-8000-0000000000a1
-```
-
-Tenant A staff role:
-
-```text
-50000000-0000-4000-8000-0000000000a2
-```
-
-Tenant B staff role:
-
-```text
-50000000-0000-4000-8000-0000000000b1
-```
-
-Current R04 role codes include:
-
-```text
-R04_MANAGER
-R04_STAFF
-```
-
-R02 must decide whether to preserve these test-role codes or add Phase-02-specific kitchen/cashier roles.
-
-Do not rename existing role codes only for aesthetics.
-
-If new roles are required, add only roles needed to prove Phase 02 permission behavior.
-
----
-
-# 15. Canonical Permission Catalog Baseline
-
-The repository already seeds canonical permission codes.
-
-Examples include:
-
-```text
-operations.staff.access
-operations.kitchen.access
-operations.cashier.access
-management.admin.access
-order.view
-order.manage
-service.view
-service.manage
-kitchen.view
-kitchen.manage
-merchant_payment.view
-merchant_payment.collect
-merchant_payment.void
-menu.view
-menu.manage
-settings.view
-settings.manage
-member.view
-member.invite
-member.manage
-role.view
-role.manage
-audit.view
-```
-
-R02 must use canonical permission codes.
-
-R02 must not invent equivalent aliases.
-
-R02 must not infer permissions from role display names.
-
-R02 must not infer permissions from route names.
-
-R02 must not infer permissions from UI labels.
-
-R02 must test exact permission codes.
-
----
-
-# 16. R02 Fixture Design Principles
-
-Every fixture must have one purpose.
-
-Every fixture must have a stable identifier.
-
-Every fixture must have a stable logical name.
-
-Every fixture must be synthetic.
-
-Every fixture must be safe to commit.
-
-Every fixture must avoid production identifiers.
-
-Every credential fixture must be test-only.
-
-Every fixture must be reproducible after reset.
-
-Every fixture must avoid random UUID generation at seed time.
-
-Every fixture must avoid current-time-dependent authorization state unless explicitly testing time semantics.
-
-Every fixture must avoid insertion-order assumptions.
-
-Every fixture must avoid `limit 1` lookup semantics.
-
-Every fixture must be referenced by exact ID or canonical code.
-
-Every fixture must have a positive or negative test use.
-
-Unused fixtures should not be added.
-
----
-
-# 17. Required Persona Matrix
-
-R02 should provide at least these logical personas.
-
-```text
-owner_a
-staff_a1
-staff_a2
-kitchen_a1
-cashier_a2
-staff_b1
-suspended_user_a
-invited_membership_a
-suspended_membership_a
-revoked_membership_a
-disabled_credential_a
-no_credential_a
-no_membership_a
-```
-
-The exact implementation may reuse existing R04 actors for some personas.
-
-New personas should be added only where existing R04 actors cannot represent the contract.
-
-Each persona must have documented expected access.
-
-Each persona must have documented expected denial.
-
----
-
-# 18. Owner/Manager Persona Contract
-
-The Tenant A owner/manager persona must be ACTIVE.
-
-The owner/manager must have a tenant-wide ACTIVE membership.
-
-The owner/manager membership should use `branch_id = NULL`.
-
-The owner/manager must have the configured management permissions.
-
-The owner/manager must have ordinary operational visibility where assigned.
-
-The owner/manager must pass Tenant A tenant-level checks.
-
-The owner/manager must pass Branch A1 checks where tenant-wide semantics permit.
-
-The owner/manager must pass Branch A2 checks where tenant-wide semantics permit.
-
-The owner/manager must fail Tenant B checks.
-
-The owner/manager must not gain Tenant B data access.
-
-The owner/manager must not require browser-provided tenant authority.
-
-The owner/manager credential should be enabled for positive authentication tests.
-
----
-
-# 19. Branch A1 Staff Persona Contract
-
-The Branch A1 staff persona must be ACTIVE.
-
-The staff membership must be ACTIVE.
-
-The staff membership must belong to Tenant A.
-
-The staff membership must target Branch A1.
-
-The staff role must include staff access permission where canonical.
-
-The staff role should include `order.view` if that remains canonical behavior.
-
-The staff persona must pass Branch A1 membership checks.
-
-The staff persona must fail Tenant A tenant-wide membership checks.
-
-The staff persona must fail Branch A2 checks.
-
-The staff persona must fail Tenant B checks.
-
-The staff persona must fail management permissions.
-
-The staff credential should be enabled for positive credential tests.
-
----
-
-# 20. Branch A2 Staff Persona Contract
-
-The Branch A2 staff persona must be ACTIVE.
-
-The membership must be ACTIVE.
-
-The membership must target Tenant A.
-
-The membership must target Branch A2.
-
-The persona must pass Branch A2 membership checks.
-
-The persona must fail Branch A1 checks.
-
-The persona must fail Tenant A tenant-wide checks.
-
-The persona must fail Tenant B checks.
-
-The persona should carry only intended staff permissions.
-
-The persona must not inherit Branch A1 permission through same-tenant membership.
-
----
-
-# 21. Kitchen Persona Contract
-
-R02 should add or repurpose a deterministic kitchen persona.
-
-The kitchen persona must be ACTIVE.
-
-The kitchen membership must be ACTIVE.
-
-The kitchen membership must be branch-scoped.
-
-Preferred branch is Branch A1 unless current implementation has a better canonical fixture.
-
-The kitchen role should include:
-
-```text
-operations.kitchen.access
-kitchen.view
-kitchen.manage
-```
-
-The kitchen role should not automatically include:
-
-```text
-management.admin.access
-operations.cashier.access
-member.manage
-role.manage
-```
-
-The kitchen persona must pass kitchen permission checks.
-
-The kitchen persona must fail cashier-only checks.
-
-The kitchen persona must fail admin-only checks.
-
-The kitchen persona must fail sibling-branch checks.
-
-The kitchen persona must fail cross-tenant checks.
-
----
-
-# 22. Cashier Persona Contract
-
-R02 should add or repurpose a deterministic cashier persona.
-
-The cashier persona must be ACTIVE.
-
-The cashier membership must be ACTIVE.
-
-The cashier membership must be branch-scoped.
-
-Preferred branch is Branch A2 to exercise sibling-branch denial.
-
-The cashier role should include:
-
-```text
-operations.cashier.access
-merchant_payment.view
-merchant_payment.collect
-```
-
-`merchant_payment.void` should be assigned only if intended by canonical cashier policy.
-
-The cashier role should not automatically include:
-
-```text
-management.admin.access
-operations.kitchen.access
-role.manage
-member.manage
-```
-
-The cashier persona must pass cashier checks on its branch.
-
-The cashier persona must fail kitchen-only checks.
-
-The cashier persona must fail admin-only checks.
-
-The cashier persona must fail Branch A1 if scoped to Branch A2.
-
-The cashier persona must fail Tenant B.
-
----
-
-# 23. Tenant B Persona Contract
-
-Tenant B must remain independent from Tenant A.
-
-The Tenant B actor must be ACTIVE.
-
-The Tenant B membership must be ACTIVE.
-
-The membership must target Tenant B.
-
-The membership should target Branch B1 for branch-scoped coverage.
-
-The actor must pass Branch B1 checks.
-
-The actor must fail Tenant A checks.
-
-The actor must fail Branch A1 checks.
-
-The actor must fail Branch A2 checks.
-
-Tenant A actors must fail Branch B1 checks.
-
-Tenant A tenant-wide membership must never satisfy Tenant B.
-
-Tenant B permission mapping must not use Tenant A role IDs.
-
----
-
-# 24. Suspended User Contract
-
-The suspended user must have `app.users.status = SUSPENDED`.
-
-The user may have an otherwise ACTIVE membership for denial proof.
-
-The user may have an enabled credential for denial proof.
-
-Pre-auth candidate lookup must return no eligible candidate if R01 contract says inactive user is filtered.
-
-Membership helper must return false.
-
-Permission helper must return false.
-
-RLS must deny protected data.
-
-The user must not become authorized through an ACTIVE membership alone.
-
-The user must not become authorized through a valid role alone.
-
-The user must not become authorized through a valid credential alone.
-
----
-
-# 25. Invited Membership Contract
-
-The invited membership persona should use an ACTIVE user.
-
-The membership status must be `INVITED`.
-
-The credential may remain enabled.
-
-Identity lookup may still resolve the actor if authentication and authorization are separated.
-
-Membership authorization must fail.
-
-Permission authorization must fail.
-
-RLS must deny protected branch data.
-
-No workspace authority should be inferred.
-
-R03 login may authenticate identity later but R04 access resolution must reject workspace access until membership ACTIVE.
-
-R02 must document this separation.
-
----
-
-# 26. Suspended Membership Contract
-
-The user should remain ACTIVE.
-
-The credential may remain enabled.
-
-The membership status must be `SUSPENDED`.
-
-Membership authorization must fail.
-
-Permission authorization must fail.
-
-RLS must deny protected data.
-
-Suspending membership must not require suspending the user globally.
-
-The denial proves organization-level access can be revoked independently.
-
----
-
-# 27. Revoked Membership Contract
-
-The user should remain ACTIVE.
-
-The credential may remain enabled.
-
-The membership status must be `REVOKED`.
-
-Membership authorization must fail.
-
-Permission authorization must fail.
-
-RLS must deny protected data.
-
-The revoked membership must not reactivate through role assignment.
-
-The revoked membership must not reactivate through branch context injection.
-
-The revoked membership must remain a stable future R04 revocation test fixture.
-
----
-
-# 28. Disabled Credential Contract
-
-Create or reuse an ACTIVE user.
-
-The user should have an ACTIVE membership if useful.
-
-The credential row must exist.
-
-The credential `disabled_at` must be non-null.
-
-The stored hash must be syntactically valid.
-
-Pre-auth credential lookup must return no eligible candidate.
-
-The user status alone must not override credential disablement.
-
-Membership status alone must not override credential disablement.
-
-R03 must later use this fixture to prove login denial.
-
-R02 must not wire the live route to this behavior.
-
----
-
-# 29. No-Credential User Contract
-
-Create or reuse an ACTIVE user.
-
-The user may have an ACTIVE membership.
-
-No `private.user_credentials` row should exist.
-
-Pre-auth lookup must return no eligible candidate.
-
-The user must not cause a database error merely because credential row is absent.
-
-The missing credential state must be deterministic.
-
-The fixture must be clearly distinguishable from disabled credential state internally.
-
-Public-facing error behavior remains generic in R03.
-
----
-
-# 30. No-Membership User Contract
-
-Create or reuse an ACTIVE user.
-
-The user should have an enabled credential.
-
-The user should have no membership row for Tenant A or Tenant B.
-
-Credential lookup may succeed.
-
-Membership resolution must fail.
-
-Permission resolution must fail.
-
-RLS must deny tenant/branch data under actor runtime context.
-
-This persona proves authentication is not authorization.
-
-R04 can later use this persona for no-workspace behavior.
-
----
-
-# 31. Canonical Email Strategy
-
-R02 must use the normalized-email contract inherited from R01.
-
-Expected normalization is likely equivalent to:
-
-```text
-lower(btrim(email))
-```
-
-Do not redefine normalization in R02 if R01 chose an exact implementation.
-
-Every positive credential persona needs a stable synthetic email.
-
-Recommended pattern:
-
-```text
-owner.a@flow.test
-staff.a1@flow.test
-staff.a2@flow.test
-kitchen.a1@flow.test
-cashier.a2@flow.test
-staff.b1@flow.test
-suspended.a@flow.test
-disabled.credential.a@flow.test
-no.membership.a@flow.test
-```
-
-Use `.test` or another clearly synthetic reserved domain.
-
-Do not use real personal emails.
-
-Do not use owner production email.
-
-Do not use Gmail addresses.
-
-Do not use environment credentials as fixture identity.
-
----
-
-# 32. Email Fixture Validation
-
-Every seeded login email must normalize deterministically.
-
-No two fixtures may normalize to the same value.
-
-No fixture may contain accidental surrounding whitespace unless specifically testing normalization collision behavior.
-
-Collision tests should create temporary transactional rows rather than polluting durable seed.
-
-Case-variation tests should prove one identity authority.
-
-Whitespace-variation tests should prove one identity authority.
-
-Unknown email tests should use a stable synthetic value.
-
-Email tests must not depend on collation quirks outside the chosen normalization contract.
-
----
-
-# 33. Credential Algorithm Authority
-
-R02 must inherit the supported algorithm from final R01 implementation.
-
-Current pre-R01 schema declares:
-
-```text
-scrypt-v1
-```
-
-If R01 preserves `scrypt-v1`, R02 must use it.
-
-If R01 creates a canonical encoded string format, R02 must use that exact format.
-
-R02 must not invent a second encoding format.
-
-R02 must not switch to bcrypt.
-
-R02 must not switch to Argon2 without an explicit R01/R02 architecture amendment.
-
-R02 must not use SHA-only password hashes.
-
-R02 must not store plaintext passwords in database fields.
-
----
-
-# 34. Test Password Strategy
-
-R02 needs deterministic test-only password inputs for R03 integration.
-
-Test password values may exist in test source if clearly synthetic.
-
-They must never be described as production defaults.
-
-They must never be used for owner/dev/finance accounts.
-
-They must never be loaded from production secrets.
-
-They must never appear in `FOODFLOW_INTERNAL_PASSWORD` documentation as replacement values.
-
-A suggested test-only input pattern may be used, for example:
-
-```text
-flow-test-owner-a-v1
-flow-test-staff-a1-v1
-flow-test-kitchen-a1-v1
-flow-test-cashier-a2-v1
-```
-
-The exact values should be centralized.
-
-Do not scatter password literals across multiple test files.
-
----
-
-# 35. Credential Hash Fixture Strategy
-
-Preferred strategy depends on final R01 verifier contract.
-
-Option A:
-
-```text
-precomputed deterministic test hashes committed as fixtures
-```
-
-Option B:
-
-```text
-deterministic test helper generates hashes from fixed test inputs
-```
-
-Either approach must produce stable logical behavior.
-
-If salts are part of the encoding, deterministic committed vectors are useful for repeatability.
-
-If generation uses random salt, the seed must not regenerate a different committed database state on every reset unless tests only assert verification semantics.
-
-R03 integration benefits from known test vectors.
-
-R02 should prefer explicit test vectors.
-
-R02 must document algorithm parameters inherited from R01.
-
-R02 must include at least one valid vector.
-
-R02 must include at least one wrong-password test.
-
-R02 must include malformed-encoding tests in source tests if R01 does not already cover them.
-
----
-
-# 36. Credential Seed Safety
-
-`supabase/seed.sql` is synthetic local fixture data.
-
-If R02 adds credential rows to seed:
-
-- comments must state test-only purpose;
-- no production credential may be present;
-- no plaintext password column may be introduced;
-- password hash values must be non-secret test vectors;
-- algorithm field must match supported algorithm;
-- disabled credential fixture must set `disabled_at`;
-- enabled credentials must leave `disabled_at` null;
-- `password_changed_at` should be deterministic enough for tests that do not rely on exact wall-clock time;
-- no current timestamp should become a hidden assertion dependency;
-- no secret environment variable should be required for `supabase db reset`.
-
----
-
-# 37. Fixture Namespace Strategy
-
-R02 should distinguish long-lived fixture identifiers from business data identifiers.
-
-Existing R04 UUID ranges are already visually distinct.
-
-Reuse those ranges where safe.
-
-New Phase-02-only actors should use a predictable non-production range.
-
-New role IDs should use a predictable non-production range.
-
-New membership IDs should use a predictable non-production range.
-
-Do not use random `gen_random_uuid()` in deterministic seed rows.
-
-Do not use UUIDs derived from passwords.
-
-Do not use email hashes as primary IDs.
-
-Do not depend on database sequence order.
-
----
-
-# 38. Role Design for R02
-
-R02 does not need to create every production role.
-
-R02 needs enough roles to prove permission semantics.
-
-Minimum logical roles should cover:
-
-```text
-manager/admin
-staff
-kitchen
-cashier
-```
-
-Tenant B may reuse staff semantics with a tenant-local role row.
-
-Roles remain tenant-scoped.
-
-A Tenant A role ID must not be used by Tenant B membership.
-
-A role code may repeat across tenants if schema permits and semantics are tenant-local.
-
-Tests must not assume role ID is globally interchangeable across tenants.
-
----
-
-# 39. Manager Permission Contract
-
-The manager fixture should have explicit mapped permissions.
-
-Current R04 manager includes:
-
-```text
-order.view
-member.view
-member.invite
-member.manage
-role.view
-role.manage
-```
-
-R02 may extend manager mappings if canonical management permissions require it.
-
-Do not grant every permission merely to simplify tests.
-
-Add `management.admin.access` only if manager/admin surface semantics require it.
-
-Add settings permissions only if needed for later route policy contract.
-
-Record all manager permission codes in tests.
-
-Include at least one permission the manager intentionally does not have if the model is not super-admin.
-
----
-
-# 40. Staff Permission Contract
-
-Staff should receive only operational permissions needed for staff behavior.
-
-Likely permissions include:
-
-```text
-operations.staff.access
-order.view
-```
-
-Additional `order.manage` should be added only if intended.
-
-Staff should not automatically receive:
-
-```text
-management.admin.access
-role.manage
-member.manage
-merchant_payment.void
-```
-
-Tests must prove at least one positive permission.
-
-Tests must prove at least three negative privileged permissions.
-
----
-
-# 41. Kitchen Permission Contract
-
-Kitchen role should include kitchen-scoped operational permissions.
-
-Likely permissions include:
-
-```text
-operations.kitchen.access
-kitchen.view
-kitchen.manage
-order.view
-```
-
-`order.view` should be included only if kitchen workflow requires order visibility.
-
-Kitchen must not automatically receive:
-
-```text
-operations.cashier.access
-merchant_payment.collect
-management.admin.access
-member.manage
-role.manage
-```
-
-Tests must prove positive kitchen access.
-
-Tests must prove negative cashier access.
-
-Tests must prove negative admin access.
-
----
-
-# 42. Cashier Permission Contract
-
-Cashier role should include cashier/payment collection permissions.
-
-Likely permissions include:
-
-```text
-operations.cashier.access
-merchant_payment.view
-merchant_payment.collect
-order.view
-```
-
-`merchant_payment.void` must be intentional.
-
-Cashier must not automatically receive:
-
-```text
-operations.kitchen.access
-kitchen.manage
-management.admin.access
-member.manage
-role.manage
-```
-
-Tests must prove positive collection access.
-
-Tests must prove negative kitchen management.
-
-Tests must prove negative role management.
-
----
-
-# 43. Tenant-Wide Membership Contract
-
-A tenant-wide membership uses:
-
-```text
-branch_id = NULL
-```
-
-The membership must be ACTIVE.
-
-The user must be ACTIVE.
-
-The role must belong to the same tenant.
-
-Tenant-wide membership should pass tenant-level checks for its tenant.
-
-Tenant-wide membership should pass branch-level checks for branches within its tenant according to R04 semantics.
-
-Tenant-wide membership must fail another tenant.
-
-Tenant-wide membership must not bypass permission mapping.
-
-Tenant-wide membership means scope breadth, not all permissions.
-
----
-
-# 44. Branch-Scoped Membership Contract
-
-A branch-scoped membership uses an exact branch UUID.
-
-The branch must belong to the same tenant.
-
-The membership must be ACTIVE.
-
-The user must be ACTIVE.
-
-The role must belong to the membership tenant.
-
-Exact branch membership should pass its branch.
-
-Exact branch membership should fail sibling branches.
-
-Exact branch membership should fail tenant-level checks when target branch is null under accepted R04 semantics.
-
-Exact branch membership should fail another tenant.
-
-Branch scope must not be broadened by permission ownership.
-
----
-
-# 45. Multiple Membership Contract
-
-R02 should explicitly decide whether any test actor has multiple ACTIVE memberships.
-
-A multi-membership fixture is useful for future workspace selection.
-
-If added, it should be intentional.
-
-Example:
-
-```text
-user_multi_a
-membership A1 ACTIVE
-membership A2 ACTIVE
-```
-
-The user should authenticate once.
-
-The user should have access to both memberships through later R04 selection logic.
-
-R02 should not implement that selection UI.
-
-R02 may prove both membership rows are independently valid.
-
-Avoid adding multi-membership if it creates unnecessary scope before R04.
-
-If deferred, record it explicitly for R04.
-
----
-
-# 46. Role-Permission Referential Integrity
-
-Every role-permission row must reference an existing role.
-
-Every role-permission row must reference an existing permission.
-
-Permission lookup should use canonical `code` when seeding mappings.
-
-Do not depend on permission insertion order.
-
-Do not hardcode permission IDs if canonical code lookup is clearer and already used.
-
-Duplicate role-permission rows must be prevented by schema constraints.
-
-Seed should not silently create duplicate mappings.
-
-Tests should verify expected mapping count for focused roles where useful.
-
----
-
-# 47. Membership Referential Integrity
-
-Every membership user must exist.
-
-Every membership tenant must exist.
-
-Every membership role must exist.
-
-Every branch-scoped membership branch must exist.
-
-The role tenant must equal membership tenant.
-
-The branch tenant must equal membership tenant.
-
-R02 tests should verify cross-tenant role assignment is rejected or unusable according to schema constraints.
-
-R02 should not weaken current membership constraints.
-
----
-
-# 48. User Status Contract
-
-R02 must derive valid user statuses from current schema.
-
-Current known status includes `ACTIVE`.
-
-Current known status includes `SUSPENDED`.
-
-Do not invent `INACTIVE` if the schema does not permit it.
-
-Do not change the enum/check merely to match old spec wording.
-
-If deactivation uses another current status, use the actual schema value.
-
-Tests must use valid current statuses.
-
-The spec uses semantic term inactive to mean not-authenticatable where exact schema value may be `SUSPENDED` or another supported value.
-
-Implementation PR must record exact statuses used.
-
----
-
-# 49. Membership Status Contract
-
-Current known membership states include:
-
-```text
-ACTIVE
-INVITED
-SUSPENDED
-REVOKED
-```
-
-R02 must not invent additional states without schema evidence.
-
-Only ACTIVE membership should authorize.
-
-INVITED must deny.
-
-SUSPENDED must deny.
-
-REVOKED must deny.
-
-Tests must cover each status independently.
-
----
-
-# 50. Pre-Authentication Lookup Contract
-
-R02 must consume R01 pre-auth lookup behavior.
-
-Positive fixture:
-
-```text
-ACTIVE user
-+ enabled credential
-→ eligible candidate
-```
-
-Negative fixture:
-
-```text
-SUSPENDED/non-active user
-+ enabled credential
-→ no eligible candidate
-```
-
-Negative fixture:
-
-```text
-ACTIVE user
-+ disabled credential
-→ no eligible candidate
-```
-
-Negative fixture:
-
-```text
-ACTIVE user
-+ no credential
-→ no eligible candidate
-```
-
-Unknown email must return no candidate.
-
-Membership state must not be required merely to identify a credential candidate unless final R01 contract explicitly says otherwise.
-
-Authentication and authorization remain separate.
-
----
-
-# 51. Password Verification Contract
-
-R02 must prove deterministic credential vectors work with the R01 verifier.
-
-For each positive credential fixture:
-
-- known test password verifies;
-- wrong test password fails;
-- stored algorithm is supported;
-- encoded hash parses successfully;
-- user ID returned is expected;
-- normalized email returned is expected.
-
-For disabled credential fixture:
-
-- lookup returns no candidate before verification.
-
-For unknown user:
-
-- dummy verification behavior remains available from R01 if applicable.
-
-R02 must not bypass repository lookup by reading private table directly from application tests unless the test is explicitly verifying direct access denial.
-
----
-
-# 52. Pre-Auth Role Regression
-
-R02 must preserve R01 least-privilege behavior.
-
-The pre-auth role must not gain direct `app.users` broad read.
-
-The pre-auth role must not gain direct membership broad read.
-
-The pre-auth role must not gain direct credential table read.
-
-The pre-auth role must not gain direct throttle table read.
-
-The pre-auth role must not gain FoodFlow domain read.
-
-The pre-auth role must not gain payment read.
-
-The pre-auth role must not gain audit read.
-
-Fixture convenience must not cause broader grants.
-
-R02 tests should keep the R01 role-denial matrix green.
-
----
-
-# 53. Runtime Role Regression
-
-`flow_runtime` remains actor/tenant/branch scoped.
-
-R02 must not grant `flow_runtime` direct credential read.
-
-R02 must not grant `flow_runtime` direct throttle read.
-
-R02 must not bypass `app.actor_id` checks.
-
-R02 must not bypass `app.tenant_id` checks.
-
-R02 must not bypass `app.branch_id` checks.
-
-R02 fixture tests must run representative queries under `flow_runtime`.
-
-Actorless runtime must remain deny-by-default.
-
-Wrong tenant must remain deny-by-default.
-
-Wrong branch must remain deny-by-default.
-
----
-
-# 54. Identity Role Regression
-
-`flow_identity` remains post-identity.
-
-R02 must not turn `flow_identity` into a credential reader.
-
-R02 must not grant broad credential access to `flow_identity`.
-
-R02 must preserve self/membership-read semantics from R01/P01.
-
-If R02 uses identity transaction tests, the actor ID must be a real deterministic fixture user.
-
-Do not use fake zero UUID identity hacks.
-
----
-
-# 55. RLS Contract — Actorless
-
-Set tenant context to Tenant A.
-
-Set branch context as needed.
-
-Clear actor context.
-
-Use `flow_runtime`.
-
-Expected protected row visibility:
-
-```text
-0 rows
-```
-
-This must remain true for representative protected tables.
-
-At minimum preserve actorless branch denial.
-
-At minimum preserve actorless organization denial where tenant-level access is actor-protected.
-
----
-
-# 56. RLS Contract — Tenant-Wide Manager
-
-Set actor to Tenant A manager.
-
-Set tenant to Tenant A.
-
-Use tenant-level context.
-
-Expected Tenant A organization visibility:
-
-```text
-ALLOW
-```
-
-Expected Branch A1 visibility:
-
-```text
-ALLOW
-```
-
-Expected Branch A2 visibility:
-
-```text
-ALLOW
-```
-
-Expected Tenant B visibility:
-
-```text
-DENY
-```
-
-Permission checks remain role-mapped.
-
----
-
-# 57. RLS Contract — Branch A1 Staff
-
-Set actor to Branch A1 staff.
-
-Set tenant to Tenant A.
-
-Set branch to Branch A1.
-
-Expected Branch A1 visibility:
-
-```text
-ALLOW
-```
-
-Expected Branch A2 visibility:
-
-```text
-DENY
-```
-
-Expected Tenant A organization tenant-wide visibility:
-
-```text
-DENY
-```
-
-Expected Tenant B visibility:
-
-```text
-DENY
-```
-
----
-
-# 58. RLS Contract — Branch A2 Staff
-
-Set actor to Branch A2 staff.
-
-Set tenant to Tenant A.
-
-Set branch to Branch A2.
-
-Expected Branch A2 visibility:
-
-```text
-ALLOW
-```
-
-Expected Branch A1 visibility:
-
-```text
-DENY
-```
-
-Expected Tenant B visibility:
-
-```text
-DENY
-```
-
----
-
-# 59. RLS Contract — Tenant B Staff
-
-Set actor to Tenant B staff.
-
-Set tenant to Tenant B.
-
-Set branch to Branch B1.
-
-Expected Branch B1 visibility:
-
-```text
-ALLOW
-```
-
-Expected Tenant A Branch A1 visibility:
-
-```text
-DENY
-```
-
-Expected Tenant A Branch A2 visibility:
-
-```text
-DENY
-```
-
-Expected Tenant A organization visibility:
-
-```text
-DENY
-```
-
----
-
-# 60. RLS Contract — Suspended User
-
-Set actor to suspended user.
-
-Set tenant to Tenant A.
-
-Set branch to Branch A1.
-
-Use `flow_runtime`.
-
-Protected branch visibility must be zero.
-
-Protected domain visibility must be zero where actor helper applies.
-
-An ACTIVE membership must not rescue a suspended user.
-
-A valid role must not rescue a suspended user.
-
----
-
-# 61. RLS Contract — Non-Active Memberships
-
-For invited membership actor:
-
-```text
-DENY
-```
-
-For suspended membership actor:
-
-```text
-DENY
-```
-
-For revoked membership actor:
-
-```text
-DENY
-```
-
-Each case must be tested separately.
-
-Do not collapse all statuses into one fixture.
-
-Separate fixtures make future revocation regressions diagnosable.
-
----
-
-# 62. Permission Helper Positive Matrix
-
-Manager on Tenant A:
-
-```text
-member.manage → ALLOW if mapped
-role.manage → ALLOW if mapped
-order.view → ALLOW if mapped
-```
-
-Staff A1 on Branch A1:
-
-```text
-operations.staff.access → ALLOW if mapped
-order.view → ALLOW if mapped
-```
-
-Kitchen A1 on Branch A1:
-
-```text
-operations.kitchen.access → ALLOW
-kitchen.view → ALLOW
-kitchen.manage → ALLOW if mapped
-```
-
-Cashier A2 on Branch A2:
-
-```text
-operations.cashier.access → ALLOW
-merchant_payment.view → ALLOW
-merchant_payment.collect → ALLOW
-```
-
----
-
-# 63. Permission Helper Negative Matrix
-
-Staff A1:
-
-```text
-role.manage → DENY
-member.manage → DENY
-management.admin.access → DENY
-```
-
-Kitchen A1:
-
-```text
-operations.cashier.access → DENY
-merchant_payment.collect → DENY unless explicitly mapped
-role.manage → DENY
-```
-
-Cashier A2:
-
-```text
-operations.kitchen.access → DENY
-kitchen.manage → DENY
-role.manage → DENY
-```
-
-Tenant B staff requesting Tenant A permission:
-
-```text
-DENY
-```
-
-Branch A1 staff requesting same permission at Branch A2:
-
-```text
-DENY
-```
-
----
-
-# 64. Self-Elevation Regression
-
-R02 must preserve R04 self-elevation hardening.
-
-Ordinary staff must not promote own membership role to manager.
-
-Ordinary staff must not add role permissions.
-
-Ordinary staff must not edit manager role permissions.
-
-Ordinary staff must not create an ACTIVE tenant-wide membership for self.
-
-Ordinary staff must not rewrite membership tenant.
-
-Ordinary staff must not rewrite membership branch to broaden scope.
-
-Tests must prove data remains unchanged after filtered/denied mutations.
-
-Do not weaken existing test assertions to accommodate fixture changes.
-
----
-
-# 65. Fixture Mutation Policy
-
-Seed fixtures define reset baseline.
-
-Tests may mutate fixture rows inside transactions.
-
-Every destructive fixture test should roll back.
-
-Do not permanently mutate seed state across SQL test files.
-
-Do not rely on test execution order to restore state.
-
-Do not require one test file to clean up another test file.
-
-Use explicit `begin`/`rollback` in SQL tests where current convention permits.
-
-Node integration tests must clean temporary rows or use reset-isolated database state.
-
----
-
-# 66. Seed Idempotency Expectations
-
-`supabase db reset --local` must recreate deterministic state.
-
-Seed should not depend on previous seed execution.
-
-Seed should not depend on random UUIDs.
-
-Seed should not depend on wall-clock ordering.
-
-Seed should not depend on external APIs.
-
-Seed should not depend on Auth.js runtime.
-
-Seed should not depend on production secrets.
-
-Seed should not depend on Vercel environment.
-
-Seed should not depend on browser state.
-
----
-
-# 67. Schema Change Policy
-
-R02 is primarily fixture and authorization-contract work.
-
-Default expectation:
-
-```text
-NO SCHEMA CHANGE
-```
-
-A schema migration is allowed only if final R01 implementation reveals a fixture-blocking structural defect.
-
-Examples of legitimate structural blockers:
-
-- missing uniqueness required for deterministic identity;
-- missing constraint allowing impossible cross-tenant membership;
-- credential algorithm field incompatible with R01 final contract;
-- necessary testable authorization invariant absent from schema.
-
-Do not add a migration merely to hold fixture labels.
-
-Do not add production columns solely for test convenience.
-
-If schema change is required, use forward-only migration.
-
-Never rewrite R01 or P01 historical migrations.
-
----
-
-# 68. Generated Type Policy
-
-If R02 changes no schema:
-
-```text
-GENERATED DB TYPES SHOULD NOT CHANGE
-```
-
-If generated DB types change unexpectedly without schema change:
-
-```text
-INVESTIGATE
-```
-
-Do not manually edit generated types.
-
-If an approved R02 schema change occurs:
-
-- reset DB;
-- regenerate types;
-- inspect diff;
-- commit expected change;
-- run drift verification.
-
-Fixture row additions alone must not require generated type changes.
-
----
-
-# 69. Server Fixture Helper Strategy
-
-A focused test helper may be created.
-
-Suggested path:
-
-```text
-apps/web/next-flow/tests/fixtures/identity.ts
-```
-
-The helper should export stable fixture constants.
-
-The helper should not contain production auth logic.
-
-The helper should not import client components.
-
-The helper should not issue cookies.
-
-The helper should not issue JWTs.
-
-The helper should not choose workspace state.
-
-The helper may export IDs.
-
-The helper may export test emails.
-
-The helper may export test passwords.
-
-The helper may export expected permission arrays.
-
-The helper may export expected tenant/branch IDs.
-
----
-
-# 70. Suggested Fixture Constant Shape
-
-Example only:
-
-```ts
-export const identityFixtures = {
-  ownerA: {
-    userId: "...",
-    email: "owner.a@flow.test",
-    tenantId: "...",
-    branchId: null,
-  },
-  staffA1: {
-    userId: "...",
-    email: "staff.a1@flow.test",
-    tenantId: "...",
-    branchId: "...",
-  },
-} as const;
-```
-
-Do not duplicate database authority in TypeScript.
-
-The constants identify fixtures.
-
-Database tests remain authoritative for DB behavior.
-
----
-
-# 71. Fixture Helper Password Safety
-
-Test password constants must be clearly named.
-
-Example:
-
-```text
-TEST_ONLY_PASSWORD
-```
-
-Do not use names suggesting production defaults.
-
-Do not export passwords from runtime application modules.
-
-Keep them under test-only paths.
-
-Do not import them from production route code.
-
-R03 tests may import test fixture constants.
-
-Production Auth.js code must not import test fixtures.
-
----
-
-# 72. SQL Test File Strategy
-
-Create a focused R02 SQL test file.
-
-Suggested path:
-
-```text
-supabase/tests/database/p02_r02_identity_authorization_fixtures.test.sql
-```
-
-The file should verify seed/fixture contract.
-
-The file should not replace R01 tests.
-
-The file should not replace R04 tests.
-
-The file should complement inherited tests.
-
-Use pgTAP conventions already present.
-
-Plan the exact assertion count.
-
-Keep assertions named precisely.
-
-Use stable IDs/codes.
-
-Avoid vague messages such as `works`.
-
----
-
-# 73. SQL Test Group — Fixture Presence
-
-Assert Tenant A exists.
-
-Assert Tenant B exists.
-
-Assert Branch A1 exists.
-
-Assert Branch A2 exists.
-
-Assert Branch B1 exists.
-
-Assert owner/manager user exists.
-
-Assert Branch A1 staff exists.
-
-Assert Branch A2 staff exists.
-
-Assert kitchen actor exists.
-
-Assert cashier actor exists.
-
-Assert Tenant B actor exists.
-
-Assert suspended user exists.
-
-Assert invited membership exists.
-
-Assert suspended membership exists.
-
-Assert revoked membership exists.
-
-Assert disabled credential exists.
-
-Assert no-credential user exists with no credential row.
-
----
-
-# 74. SQL Test Group — Credential Presence
-
-Assert enabled positive credential rows exist.
-
-Assert algorithm equals supported R01 algorithm.
-
-Assert password hash is non-empty.
-
-Assert password hash is not plaintext test password.
-
-Assert disabled credential has non-null `disabled_at`.
-
-Assert enabled credentials have null `disabled_at`.
-
-Assert no-credential fixture has zero credential rows.
-
-Assert one credential row per credential-bearing user.
-
-Assert no duplicate user credential primary key.
-
----
-
-# 75. SQL Test Group — Email Contract
-
-Assert expected normalized owner email.
-
-Assert expected normalized staff email.
-
-Assert expected normalized kitchen email.
-
-Assert expected normalized cashier email.
-
-Assert expected normalized Tenant B email.
-
-Assert case variation resolves same candidate.
-
-Assert whitespace variation resolves same candidate if lookup normalizes input.
-
-Assert unknown email resolves no candidate.
-
-Assert collision insertion fails if R01 constraint exists.
-
-Assert collision update fails if R01 constraint exists.
-
----
-
-# 76. SQL Test Group — Membership Contract
-
-Assert manager tenant-wide membership is ACTIVE.
-
-Assert manager branch_id is NULL.
-
-Assert Branch A1 staff membership is ACTIVE.
-
-Assert Branch A1 staff branch_id equals A1.
-
-Assert Branch A2 staff branch_id equals A2.
-
-Assert Tenant B staff branch_id equals B1.
-
-Assert invited membership status is INVITED.
-
-Assert suspended membership status is SUSPENDED.
-
-Assert revoked membership status is REVOKED.
-
-Assert role tenant matches membership tenant.
-
-Assert branch tenant matches membership tenant.
-
----
-
-# 77. SQL Test Group — Role Contract
-
-Assert manager role exists for Tenant A.
-
-Assert staff role exists for Tenant A.
-
-Assert kitchen role exists if introduced.
-
-Assert cashier role exists if introduced.
-
-Assert Tenant B staff role exists under Tenant B.
-
-Assert no Tenant A role is reused by Tenant B membership.
-
-Assert expected role codes are stable.
-
-Assert expected role names are not used as permission authority.
-
----
-
-# 78. SQL Test Group — Permission Mapping
-
-Assert manager has `member.manage` if intended.
-
-Assert manager has `role.manage` if intended.
-
-Assert staff lacks `role.manage`.
-
-Assert staff lacks `member.manage`.
-
-Assert kitchen has `operations.kitchen.access`.
-
-Assert kitchen has `kitchen.view`.
-
-Assert cashier has `operations.cashier.access`.
-
-Assert cashier has `merchant_payment.view`.
-
-Assert cashier has `merchant_payment.collect`.
-
-Assert cashier lacks `kitchen.manage`.
-
-Assert kitchen lacks `merchant_payment.collect` unless intentionally mapped.
-
----
-
-# 79. SQL Test Group — Membership Helper
-
-Manager + Tenant A + null branch:
-
-```text
-TRUE
-```
-
-Manager + Tenant A + A1:
-
-```text
-TRUE
-```
-
-Manager + Tenant A + A2:
-
-```text
-TRUE
-```
-
-Manager + Tenant B + B1:
-
-```text
-FALSE
-```
-
-Staff A1 + Tenant A + null:
-
-```text
-FALSE
-```
-
-Staff A1 + Tenant A + A1:
-
-```text
-TRUE
-```
-
-Staff A1 + Tenant A + A2:
-
-```text
-FALSE
-```
-
-Staff A1 + Tenant B + B1:
-
-```text
-FALSE
-```
-
----
-
-# 80. SQL Test Group — Permission Helper
-
-Manager + `member.manage` + Tenant A:
-
-```text
-TRUE if mapped
-```
-
-Staff A1 + `order.view` + A1:
-
-```text
-TRUE if mapped
-```
-
-Staff A1 + `role.manage` + A1:
-
-```text
-FALSE
-```
-
-Staff A1 + `order.view` + A2:
-
-```text
-FALSE
-```
-
-Kitchen A1 + kitchen permission + A1:
-
-```text
-TRUE
-```
-
-Kitchen A1 + cashier permission + A1:
-
-```text
-FALSE
-```
-
-Cashier A2 + collect permission + A2:
-
-```text
-TRUE
-```
-
-Cashier A2 + kitchen manage + A2:
-
-```text
-FALSE
-```
-
----
-
-# 81. SQL Test Group — User Status Denial
-
-Suspended user membership helper:
-
-```text
-FALSE
-```
-
-Suspended user permission helper:
-
-```text
-FALSE
-```
-
-Suspended user RLS branch visibility:
-
-```text
-0
-```
-
-Suspended user pre-auth lookup:
-
-```text
-NO ELIGIBLE CANDIDATE
-```
-
-Do not remove membership to make this pass.
-
-The test should prove user status itself matters.
-
----
-
-# 82. SQL Test Group — Membership Status Denial
-
-Invited membership helper:
-
-```text
-FALSE
-```
-
-Suspended membership helper:
-
-```text
-FALSE
-```
-
-Revoked membership helper:
-
-```text
-FALSE
-```
-
-Invited permission helper:
-
-```text
-FALSE
-```
-
-Suspended permission helper:
-
-```text
-FALSE
-```
-
-Revoked permission helper:
-
-```text
-FALSE
-```
-
----
-
-# 83. SQL Test Group — RLS Positive
-
-Manager sees Tenant A organization.
-
-Manager sees Branch A1.
-
-Manager sees Branch A2.
-
-Staff A1 sees Branch A1.
-
-Staff A2 sees Branch A2.
-
-Kitchen A1 sees branch-scoped kitchen-relevant protected data only if seeded and authorized.
-
-Cashier A2 sees branch-scoped payment/order data only if seeded and authorized.
-
-Tenant B staff sees Branch B1.
-
-Keep positive cases small and deterministic.
-
-Do not create large domain datasets solely for R02.
-
----
-
-# 84. SQL Test Group — RLS Negative
-
-Actorless sees no protected branches.
-
-Staff A1 cannot see Branch A2.
-
-Staff A2 cannot see Branch A1.
-
-Tenant A manager cannot see Tenant B.
-
-Tenant B staff cannot see Tenant A.
-
-Suspended user cannot see Branch A1.
-
-Invited membership user cannot see Branch A1.
-
-Suspended membership user cannot see Branch A1.
-
-Revoked membership user cannot see Branch A1.
-
-No-membership user cannot see Tenant A protected rows.
-
-Wrong tenant context cannot broaden access.
-
-Wrong branch context cannot broaden access.
-
----
-
-# 85. SQL Test Group — Self-Elevation
-
-Attempt ordinary staff membership role escalation.
-
-Expected:
-
-```text
-NO PRIVILEGE GAIN
-```
-
-Attempt ordinary staff membership branch broadening.
-
-Expected:
-
-```text
-NO PRIVILEGE GAIN
-```
-
-Attempt ordinary staff tenant reassignment.
-
-Expected:
-
-```text
-NO PRIVILEGE GAIN
-```
-
-Attempt ordinary staff role-permission insertion.
-
-Expected:
-
-```text
-DENY / FILTER WITHOUT ELEVATION
-```
-
-Verify persisted row unchanged after each attempt.
-
----
-
-# 86. SQL Test Group — Pre-Auth Least Privilege
-
-Under the pre-auth role:
-
-Direct `app.users` broad select must fail.
-
-Direct `app.memberships` broad select must fail.
-
-Direct `private.user_credentials` select must fail.
-
-Direct `private.login_throttles` select must fail.
-
-Direct `foodflow.orders` select must fail.
-
-Direct `payments.payments` select must fail.
-
-Direct `audit.events` select must fail.
-
-Approved credential lookup function must succeed.
-
-Approved throttle functions must preserve R01 behavior.
-
----
-
-# 87. Node Unit Test Scope
-
-R02 should avoid duplicating R01 password-verifier tests.
-
-R02 unit tests should focus on fixture helpers.
-
-Test fixture constant stability.
-
-Test expected normalized emails.
-
-Test expected IDs.
-
-Test expected test-password labels.
-
-Test permission expectation arrays if exported.
-
-Test helper does not expose production secret names.
-
-Test helper remains importable from test environment.
-
-Do not create unit tests that merely restate object literals without value.
-
----
-
-# 88. Node Integration Test File
-
-Suggested path:
-
-```text
-apps/web/next-flow/tests/integration/identity-authorization-contract.test.ts
-```
-
-The integration test should consume the real DB runtime.
-
-It should use deterministic fixture IDs.
-
-It should use R01 credential repository.
-
-It should use R01 password verifier.
-
-It should use actor-aware transaction helpers.
-
-It should not call the live legacy login route as new authority.
-
-It should not create Auth.js sessions.
-
----
-
-# 89. Integration Test — Positive Credential
-
-Load owner/manager credential candidate by email.
-
-Assert candidate is non-null.
-
-Assert user ID equals fixture ID.
-
-Assert normalized email equals expected value.
-
-Verify known test password.
-
-Assert verification succeeds.
-
-Repeat for Branch A1 staff.
-
-Repeat for kitchen persona if credential-bearing.
-
-Repeat for cashier persona if credential-bearing.
-
-Do not assert password hash literal in failure output.
-
----
-
-# 90. Integration Test — Wrong Password
-
-Lookup valid candidate.
-
-Verify wrong password.
-
-Expected:
-
-```text
-FALSE / INVALID
-```
-
-Do not mutate credential row.
-
-Do not log password.
-
-Do not log hash.
-
-Do not create session.
-
-Do not call live login cutover code.
-
----
-
-# 91. Integration Test — Disabled Credential
-
-Lookup disabled credential fixture by normalized email.
-
-Expected repository result:
-
-```text
-NULL / NO ELIGIBLE CANDIDATE
-```
-
-Do not manually select credential table from application repository.
-
-Prove repository honors database lookup contract.
-
----
-
-# 92. Integration Test — Suspended User
-
-Lookup suspended user fixture by normalized email.
-
-Expected:
-
-```text
-NO ELIGIBLE CANDIDATE
-```
-
-If credential exists, denial must still occur.
-
-This proves user status is part of pre-auth eligibility.
-
----
-
-# 93. Integration Test — No Credential
-
-Lookup ACTIVE no-credential user.
-
-Expected:
-
-```text
-NO ELIGIBLE CANDIDATE
-```
-
-No database exception should leak.
-
-No fallback to legacy shared credential should occur inside repository helper.
-
-Legacy route remains separate.
-
----
-
-# 94. Integration Test — Membership Resolution
-
-Use real fixture actor ID.
-
-Use identity/tenant transaction helper as appropriate.
-
-Verify owner membership set.
-
-Verify staff A1 membership set.
-
-Verify staff A2 membership set.
-
-Verify Tenant B membership set.
-
-Verify inactive membership rows do not authorize.
-
-Do not invent workspace selection behavior.
-
-R02 validates data contract only.
-
----
-
-# 95. Integration Test — Permission Resolution
-
-Resolve manager permission.
-
-Resolve staff positive permission.
-
-Resolve staff negative permission.
-
-Resolve kitchen positive permission.
-
-Resolve kitchen negative permission.
-
-Resolve cashier positive permission.
-
-Resolve cashier negative permission.
-
-Resolve cross-tenant negative permission.
-
-Resolve cross-branch negative permission.
-
-Use canonical permission code strings.
-
----
-
-# 96. Integration Test — Transaction Context Cleanup
-
-R01 should already test role/context cleanup.
-
-R02 should preserve that coverage.
-
-If R02 adds new authorization integration flows:
-
-- complete transaction;
-- run subsequent transaction;
-- verify actor does not leak;
-- verify tenant does not leak;
-- verify branch does not leak;
-- verify role does not leak.
-
-Do not weaken R01 cleanup tests.
-
----
-
-# 97. Integration Test — Fixture Reproducibility
-
-The same clean database reset must produce the same fixture IDs.
-
-The same clean reset must produce the same logical credential eligibility.
-
-The same clean reset must produce the same role mappings.
-
-The same clean reset must produce the same membership scopes.
-
-The same clean reset must produce the same negative cases.
-
-Do not assert volatile timestamps unless necessary.
-
-Do not assert database row physical order.
-
----
-
-# 98. Error Handling
-
-Missing fixture should fail tests loudly.
-
-Wrong fixture ID should fail tests loudly.
-
-Duplicate normalized email should fail reset/migration or fixture insert deterministically.
-
-Unsupported credential algorithm should fail verification deterministically.
-
-Malformed hash should fail verifier without secret leakage.
-
-Cross-tenant role assignment should fail or remain unauthorized.
-
-Wrong branch assignment should fail or remain unauthorized.
-
-Database unavailable should produce typed server failure in integration paths.
-
-Do not convert structural fixture errors into generic PASS states.
-
----
-
-# 99. Failure Recovery
-
-If seed reset fails due to foreign-key order:
-
-- fix seed insertion dependency order;
-- do not disable constraints globally.
-
-If role-permission lookup fails:
-
-- verify canonical permission code;
-- do not hardcode an arbitrary permission ID.
-
-If normalized email collides:
-
-- fix synthetic fixture identity;
-- do not weaken uniqueness.
-
-If credential vector fails:
-
-- verify R01 encoding contract;
-- do not downgrade KDF.
-
-If RLS test fails unexpectedly:
-
-- diagnose actor/tenant/branch scope;
-- do not grant broader privileges as first fix.
-
----
-
-# 100. Concurrency Considerations
-
-R02 is not primarily a concurrency round.
-
-However fixture work must not invalidate R01 throttle concurrency behavior.
-
-R02 should not add login-throttle writes to seed.
-
-Throttle state should begin clean after reset.
-
-R02 should not use shared mutable throttle state across tests without reset.
-
-Parallel integration tests must avoid accidental collision on throttle subject digest.
-
-Use deterministic but distinct test subjects where throttle behavior is exercised.
-
-Do not hold DB transactions open during password KDF work.
-
----
-
-# 101. Idempotency Considerations
-
-Seed reset must be deterministic.
-
-Repeated full resets must converge on same logical state.
-
-Tests may use `on conflict` only where current seed convention supports it.
-
-Do not hide accidental duplicate fixture IDs with broad `on conflict do nothing`.
-
-A duplicate fixture definition should fail visibly unless the seed contract intentionally updates it.
-
-Role-permission seeding should remain deterministic.
-
-Membership seeding should remain deterministic.
-
-Credential seeding should remain deterministic.
-
----
-
-# 102. Performance Considerations
-
-R02 should not create large fixture datasets.
-
-A compact matrix is enough.
-
-Credential lookup must remain indexed through R01 normalized-email design.
-
-Membership lookup should continue to use indexed keys/relationships.
-
-Permission resolution should not introduce per-test N+1 application queries if current helper resolves in DB.
-
-Do not add caching for credential hashes.
-
-Do not add Redis.
-
-Do not add external fixture services.
-
----
-
-# 103. Logging and Secret Redaction
-
-No test output should print raw password hash.
-
-No test output should print raw test password on failure unless framework inherently includes expected literal and the value is clearly synthetic.
-
-Prefer redacted assertions.
-
-No production secret may appear in fixtures.
-
-No `AUTH_SECRET` value may appear.
-
-No `FOODFLOW_SESSION_SECRET` value may appear.
-
-No production `DATABASE_URL` may appear.
-
-No session token may appear.
-
-No private customer data may appear.
-
----
-
-# 104. Observability Boundary
-
-R02 does not implement production auth observability.
-
-R02 may add descriptive test labels.
-
-R02 may add safe internal test diagnostics.
-
-R02 should identify which persona failed.
-
-R02 should identify which permission failed.
-
-R02 should identify which tenant/branch scope failed.
-
-R02 must not log credential material.
-
-R02 must not introduce production telemetry dependencies.
-
----
-
-# 105. Expected Files to CREATE
-
-Subject to final R01 branch audit, likely create:
-
-```text
-supabase/tests/database/p02_r02_identity_authorization_fixtures.test.sql
-```
-
-Likely create:
-
-```text
-apps/web/next-flow/tests/fixtures/identity.ts
-```
-
-Likely create:
-
-```text
-apps/web/next-flow/tests/integration/identity-authorization-contract.test.ts
-```
-
-Optional focused test helper:
-
-```text
-apps/web/next-flow/tests/fixtures/credential-vectors.ts
-```
-
-Only create credential-vector helper if it reduces duplication and stays test-only.
-
----
-
-# 106. Expected Files to MODIFY
-
-Likely modify:
-
-```text
-supabase/seed.sql
-```
-
-Reason:
-
-```text
-add deterministic Phase-02 identity/credential/role/membership fixtures
-```
-
-Potentially modify existing R01 integration tests only to reuse stable fixtures.
-
-Potentially modify R04 tests only if fixture references need non-semantic updates.
-
-Do not weaken R04 assertions.
-
-Do not rewrite existing tests merely to centralize constants if that creates broad churn.
-
----
-
-# 107. Files to Re-Audit Before Modification
-
-```text
-supabase/seed.sql
-```
-
-```text
-supabase/tests/database/p01_r04_actor_authorization_baseline.test.sql
-```
-
-```text
-supabase/tests/database/p02_r01_identity_pre_auth_boundary.test.sql
-```
-
-if created by R01.
-
-```text
-apps/web/next-flow/tests/integration/authentication-database.test.ts
-```
-
-if created by R01.
-
-```text
-apps/web/next-flow/src/modules/identity/server/*
-```
-
-```text
-apps/web/next-flow/src/server/db/identity-transaction.ts
-```
-
-```text
-apps/web/next-flow/src/server/db/transaction.ts
-```
-
----
-
-# 108. Files Not to Touch by Default
-
-Do not modify:
-
-```text
-apps/web/next-flow/src/app/api/auth/login/route.ts
-```
-
-Do not modify:
-
-```text
-apps/web/next-flow/src/app/api/auth/logout/route.ts
-```
-
-Do not modify:
-
-```text
-apps/web/next-flow/src/lib/auth/session.ts
-```
-
-Do not modify:
-
-```text
-apps/web/next-flow/src/lib/auth/token.ts
-```
-
-Do not modify:
-
-```text
-apps/web/next-flow/src/proxy.ts
-```
-
-Do not modify login UI.
-
-Do not modify customer menu/order UI.
-
-Do not modify payment integration.
-
----
-
-# 109. Package Dependency Policy
-
-Default expectation:
-
-```text
-NO NEW NPM DEPENDENCY
-```
-
-R02 should use existing Vitest.
-
-R02 should use existing Kysely/pg runtime.
-
-R02 should use existing Node crypto only through R01 verifier/helper.
-
-R02 should use existing Supabase CLI.
-
-Do not add faker merely for deterministic fixtures.
-
-Do not add UUID libraries merely for fixed UUID constants.
-
-Do not add password libraries merely to generate test vectors if R01 already owns hashing.
-
----
-
-# 110. Migration Policy
-
-Default:
-
-```text
-NO R02 MIGRATION
-```
-
-If required, migration must be forward-only.
-
-Migration must be narrowly justified.
-
-Migration must not encode test-only concepts into production schema without product need.
-
-Migration must not rewrite historical P01/R01 files.
-
-Migration must be clean-reset safe.
-
-Migration must have dedicated tests.
-
-Implementation PR must explain why fixture-only work required schema change.
-
----
-
-# 111. Database Reset Contract
-
-A clean local Supabase reset must succeed.
-
-The reset must apply all migrations.
-
-The reset must execute seed.
-
-The reset must create all R02 fixtures.
-
-The reset must not require manual SQL edits.
-
-The reset must not require production credentials.
-
-The reset must not require network access to identity provider.
-
-The reset must not require Auth.js server runtime.
-
-The reset must be repeatable.
-
----
-
-# 112. Database Lint Contract
-
-R02 implementation should preserve database lint success.
-
-New SQL test files should not introduce unsafe dynamic SQL.
-
-New schema changes, if any, should avoid unqualified security-sensitive references.
-
-No broad grants should be introduced.
-
-No unsafe SECURITY DEFINER function should be added in R02 by default.
-
-If a new function is truly required, follow R01 fixed-search-path rules.
-
----
-
-# 113. Generated Type Contract
-
-If no schema change:
-
-```text
-npm run db:generate
-→ no meaningful generated type diff
-```
-
-If schema change:
-
-```text
-npm run db:generate
-→ expected generated diff
-```
-
-Then:
-
-```text
-npm run db:verify-types
-```
-
-or current equivalent.
-
-Never edit generated types manually.
-
----
-
-# 114. Application Quality Contract
-
-R02 test-only helper code must typecheck.
-
-R02 integration tests must compile.
-
-No runtime import should accidentally import test-only fixture modules.
-
-No client component should import server identity modules.
-
-No server production module should import test passwords.
-
-Lint must catch accidental unused/unsafe test code where configured.
-
-Build must remain behaviorally unchanged for legacy login.
-
----
-
-# 115. Legacy Auth Regression
-
-Current legacy internal login remains live until R03/R06 sequencing.
-
-R02 must keep current login behavior working.
-
-R02 must keep current session cookie behavior working.
-
-R02 must keep current logout behavior working.
-
-R02 must keep current proxy behavior unchanged.
-
-R02 must keep legacy auth-session tests green.
-
-R02 must not modify expected legacy credential semantics.
-
-R02 fixtures exist alongside legacy auth temporarily.
-
----
-
-# 116. Customer Boundary Regression
-
-Customer direct entry remains public according to current architecture.
-
-R02 must not require staff credentials for customer menu browsing.
-
-R02 must not change customer table-session semantics.
-
-R02 must not change customer capability design.
-
-R02 must not expose internal fixture credentials to customer UI.
-
-R02 must not add internal role data to customer responses.
-
----
-
-# 117. Security Test Priority
-
-R02 security validation should prioritize denied paths.
-
-Priority 1:
-
-```text
-cross-tenant denial
-```
-
-Priority 2:
-
-```text
-cross-branch denial
-```
-
-Priority 3:
-
-```text
-inactive user denial
-```
-
-Priority 4:
-
-```text
-inactive membership denial
-```
-
-Priority 5:
-
-```text
-disabled credential denial
-```
-
-Priority 6:
-
-```text
-self-elevation denial
-```
-
-Priority 7:
-
-```text
-pre-auth direct-table denial
-```
-
----
-
-# 118. Test Naming Standard
-
-Use names that identify actor, action, and expected result.
-
-Good:
-
-```text
-staff A1 cannot resolve order.view for Branch A2
-```
-
-Good:
-
-```text
-suspended membership cannot access Branch A1
-```
-
-Good:
-
-```text
-disabled credential is not returned by pre-auth lookup
-```
-
-Avoid:
-
-```text
-test 1
-works
-should fail
-permissions okay
-```
-
-Clear names reduce future regression diagnosis cost.
-
----
-
-# 119. Test Isolation Standard
-
-SQL tests should run inside transaction when mutation occurs.
-
-Node tests should avoid persistent state leakage.
-
-Credential verification tests should not mutate hash rows unless specifically testing disablement/change behavior.
-
-Membership mutation tests should roll back.
-
-Role mapping mutation tests should roll back.
-
-Throttle tests should use distinct subject digests.
-
-Do not depend on test file execution order.
-
----
-
-# 120. Authorization Data Ownership
-
-Database remains authority for user status.
-
-Database remains authority for membership status.
-
-Database remains authority for tenant scope.
-
-Database remains authority for branch scope.
-
-Database remains authority for role assignment.
-
-Database remains authority for role-permission mapping.
-
-TypeScript fixture constants are test locators only.
-
-TypeScript must not become a second permission database.
-
----
-
-# 121. Permission Code Stability
-
-Permission codes are API-like internal contracts.
-
-R02 tests should reference them explicitly.
-
-Do not rename permission codes in R02 without separate architecture reason.
-
-Do not create aliases solely for test readability.
-
-If permission description changes, tests should not depend on prose description.
-
-Tests should depend on `code`.
-
----
-
-# 122. Role Code Stability
-
-Role codes may be fixture-local.
-
-If new R02 roles are created, choose stable codes.
-
-Suggested synthetic role codes:
-
-```text
-P02_MANAGER
-P02_STAFF
-P02_KITCHEN
-P02_CASHIER
-```
-
-Use these only if coexistence with R04 roles is beneficial.
-
-Do not create duplicate semantic roles if existing roles can be extended safely.
-
-Record final decision in implementation PR.
-
----
-
-# 123. Fixture Coexistence Strategy
-
-Prefer extending existing R04 fixtures where they already represent needed actors.
-
-Do not delete R04 manager merely to add R02 owner.
-
-Do not delete R04 staff merely to add R02 staff.
-
-Add email/credential identity to existing actor where compatible.
-
-Add kitchen/cashier actors only if missing.
-
-Preserve IDs used by existing R04 tests.
-
-Avoid broad fixture renaming.
-
----
-
-# 124. Seed Update Strategy
-
-Add user email fields to existing synthetic users if final schema permits.
-
-Add credential rows after users exist.
-
-Add any new roles before memberships that reference them.
-
-Add role-permission mappings before authorization tests consume them.
-
-Add memberships after role/user/branch rows exist.
-
-Maintain readable sections with comments.
-
-Keep synthetic credential comments explicit.
-
-Do not interleave credential hashes into unrelated FoodFlow menu seed sections.
-
----
-
-# 125. Credential Fixture Comment Standard
-
-Near credential seed rows, include a warning such as:
-
-```text
-Synthetic local/test credential fixtures only.
-Never use these passwords or hashes in production.
-```
-
-Do not claim test hashes are secrets.
-
-Do not hide them in environment variables merely for appearance.
-
-The security boundary is that production does not use them.
-
----
-
-# 126. Auth.js Handoff Requirement
-
-R03 needs deterministic login-positive fixture.
-
-R03 needs wrong-password fixture behavior.
-
-R03 needs disabled-credential fixture.
-
-R03 needs suspended-user fixture.
-
-R03 needs no-membership fixture.
-
-R03 needs stable user IDs.
-
-R03 needs stable normalized emails.
-
-R03 needs stable test passwords.
-
-R03 needs membership expectations.
-
-R03 needs permission expectations for later session claims/access checks.
-
-R02 must provide these before R03 implementation begins.
-
----
-
-# 127. R03 Scope Reserved
-
-R03 owns Auth.js configuration.
-
-R03 owns Credentials provider wiring.
-
-R03 owns live password verification flow.
-
-R03 owns successful Auth.js session creation.
-
-R03 owns invalid-credential login response.
-
-R03 owns replacement of live login authority.
-
-R03 may use R02 fixtures.
-
-R02 must not implement these behaviors early.
-
----
-
-# 128. R04 Scope Reserved
-
-R04 owns workspace/access context.
-
-R04 owns choosing valid tenant/branch membership after identity.
-
-R04 owns revocation/session response semantics.
-
-R04 owns membership changes affecting active access.
-
-R02 provides fixtures for these cases.
-
-R02 does not implement user-facing workspace selection.
-
----
-
-# 129. R05 Scope Reserved
-
-R05 owns route permission enforcement.
-
-R05 owns command permission enforcement.
-
-R05 owns mapping authenticated access context to protected actions.
-
-R02 proves permission data semantics only.
-
-R02 must not rewrite proxy authorization yet.
-
----
-
-# 130. R06 Scope Reserved
-
-R06 owns legacy shared-auth removal.
-
-R06 owns atomic cleanup of temporary credential/session code.
-
-R06 owns Phase 02 security acceptance.
-
-R02 must preserve legacy path until later replacement is proven.
-
----
-
-# 131. Validation Commands — Application
-
-Implementation should use current package scripts.
-
-Expected:
-
+- This file must exist on current main.
+- `Status` must remain `READY`.
+- Current merge/branch policy must be re-read from main.
+- P02/R01 implementation branch must exist before R02 code starts.
+- P02/R01 must contain meaningful implementation code.
+- R01 handoff must be stable enough to consume.
+- R01 normalized-email contract must be re-read.
+- R01 credential encoding contract must be re-read.
+- R01 pre-auth role/function names must be re-read.
+- R01 server identity module paths must be re-read.
+- R02 must not already have another active implementation branch.
+- R02 branch parent must be the latest approved R01 lineage tip.
+
+# 7. Stop Conditions Before R02 Code
+- Stop if no R01 implementation branch exists.
+- Stop if R01 branch contains no meaningful implementation.
+- Stop if R01 code contradicts this document materially.
+- Stop if current main contains a superseding R02 amendment.
+- Stop if an R02 branch already exists and should be continued instead.
+- Stop if a production database action would be required.
+- Stop if implementation requires live Auth.js cutover.
+- Stop if implementation requires route permission cutover.
+- Stop if implementation requires workspace productization.
+- Stop if implementation requires unrelated product work.
+- Report the blocker precisely.
+- Do not silently broaden scope.
+
+# 8. Authority vs Lineage
+- `main` is specification authority.
+- `main` is policy authority.
+- Latest R01 implementation branch is code baseline.
+- R02 must branch from R01 lineage, not automatically from main.
+- R01 implementation merge is not required merely for lineage continuation when current policy permits it.
+- R02 PR must record exact parent branch.
+- R02 PR must record exact parent SHA.
+- R02 PR must record exact R02 head SHA.
+- Do not use a stale R01 branch if a newer approved lineage tip exists.
+- Do not use old PR prose as code authority.
+- Re-audit actual R01 code before implementation.
+- Keep documentation authority separate from implementation ancestry.
+
+# 9. In Scope — Identity Fixtures
+- Stable synthetic internal user IDs.
+- Stable synthetic login emails.
+- Active user positive cases.
+- Suspended user denial case.
+- Disabled credential denial case.
+- Missing credential denial case.
+- No-membership authorization denial case.
+- Tenant A personas.
+- Tenant B persona.
+- Branch A1 persona.
+- Branch A2 persona.
+- Branch B1 persona.
+
+# 10. In Scope — Authorization Fixtures
+- Tenant-wide active membership.
+- Branch A1 active membership.
+- Branch A2 active membership.
+- Branch B1 active membership.
+- Invited membership.
+- Suspended membership.
+- Revoked membership.
+- Manager role.
+- Staff role.
+- Kitchen role when needed.
+- Cashier role when needed.
+- Canonical role-permission mappings.
+
+# 11. In Scope — Validation
+- Credential candidate lookup tests.
+- Password test-vector verification.
+- Membership helper tests.
+- Permission helper tests.
+- RLS allow tests.
+- RLS deny tests.
+- Cross-tenant tests.
+- Cross-branch tests.
+- Inactive-state tests.
+- Pre-auth least-privilege regression.
+- Self-elevation regression.
+- Clean reset reproducibility.
+
+# 12. Out of Scope — Authentication Cutover
+- No live database-backed `/api/auth/login` cutover.
+- No final Auth.js Credentials provider.
+- No final Auth.js handler route.
+- No `foodflow_session` replacement.
+- No JOSE legacy token removal.
+- No `FOODFLOW_INTERNAL_*` removal.
+- No Google OAuth.
+- No social OAuth.
+- No MFA productization.
+- No session authority switch.
+- No production login migration.
+- No user migration tooling.
+
+# 13. Out of Scope — Authorization Productization
+- No workspace chooser UI.
+- No tenant selector UI.
+- No branch selector UI.
+- No AccessContext productization.
+- No live session revocation propagation.
+- No route-level permission guard cutover.
+- No command-level permission guard cutover.
+- No proxy redesign.
+- No admin navigation redesign.
+- No role-management UI.
+- No member-management UI expansion.
+- No customer account authorization.
+
+# 14. Out of Scope — Product Features
+- No customer cart work.
+- No order persistence work.
+- No staff operation workflow work.
+- No kitchen routing work.
+- No realtime work.
+- No merchant payment work.
+- No SaaS billing work.
+- No voice ordering work.
+- No unrelated UI redesign.
+- No unrelated dependency modernization.
+- No production DB mutation.
+- No production secret rotation.
+
+# 15. Existing Database Baseline
+- `app.organizations` already exists.
+- `app.restaurants` already exists.
+- `app.branches` already exists.
+- `app.users` already exists.
+- `app.roles` already exists.
+- `app.permissions` already exists.
+- `app.role_permissions` already exists.
+- `app.memberships` already exists.
+- `private.user_credentials` already exists.
+- `private.login_throttles` already exists.
+- Actor-aware membership helpers already exist.
+- Tenant/branch RLS already exists.
+
+# 16. Existing Seed Baseline
+- Tenant A already exists.
+- Tenant B already exists.
+- Restaurant A already exists.
+- Restaurant B already exists.
+- Branch A1 already exists.
+- Branch A2 already exists.
+- Branch B1 already exists.
+- R04 manager actor already exists.
+- R04 Branch A1 staff actor already exists.
+- R04 Branch A2 staff actor already exists.
+- R04 inactive-state actors already exist.
+- Tenant B staff actor already exists.
+
+# 17. Existing Tenant IDs
+- Tenant A: `00000000-0000-0000-0000-0000000000a1`.
+- Restaurant A: `00000000-0000-0000-0000-0000000000a2`.
+- Branch A1: `00000000-0000-0000-0000-0000000000a3`.
+- Branch A2: `00000000-0000-0000-0000-0000000000ac`.
+- Tenant B: `00000000-0000-0000-0000-0000000000b1`.
+- Restaurant B: `00000000-0000-0000-0000-0000000000b2`.
+- Branch B1: `00000000-0000-0000-0000-0000000000b3`.
+- Reuse these IDs unless final R01 implementation gives a concrete reason not to.
+- Do not duplicate tenants for auth tests.
+- Do not create unnecessary extra branches.
+- Keep fixture footprint compact.
+- Keep IDs deterministic.
+
+# 18. Existing R04 User IDs
+- Tenant A manager: `30000000-0000-4000-8000-0000000000a1`.
+- Branch A1 staff: `30000000-0000-4000-8000-0000000000a2`.
+- Branch A2 staff: `30000000-0000-4000-8000-0000000000a3`.
+- Suspended user: `30000000-0000-4000-8000-0000000000a4`.
+- Invited-membership user: `30000000-0000-4000-8000-0000000000a5`.
+- Suspended-membership user: `30000000-0000-4000-8000-0000000000a6`.
+- Revoked-membership user: `30000000-0000-4000-8000-0000000000a7`.
+- Tenant B staff: `30000000-0000-4000-8000-0000000000b1`.
+- Preserve these IDs where compatible.
+- Prefer adding identity fields to existing actors rather than replacing them.
+- Do not break R04 tests through unnecessary renumbering.
+- Add new personas only when existing actors cannot express the needed contract.
+
+# 19. Existing R04 Role IDs
+- Tenant A manager role: `50000000-0000-4000-8000-0000000000a1`.
+- Tenant A staff role: `50000000-0000-4000-8000-0000000000a2`.
+- Tenant B staff role: `50000000-0000-4000-8000-0000000000b1`.
+- Existing role codes include `R04_MANAGER` and `R04_STAFF`.
+- Reuse existing roles where semantics fit.
+- Add kitchen/cashier roles only when needed.
+- Keep roles tenant-scoped.
+- Do not reuse Tenant A role ID in Tenant B membership.
+- Do not rename existing roles only for aesthetics.
+- Test permission codes rather than display names.
+- Record any new role IDs in implementation PR.
+- Keep role IDs deterministic.
+
+# 20. Canonical Permission Catalog
+- `operations.staff.access`.
+- `operations.kitchen.access`.
+- `operations.cashier.access`.
+- `management.admin.access`.
+- `order.view`.
+- `order.manage`.
+- `service.view`.
+- `service.manage`.
+- `kitchen.view`.
+- `kitchen.manage`.
+- `merchant_payment.view`.
+- `merchant_payment.collect`.
+- `merchant_payment.void`.
+- `menu.view`.
+- `menu.manage`.
+- `settings.view`.
+- `settings.manage`.
+- `member.view`.
+- `member.invite`.
+- `member.manage`.
+- `role.view`.
+- `role.manage`.
+- `audit.view`.
+
+# 21. Permission Catalog Rules
+- Use canonical permission codes already in repository.
+- Do not invent aliases.
+- Do not infer permission from role display name.
+- Do not infer permission from route label.
+- Do not infer permission from UI text.
+- Do not assign all permissions for test convenience.
+- Map only intentional permissions.
+- Test positive permissions explicitly.
+- Test negative permissions explicitly.
+- Keep permission descriptions out of authorization assertions.
+- Use `code` as stable contract.
+- Preserve tenant-local role ownership.
+
+# 22. Fixture Design Principles
+- Every fixture has one documented purpose.
+- Every fixture has stable identifier.
+- Every fixture has stable logical name.
+- Every fixture is synthetic.
+- Every fixture is safe to commit.
+- Every fixture avoids production identifiers.
+- Every credential fixture is test-only.
+- Every fixture is reproducible after reset.
+- No random UUID generation in durable seed.
+- No insertion-order assumptions.
+- No `limit 1` identity lookup.
+- No unused fixture rows.
+
+# 23. Required Persona Set
+- `owner_a`.
+- `staff_a1`.
+- `staff_a2`.
+- `kitchen_a1`.
+- `cashier_a2`.
+- `staff_b1`.
+- `suspended_user_a`.
+- `invited_membership_a`.
+- `suspended_membership_a`.
+- `revoked_membership_a`.
+- `disabled_credential_a`.
+- `no_credential_a`.
+- `no_membership_a` when useful for R04 handoff.
+
+# 24. Owner Persona
+- User status ACTIVE.
+- Credential enabled.
+- Tenant A membership ACTIVE.
+- Membership branch_id NULL.
+- Management role tenant = Tenant A.
+- Management permissions explicit.
+- Tenant A tenant-level membership check ALLOW.
+- Branch A1 membership check ALLOW.
+- Branch A2 membership check ALLOW.
+- Tenant B membership check DENY.
+- Tenant B data access DENY.
+- Credential lookup ALLOW.
+
+# 25. Staff A1 Persona
+- User status ACTIVE.
+- Credential enabled.
+- Membership ACTIVE.
+- Tenant = Tenant A.
+- Branch = A1.
+- Staff permission mapping explicit.
+- Branch A1 membership ALLOW.
+- Tenant-level membership with null branch DENY.
+- Branch A2 membership DENY.
+- Tenant B membership DENY.
+- Privileged management permissions DENY.
+- Credential lookup ALLOW.
+
+# 26. Staff A2 Persona
+- User status ACTIVE.
+- Credential enabled.
+- Membership ACTIVE.
+- Tenant = Tenant A.
+- Branch = A2.
+- Staff permission mapping explicit.
+- Branch A2 membership ALLOW.
+- Tenant-level membership with null branch DENY.
+- Branch A1 membership DENY.
+- Tenant B membership DENY.
+- Privileged management permissions DENY.
+- Credential lookup ALLOW.
+
+# 27. Kitchen Persona
+- User status ACTIVE.
+- Credential enabled when needed for R03 tests.
+- Membership ACTIVE.
+- Tenant = Tenant A.
+- Preferred branch = A1.
+- `operations.kitchen.access` ALLOW.
+- `kitchen.view` ALLOW.
+- `kitchen.manage` ALLOW when mapped.
+- `operations.cashier.access` DENY.
+- `merchant_payment.collect` DENY unless explicitly mapped.
+- `management.admin.access` DENY.
+- Cross-branch and cross-tenant DENY.
+
+# 28. Cashier Persona
+- User status ACTIVE.
+- Credential enabled when needed for R03 tests.
+- Membership ACTIVE.
+- Tenant = Tenant A.
+- Preferred branch = A2.
+- `operations.cashier.access` ALLOW.
+- `merchant_payment.view` ALLOW.
+- `merchant_payment.collect` ALLOW.
+- `merchant_payment.void` only if intentionally mapped.
+- `operations.kitchen.access` DENY.
+- `management.admin.access` DENY.
+- Cross-branch and cross-tenant DENY.
+
+# 29. Tenant B Persona
+- User status ACTIVE.
+- Credential enabled.
+- Membership ACTIVE.
+- Tenant = Tenant B.
+- Branch = B1.
+- Role belongs to Tenant B.
+- Branch B1 membership ALLOW.
+- Tenant A membership DENY.
+- Branch A1 access DENY.
+- Branch A2 access DENY.
+- Tenant A role IDs never reused.
+- Credential lookup independent of Tenant A state.
+
+# 30. Suspended User Persona
+- User status must be the actual non-active schema value, currently known as `SUSPENDED`.
+- Credential may remain enabled for denial proof.
+- Membership may remain ACTIVE for denial proof.
+- Pre-auth candidate lookup DENY.
+- Membership helper DENY.
+- Permission helper DENY.
+- RLS protected visibility DENY.
+- ACTIVE membership must not rescue suspended user.
+- Valid role must not rescue suspended user.
+- Valid hash must not rescue suspended user.
+- Keep this fixture stable for R03 denial tests.
+- Do not delete membership merely to make test pass.
+
+# 31. Invited Membership Persona
+- User status ACTIVE.
+- Credential may be enabled.
+- Membership status INVITED.
+- Credential lookup may identify user if auth/authz remain separate.
+- Membership authorization DENY.
+- Permission authorization DENY.
+- RLS DENY.
+- No workspace authority.
+- Keep status explicit.
+- Do not convert INVITED to ACTIVE in test setup.
+- Preserve as R04 access-context fixture.
+- Separate authentication from authorization.
+
+# 32. Suspended Membership Persona
+- User status ACTIVE.
+- Credential may be enabled.
+- Membership status SUSPENDED.
+- Membership authorization DENY.
+- Permission authorization DENY.
+- RLS DENY.
+- User global status remains ACTIVE.
+- Organization access can therefore be revoked independently.
+- Preserve fixture for R04 revocation semantics.
+- Do not change user to SUSPENDED just to produce denial.
+- Keep tenant/branch fields valid so status is the denial reason.
+- Keep role valid so status is the denial reason.
+
+# 33. Revoked Membership Persona
+- User status ACTIVE.
+- Credential may be enabled.
+- Membership status REVOKED.
+- Membership authorization DENY.
+- Permission authorization DENY.
+- RLS DENY.
+- Role assignment must not reactivate access.
+- Branch context injection must not reactivate access.
+- Tenant context injection must not reactivate access.
+- Preserve as durable R04 revocation fixture.
+- Keep user identity otherwise valid.
+- Keep denial reason isolated to membership status.
+
+# 34. Disabled Credential Persona
+- User status ACTIVE.
+- Membership may be ACTIVE.
+- Credential row exists.
+- `disabled_at` non-null.
+- Password hash syntactically valid.
+- Algorithm supported.
+- Pre-auth lookup returns no eligible candidate.
+- User status must not override disabled credential.
+- Membership status must not override disabled credential.
+- R03 later uses this for login denial.
+- R02 does not wire live route.
+- Keep fixture deterministic.
+
+# 35. No-Credential Persona
+- User status ACTIVE.
+- Membership may be ACTIVE.
+- No credential row exists.
+- Pre-auth lookup returns no eligible candidate.
+- Missing credential must not cause unhandled DB error.
+- No legacy fallback inside credential repository.
+- Keep fixture distinct from disabled credential.
+- Keep synthetic email stable.
+- Preserve for R03 no-credential login denial.
+- Do not seed fake empty hash.
+- Do not use null hash row.
+- Absence itself is the contract.
+
+# 36. No-Membership Persona
+- User status ACTIVE.
+- Credential enabled.
+- No membership for Tenant A.
+- No membership for Tenant B.
+- Credential lookup may succeed.
+- Membership resolution DENY.
+- Permission resolution DENY.
+- RLS tenant/branch access DENY.
+- Proves authentication is not authorization.
+- Useful for R04 no-workspace behavior.
+- Do not give hidden tenant-wide role.
+- Keep identity otherwise valid.
+
+# 37. Canonical Email Contract
+- Inherit normalized-email contract from final R01 implementation.
+- Expected semantic normalization: `lower(btrim(email))` unless R01 differs.
+- Do not redefine normalization independently in R02.
+- Use synthetic reserved-domain emails.
+- Suggested owner email: `owner.a@flow.test`.
+- Suggested staff A1 email: `staff.a1@flow.test`.
+- Suggested staff A2 email: `staff.a2@flow.test`.
+- Suggested kitchen email: `kitchen.a1@flow.test`.
+- Suggested cashier email: `cashier.a2@flow.test`.
+- Suggested Tenant B email: `staff.b1@flow.test`.
+- No production email.
+- No Gmail address.
+
+# 38. Email Fixture Validation
+- Every positive email normalizes deterministically.
+- No two durable fixtures normalize to same value.
+- Case variation resolves same identity where lookup contract requires it.
+- Surrounding whitespace variation resolves same identity where lookup normalizes input.
+- Unknown email returns no candidate.
+- Durable seed should not contain accidental surrounding whitespace.
+- Collision test rows should remain transactional/test-only.
+- Collision insert should fail if R01 uniqueness requires it.
+- Collision update should fail if R01 uniqueness requires it.
+- Do not depend on insertion order.
+- Do not depend on locale-specific browser normalization.
+- Use database contract as authority.
+
+# 39. Credential Algorithm Contract
+- Inherit supported algorithm from R01.
+- Pre-R01 schema currently declares `scrypt-v1`.
+- If R01 keeps `scrypt-v1`, R02 uses it.
+- If R01 defines canonical encoded format, R02 uses exact format.
+- No second encoding format.
+- No bcrypt switch.
+- No Argon2 switch without explicit architecture amendment.
+- No SHA-only password hashing.
+- No reversible password encryption.
+- No plaintext password storage.
+- Record final algorithm in PR.
+- Record fixture encoding strategy in PR.
+
+# 40. Test Password Strategy
+- Use deterministic test-only input values.
+- Centralize them in test-only code or documented fixture section.
+- Never describe them as production defaults.
+- Never use real owner/dev/finance credentials.
+- Never load production passwords from env for fixtures.
+- Suggested pattern: `flow-test-owner-a-v1`.
+- Suggested pattern: `flow-test-staff-a1-v1`.
+- Suggested pattern: `flow-test-kitchen-a1-v1`.
+- Suggested pattern: `flow-test-cashier-a2-v1`.
+- Avoid scattering literals through many test files.
+- Runtime production code must not import test passwords.
+- PR must identify test-only nature clearly.
+
+# 41. Credential Hash Strategy
+- Prefer deterministic known test vectors.
+- Vectors must match final R01 verifier.
+- Hashes may be committed because they are synthetic test data.
+- Hashes must not be treated as production secrets.
+- If salts are encoded, vectors must include expected format.
+- Known correct password must verify.
+- Known wrong password must fail.
+- Malformed encoding coverage remains in R01 or is extended if missing.
+- Disabled credential lookup should stop before verification.
+- Unknown user should preserve R01 dummy-KDF capability if applicable.
+- Do not generate different logical credentials on each reset without purpose.
+- Do not log hashes.
+
+# 42. Seed Credential Safety
+- Add credential rows only after users exist.
+- Add comments marking them local/test-only.
+- No production credential.
+- No plaintext password DB column.
+- Enabled credentials have `disabled_at IS NULL`.
+- Disabled fixture has non-null `disabled_at`.
+- Algorithm field matches R01 contract.
+- `password_hash` non-empty.
+- No production secret env dependency.
+- No Auth.js runtime dependency for seed.
+- No throttle failure rows seeded by default.
+- Reset remains deterministic.
+
+# 43. Deterministic ID Strategy
+- Reuse R04 actor IDs where meaningful.
+- Use fixed UUIDs for new personas.
+- Use fixed UUIDs for new roles.
+- Use fixed UUIDs for new memberships.
+- Avoid `gen_random_uuid()` in durable fixture seed.
+- Avoid sequence-order assumptions.
+- Avoid password-derived IDs.
+- Avoid email-hash-derived IDs.
+- Use visibly synthetic ranges.
+- Document new IDs in PR.
+- Keep IDs stable for R03–R06 tests.
+- Do not renumber existing R04 IDs.
+
+# 44. Role Design
+- Minimum logical role set: manager/admin, staff, kitchen, cashier.
+- Tenant B may use its own staff role.
+- Roles remain tenant-scoped.
+- Tenant A role ID never used in Tenant B membership.
+- Existing R04 roles may be reused.
+- Kitchen/cashier roles added only when needed.
+- Do not create every hypothetical production role.
+- Do not grant every permission for convenience.
+- Keep role codes stable.
+- Use permission codes as behavior authority.
+- Record added/reused roles in PR.
+- Avoid cosmetic role migration.
+
+# 45. Manager Permission Contract
+- Preserve existing `order.view` if still canonical.
+- Preserve `member.view` if still canonical.
+- Preserve `member.invite` if still canonical.
+- Preserve `member.manage` if still canonical.
+- Preserve `role.view` if still canonical.
+- Preserve `role.manage` if still canonical.
+- Add `management.admin.access` only if intended.
+- Add settings permissions only if later route contract needs them.
+- Do not grant all catalog permissions by default.
+- Test at least three positive manager permissions.
+- Test at least one intentionally absent permission when applicable.
+- Tenant B remains denied.
+
+# 46. Staff Permission Contract
+- Likely `operations.staff.access`.
+- Likely `order.view`.
+- `order.manage` only if intended.
+- No `management.admin.access` by default.
+- No `role.manage`.
+- No `member.manage`.
+- No `merchant_payment.void` by default.
+- Positive permission tested on exact branch.
+- Same permission denied on sibling branch.
+- Same permission denied cross-tenant.
+- Tenant-wide management permission denied.
+- Keep mappings explicit.
+
+# 47. Kitchen Permission Contract
+- `operations.kitchen.access` ALLOW.
+- `kitchen.view` ALLOW.
+- `kitchen.manage` ALLOW when intended.
+- `order.view` only if kitchen workflow needs it.
+- `operations.cashier.access` DENY.
+- `merchant_payment.collect` DENY unless intentionally mapped.
+- `management.admin.access` DENY.
+- `member.manage` DENY.
+- `role.manage` DENY.
+- Exact branch ALLOW.
+- Sibling branch DENY.
+- Cross-tenant DENY.
+
+# 48. Cashier Permission Contract
+- `operations.cashier.access` ALLOW.
+- `merchant_payment.view` ALLOW.
+- `merchant_payment.collect` ALLOW.
+- `merchant_payment.void` only if intentionally assigned.
+- `order.view` only if operationally required.
+- `operations.kitchen.access` DENY.
+- `kitchen.manage` DENY.
+- `management.admin.access` DENY.
+- `member.manage` DENY.
+- `role.manage` DENY.
+- Exact branch ALLOW.
+- Sibling/cross-tenant DENY.
+
+# 49. Tenant-Wide Membership Contract
+- `branch_id = NULL`.
+- User ACTIVE.
+- Membership ACTIVE.
+- Role tenant equals membership tenant.
+- Tenant-level helper ALLOW for same tenant.
+- Branch A1 helper ALLOW for same tenant.
+- Branch A2 helper ALLOW for same tenant.
+- Tenant B helper DENY.
+- Tenant-wide scope does not imply every permission.
+- Permission mapping remains required.
+- RLS follows actor helper semantics.
+- Preserve R04 null-target semantics.
+
+# 50. Branch-Scoped Membership Contract
+- Exact branch UUID stored.
+- User ACTIVE.
+- Membership ACTIVE.
+- Role tenant equals membership tenant.
+- Branch tenant equals membership tenant.
+- Exact branch helper ALLOW.
+- Sibling branch helper DENY.
+- Tenant-level null-target helper DENY under R04 semantics.
+- Cross-tenant helper DENY.
+- Permission mapping remains required.
+- Branch scope never widened by role privilege.
+- Keep branch ID explicit.
+
+# 51. Membership Status Contract
+- ACTIVE authorizes when all other conditions pass.
+- INVITED denies.
+- SUSPENDED denies.
+- REVOKED denies.
+- Use actual schema statuses only.
+- Do not invent `INACTIVE` membership status unless schema supports it.
+- Each status gets separate test fixture.
+- Each status gets separate membership-helper test.
+- Each status gets separate permission-helper test.
+- Each status gets separate RLS test where useful.
+- Keep actor otherwise valid to isolate denial reason.
+- Preserve status semantics for R04.
+
+# 52. User Status Contract
+- Use actual schema-supported statuses.
+- Current known ACTIVE status authorizes candidate eligibility.
+- Current known SUSPENDED status denies candidate eligibility.
+- Do not invent unsupported `INACTIVE` user status.
+- Keep membership valid when testing user status denial.
+- Keep credential valid when testing user status denial.
+- Test candidate lookup denial.
+- Test membership helper denial.
+- Test permission helper denial.
+- Test RLS denial.
+- Preserve semantic distinction between user status and membership status.
+- Record exact status values in PR.
+
+# 53. Role-Permission Integrity
+- Every role-permission row references existing role.
+- Every role-permission row references existing permission.
+- Prefer lookup by permission `code` during seed.
+- Do not depend on permission row order.
+- Do not duplicate mappings.
+- Preserve unique constraints.
+- Tenant-local role owns mapping.
+- Tests may assert focused mapping counts.
+- Tests must assert important absent mappings.
+- No implicit permission inheritance unless schema defines it.
+- No role-display-name authorization.
+- No UI-label authorization.
+
+# 54. Membership Referential Integrity
+- Membership user exists.
+- Membership tenant exists.
+- Membership role exists.
+- Branch-scoped membership branch exists.
+- Role tenant matches membership tenant.
+- Branch tenant matches membership tenant.
+- Cross-tenant role assignment must not create authority.
+- Cross-tenant branch assignment must not create authority.
+- Keep foreign-key constraints enabled.
+- Do not disable constraints for fixture setup.
+- Test invalid cross-scope cases transactionally if useful.
+- Keep seed insertion order valid.
+
+# 55. Pre-Auth Lookup Contract
+- ACTIVE + enabled credential returns candidate.
+- Suspended/non-active user returns no candidate.
+- ACTIVE + disabled credential returns no candidate.
+- ACTIVE + missing credential returns no candidate.
+- Unknown email returns no candidate.
+- Candidate user ID equals deterministic fixture ID.
+- Candidate normalized email equals expected synthetic email.
+- Candidate algorithm equals supported R01 algorithm.
+- Candidate hash remains server-only.
+- Membership state should not become credential lookup authority unless R01 explicitly says so.
+- Authentication remains separate from authorization.
+- No tenant/branch input accepted as credential authority.
+
+# 56. Password Verification Contract
+- Known valid test password verifies.
+- Wrong password fails.
+- Supported algorithm parses.
+- Malformed encoding fails safely.
+- Unsupported algorithm fails safely.
+- Constant-time compare remains R01 responsibility and regression.
+- Dummy KDF path remains available if R01 defines one.
+- Verification does not create session in R02.
+- Verification does not mutate membership.
+- Verification does not choose tenant.
+- Verification does not choose branch.
+- No secret value logged.
+
+# 57. Pre-Auth Least-Privilege Regression
+- Pre-auth role cannot broadly select `app.users`.
+- Pre-auth role cannot broadly select `app.memberships`.
+- Pre-auth role cannot directly select `private.user_credentials`.
+- Pre-auth role cannot directly select `private.login_throttles`.
+- Pre-auth role cannot select `foodflow.orders` broadly.
+- Pre-auth role cannot select `payments.payments` broadly.
+- Pre-auth role cannot select `audit.events` broadly.
+- Approved credential function remains executable.
+- Approved throttle functions remain executable as designed.
+- R02 fixture convenience never broadens grants.
+- R01 role-denial tests remain green.
+- No BYPASSRLS introduced.
+
+# 58. Runtime Role Regression
+- `flow_runtime` remains tenant/branch/actor scoped.
+- No direct credential access granted.
+- No direct throttle access granted.
+- Missing actor remains deny-by-default.
+- Wrong tenant remains deny-by-default.
+- Wrong branch remains deny-by-default.
+- Valid exact branch remains allowed when membership active.
+- Tenant-wide actor remains bounded to own tenant.
+- Context values remain transaction-local.
+- R02 tests use real deterministic actor IDs.
+- No fake zero actor identity.
+- No privilege broadening for test convenience.
+
+# 59. Identity Role Regression
+- `flow_identity` remains post-identity.
+- `flow_identity` does not become pre-auth credential reader.
+- No broad credential grants.
+- Self/membership-read semantics preserved.
+- Real deterministic user IDs used.
+- R01 identity transaction behavior preserved.
+- No browser-supplied actor accepted.
+- No tenant choice inferred from credential alone.
+- No branch choice inferred from credential alone.
+- Keep R03/R04 boundaries intact.
+- Test role/context cleanup remains green.
+- No pool role leakage.
+
+# 60. RLS Actorless Contract
+- Set Tenant A context.
+- Clear actor context.
+- Use `flow_runtime`.
+- Protected branch visibility must be zero.
+- Protected organization visibility must be zero where actor-protected.
+- Representative FoodFlow protected row visibility must be zero where applicable.
+- No fixture addition may weaken actorless default-deny.
+- No permissive test-only RLS policy may persist.
+- Temporary test grants must roll back.
+- Existing actorless R04 assertion remains green.
+- Missing actor is security failure, not anonymous staff access.
+- Keep customer public capabilities separate.
+
+# 61. RLS Manager Contract
+- Actor = Tenant A manager.
+- Tenant = Tenant A.
+- Tenant-level organization visibility ALLOW.
+- Branch A1 visibility ALLOW.
+- Branch A2 visibility ALLOW.
+- Tenant B organization DENY.
+- Branch B1 DENY.
+- Permission mapping still required for privileged actions.
+- Tenant-wide membership does not imply cross-tenant access.
+- Keep same-tenant breadth intentional.
+- Preserve R04 helper semantics.
+- Use deterministic IDs in tests.
+
+# 62. RLS Staff A1 Contract
+- Actor = Branch A1 staff.
+- Tenant = Tenant A.
+- Branch = A1.
+- Branch A1 visibility ALLOW.
+- Branch A2 visibility DENY.
+- Tenant-wide organization visibility DENY under accepted R04 semantics.
+- Tenant B visibility DENY.
+- Assigned permission on A1 ALLOW.
+- Same permission on A2 DENY.
+- Management permission DENY.
+- No context injection widens scope.
+- Keep branch exactness explicit.
+
+# 63. RLS Staff A2 Contract
+- Actor = Branch A2 staff.
+- Tenant = Tenant A.
+- Branch = A2.
+- Branch A2 visibility ALLOW.
+- Branch A1 visibility DENY.
+- Tenant-wide organization visibility DENY.
+- Tenant B visibility DENY.
+- Assigned permission on A2 ALLOW.
+- Same permission on A1 DENY.
+- Management permission DENY.
+- No same-tenant sibling leakage.
+- Keep branch exactness explicit.
+- Use independent persona from A1.
+
+# 64. RLS Tenant B Contract
+- Actor = Tenant B staff.
+- Tenant = Tenant B.
+- Branch = B1.
+- Branch B1 visibility ALLOW.
+- Tenant A organization DENY.
+- Branch A1 DENY.
+- Branch A2 DENY.
+- Tenant A roles do not grant access.
+- Tenant A permissions do not grant access through wrong membership.
+- Tenant A tenant-wide manager cannot see B1.
+- Cross-tenant denial tested both directions.
+- Use Tenant B local role.
+- Keep data isolation independent of display names.
+
+# 65. RLS Inactive-State Contract
+- Suspended user protected visibility DENY.
+- Invited membership protected visibility DENY.
+- Suspended membership protected visibility DENY.
+- Revoked membership protected visibility DENY.
+- No-membership user protected visibility DENY.
+- Keep tenant/branch values otherwise valid.
+- Keep roles otherwise valid.
+- Keep data rows otherwise present.
+- Test denial reason independently.
+- Do not collapse all states into one assertion.
+- Keep separate diagnostic messages.
+- Preserve future revocation fixtures.
+
+# 66. Permission Positive Matrix
+- Manager `member.manage` ALLOW when mapped.
+- Manager `role.manage` ALLOW when mapped.
+- Manager `order.view` ALLOW when mapped.
+- Staff A1 `operations.staff.access` ALLOW when mapped.
+- Staff A1 `order.view` ALLOW when mapped.
+- Kitchen A1 `operations.kitchen.access` ALLOW.
+- Kitchen A1 `kitchen.view` ALLOW.
+- Kitchen A1 `kitchen.manage` ALLOW when mapped.
+- Cashier A2 `operations.cashier.access` ALLOW.
+- Cashier A2 `merchant_payment.view` ALLOW.
+- Cashier A2 `merchant_payment.collect` ALLOW.
+- Tenant B staff expected local permissions ALLOW.
+
+# 67. Permission Negative Matrix
+- Staff A1 `role.manage` DENY.
+- Staff A1 `member.manage` DENY.
+- Staff A1 `management.admin.access` DENY.
+- Staff A1 `order.view` at A2 DENY.
+- Kitchen A1 `operations.cashier.access` DENY.
+- Kitchen A1 `merchant_payment.collect` DENY unless mapped.
+- Kitchen A1 `role.manage` DENY.
+- Cashier A2 `operations.kitchen.access` DENY.
+- Cashier A2 `kitchen.manage` DENY.
+- Cashier A2 `role.manage` DENY.
+- Tenant B staff requesting Tenant A permission DENY.
+- Branch A1 staff requesting Tenant B permission DENY.
+
+# 68. Self-Elevation Regression
+- Staff cannot change own role to manager.
+- Staff cannot broaden membership from branch to tenant-wide.
+- Staff cannot change membership tenant to another tenant.
+- Staff cannot change branch to sibling branch for privilege.
+- Staff cannot insert privileged role-permission mapping.
+- Staff cannot update manager role mapping.
+- Filtered mutation must not silently elevate.
+- Persisted role ID remains unchanged after attempted escalation.
+- Persisted branch scope remains unchanged after attempted broadening.
+- Existing R04 self-elevation assertions remain green.
+- Do not weaken RLS to make seed convenient.
+- No admin bypass introduced for tests.
+
+# 69. Seed Mutation Policy
+- Seed defines deterministic reset baseline.
+- SQL tests may mutate inside transactions.
+- Mutating SQL tests should rollback.
+- Integration tests must clean temporary rows.
+- Test files must not depend on previous test mutation.
+- Do not require test-order cleanup.
+- Credential tests should avoid permanently changing hash rows.
+- Membership mutation tests must restore state by rollback/reset.
+- Role mapping tests must restore state.
+- Throttle test subjects must not pollute durable fixture state.
+- No test-only persistent bypass grants.
+- Reset should restore same logical fixture contract.
+
+# 70. Seed Idempotency and Reproducibility
+- `supabase db reset --local` recreates same fixture IDs.
+- Same reset recreates same emails.
+- Same reset recreates same membership scopes.
+- Same reset recreates same role mappings.
+- Same reset recreates same credential eligibility.
+- Same reset recreates same negative cases.
+- No random UUIDs.
+- No external APIs.
+- No Auth.js server requirement.
+- No Vercel environment requirement.
+- No production secrets.
+- Avoid assertions on volatile timestamps.
+
+# 71. Schema Change Policy
+- Default expectation = no R02 schema change.
+- R02 is primarily fixture/test work.
+- Migration allowed only for a genuine structural blocker.
+- Missing invariant may justify forward migration.
+- Missing uniqueness may justify forward migration only if R01 did not solve it.
+- Cross-tenant constraint defect may justify migration.
+- Test convenience alone does not justify schema column.
+- Historical P01 migrations must not be rewritten.
+- Historical R01 migration must not be rewritten.
+- Approved migration must be clean-reset safe.
+- Approved migration must have tests.
+- PR must explain why schema change was unavoidable.
+
+# 72. Generated Type Policy
+- No schema change should mean no generated type change.
+- Unexpected generated diff must be investigated.
+- Do not manually edit generated types.
+- Approved schema change requires regeneration.
+- Inspect generated diff.
+- Commit only expected changes.
+- Run type drift verification.
+- Fixture row changes alone do not require type changes.
+- Test constants must use generated runtime types only where useful.
+- Do not import generated DB types into client components.
+- Record generated-type result in PR.
+- Keep R01 type baseline intact.
+
+# 73. Test Fixture Helper
+- Suggested path: `apps/web/next-flow/tests/fixtures/identity.ts`.
+- Export stable actor IDs.
+- Export tenant IDs.
+- Export branch IDs.
+- Export synthetic emails.
+- Export test-only passwords when needed.
+- Export expected permission codes.
+- Keep file under test-only path.
+- Do not import React/UI.
+- Do not issue sessions.
+- Do not query database directly.
+- Do not become production identity configuration.
+
+# 74. Credential Vector Helper
+- Optional path: `apps/web/next-flow/tests/fixtures/credential-vectors.ts`.
+- Create only if it reduces duplication.
+- Keep synthetic test vectors only.
+- Match exact R01 algorithm.
+- Match exact R01 encoding format.
+- Include positive vector.
+- Include wrong-password expectation.
+- Avoid production secret names.
+- Avoid runtime production imports.
+- Do not replace password-verifier unit tests.
+- Document vector purpose.
+- Keep deterministic values stable for R03.
+
+# 75. SQL Test File
+- Suggested path: `supabase/tests/database/p02_r02_identity_authorization_fixtures.test.sql`.
+- Use pgTAP conventions already present.
+- Use explicit plan count.
+- Use precise assertion messages.
+- Reference stable IDs/codes.
+- Test fixture presence.
+- Test credential state.
+- Test membership state.
+- Test permission mapping.
+- Test RLS positive cases.
+- Test RLS negative cases.
+- Test self-elevation regression.
+
+# 76. SQL Fixture Presence Tests
+- Tenant A exists.
+- Tenant B exists.
+- Branch A1 exists.
+- Branch A2 exists.
+- Branch B1 exists.
+- Owner/manager user exists.
+- Staff A1 exists.
+- Staff A2 exists.
+- Kitchen actor exists when added.
+- Cashier actor exists when added.
+- Tenant B actor exists.
+- Inactive/credential-denial personas exist.
+
+# 77. SQL Credential State Tests
+- Positive credential rows exist.
+- Algorithm equals supported value.
+- Hash non-empty.
+- Hash not equal plaintext test password.
+- Enabled `disabled_at` null.
+- Disabled fixture `disabled_at` non-null.
+- No-credential fixture has zero credential rows.
+- One credential row per credential-bearing user.
+- Primary key uniqueness preserved.
+- No production email in credential fixtures.
+- No production secret dependency.
+- Pre-auth lookup behavior matches expected eligibility.
+
+# 78. SQL Email Tests
+- Owner normalized email matches expected.
+- Staff A1 normalized email matches expected.
+- Staff A2 normalized email matches expected.
+- Kitchen normalized email matches expected.
+- Cashier normalized email matches expected.
+- Tenant B normalized email matches expected.
+- Case variation resolves same identity.
+- Whitespace variation resolves same identity when contract requires it.
+- Unknown email returns no candidate.
+- Collision insert fails when uniqueness applies.
+- Collision update fails when uniqueness applies.
+- No ambiguous durable fixture identities.
+
+# 79. SQL Membership Tests
+- Manager membership ACTIVE.
+- Manager branch_id NULL.
+- Staff A1 membership ACTIVE and branch A1.
+- Staff A2 membership ACTIVE and branch A2.
+- Kitchen membership ACTIVE and exact branch.
+- Cashier membership ACTIVE and exact branch.
+- Tenant B membership ACTIVE and branch B1.
+- Invited membership = INVITED.
+- Suspended membership = SUSPENDED.
+- Revoked membership = REVOKED.
+- Role tenant equals membership tenant.
+- Branch tenant equals membership tenant.
+
+# 80. SQL Role Tests
+- Manager role exists under Tenant A.
+- Staff role exists under Tenant A.
+- Kitchen role exists when introduced.
+- Cashier role exists when introduced.
+- Tenant B staff role exists under Tenant B.
+- Tenant A role ID not reused by Tenant B membership.
+- Stable role code recorded.
+- Role display name not used as authorization check.
+- Expected role-permission rows exist.
+- Unexpected privileged mappings absent.
+- No duplicate mapping rows.
+- Tenant-local ownership preserved.
+
+# 81. SQL Membership Helper Matrix
+- Manager + Tenant A + null = true.
+- Manager + Tenant A + A1 = true.
+- Manager + Tenant A + A2 = true.
+- Manager + Tenant B + B1 = false.
+- Staff A1 + Tenant A + null = false.
+- Staff A1 + Tenant A + A1 = true.
+- Staff A1 + Tenant A + A2 = false.
+- Staff A1 + Tenant B + B1 = false.
+- Staff A2 + A2 = true.
+- Staff A2 + A1 = false.
+- Tenant B staff + B1 = true.
+- Inactive-state actors = false.
+
+# 82. SQL Permission Helper Matrix
+- Manager + `member.manage` + Tenant A = true when mapped.
+- Manager + `role.manage` + Tenant A = true when mapped.
+- Staff A1 + `order.view` + A1 = true when mapped.
+- Staff A1 + `role.manage` + A1 = false.
+- Staff A1 + `order.view` + A2 = false.
+- Kitchen A1 + kitchen permission + A1 = true.
+- Kitchen A1 + cashier permission + A1 = false.
+- Cashier A2 + collect permission + A2 = true.
+- Cashier A2 + kitchen manage + A2 = false.
+- Tenant B staff requesting Tenant A permission = false.
+- Suspended user permission = false.
+- Non-active membership permission = false.
+
+# 83. SQL RLS Positive Tests
+- Manager sees Tenant A organization.
+- Manager sees Branch A1.
+- Manager sees Branch A2.
+- Staff A1 sees Branch A1.
+- Staff A2 sees Branch A2.
+- Kitchen A1 sees only relevant protected branch data when seeded.
+- Cashier A2 sees only relevant protected branch data when seeded.
+- Tenant B staff sees Branch B1.
+- Positive cases remain small.
+- No large domain dataset added solely for auth tests.
+- Queries use exact IDs.
+- Tests execute under constrained role.
+
+# 84. SQL RLS Negative Tests
+- Actorless sees no protected branches.
+- Staff A1 cannot see A2.
+- Staff A2 cannot see A1.
+- Tenant A manager cannot see Tenant B.
+- Tenant B staff cannot see Tenant A.
+- Suspended user cannot see A1.
+- Invited membership cannot see A1.
+- Suspended membership cannot see A1.
+- Revoked membership cannot see A1.
+- No-membership user cannot see protected Tenant A rows.
+- Wrong tenant context cannot broaden access.
+- Wrong branch context cannot broaden access.
+
+# 85. SQL Self-Elevation Tests
+- Staff attempts role escalation.
+- Role remains unchanged.
+- Staff attempts branch broadening.
+- Branch remains unchanged.
+- Staff attempts tenant reassignment.
+- Tenant remains unchanged.
+- Staff attempts role-permission insertion.
+- Privileged mapping not created.
+- Existing R04 assertions remain green.
+- No elevated test role used to hide failure.
+- No RLS disablement.
+- No admin bypass.
+
+# 86. SQL Pre-Auth Least-Privilege Tests
+- Direct `app.users` broad select denied.
+- Direct `app.memberships` broad select denied.
+- Direct `private.user_credentials` select denied.
+- Direct `private.login_throttles` select denied.
+- Direct `foodflow.orders` select denied.
+- Direct `payments.payments` select denied.
+- Direct `audit.events` select denied.
+- Approved credential lookup function allowed.
+- Approved throttle functions remain limited.
+- Public execute remains denied where R01 requires.
+- `flow_runtime` credential access remains denied.
+- `flow_identity` credential access remains denied.
+
+# 87. Node Integration Test File
+- Suggested path: `apps/web/next-flow/tests/integration/identity-authorization-contract.test.ts`.
+- Consume real DB runtime.
+- Consume deterministic fixture constants.
+- Consume R01 credential repository.
+- Consume R01 verifier.
+- Consume actor-aware transaction helpers.
+- Do not call live Auth.js provider.
+- Do not create live session.
+- Do not replace legacy login route.
+- Keep database setup explicit.
+- Keep cleanup deterministic.
+- Keep failure output secret-safe.
+
+# 88. Integration — Positive Credentials
+- Lookup owner by synthetic email.
+- Candidate non-null.
+- Candidate user ID matches fixture.
+- Candidate normalized email matches fixture.
+- Known owner test password verifies.
+- Repeat staff A1 positive lookup.
+- Repeat staff A2 positive lookup when credential-bearing.
+- Repeat kitchen positive lookup when credential-bearing.
+- Repeat cashier positive lookup when credential-bearing.
+- Do not assert raw hash in error text.
+- Do not create session.
+- Do not mutate membership.
+
+# 89. Integration — Credential Denials
+- Wrong password fails.
+- Disabled credential lookup returns no candidate.
+- Suspended user lookup returns no candidate.
+- No-credential user lookup returns no candidate.
+- Unknown email returns no candidate.
+- No hardcoded fallback credential inside repository.
+- No distinction leaked to public response because R02 has no live response path.
+- Malformed hash behavior remains safe.
+- Unsupported algorithm remains safe.
+- Test password bounds remain inherited from R01.
+- No secret logging.
+- No session issuance.
+
+# 90. Integration — Membership
+- Manager tenant-wide membership resolves.
+- Staff A1 exact membership resolves.
+- Staff A2 exact membership resolves.
+- Tenant B membership resolves.
+- Invited membership does not authorize.
+- Suspended membership does not authorize.
+- Revoked membership does not authorize.
+- No-membership actor does not authorize.
+- Tenant A actor cannot resolve Tenant B access.
+- Branch A1 actor cannot resolve A2 access.
+- Branch A2 actor cannot resolve A1 access.
+- No workspace selection productization.
+
+# 91. Integration — Permission
+- Manager positive permission resolves.
+- Manager negative permission resolves false when intentionally absent.
+- Staff positive permission resolves.
+- Staff management permission resolves false.
+- Kitchen positive permission resolves.
+- Kitchen cashier permission resolves false.
+- Cashier positive permission resolves.
+- Cashier kitchen permission resolves false.
+- Cross-tenant permission resolves false.
+- Cross-branch permission resolves false.
+- Inactive membership permission resolves false.
+- Suspended user permission resolves false.
+
+# 92. Transaction Context Regression
+- R01 role/context cleanup tests remain green.
+- Auth transaction must not leak pre-auth role.
+- Identity transaction must not leak actor.
+- Tenant transaction must not leak tenant.
+- Tenant transaction must not leak branch.
+- Subsequent pooled transaction starts clean.
+- R02 fixture tests must not set session-level role permanently.
+- Use transaction-local settings.
+- Cleanup on rollback.
+- Cleanup on success.
+- Do not leave fixture-specific actor context globally.
+- Keep pool reuse safe.
+
+# 93. Fixture Reproducibility Test
+- Reset once and record logical fixture expectations.
+- Reset again and expect same IDs.
+- Expect same normalized emails.
+- Expect same credential eligibility.
+- Expect same role mappings.
+- Expect same membership scopes.
+- Expect same negative-state fixtures.
+- Ignore volatile timestamp values unless semantically required.
+- Do not depend on physical row order.
+- Do not depend on generated UUID.
+- Do not depend on external service.
+- Do not depend on production secret.
+
+# 94. Failure Handling
+- Missing fixture fails test loudly.
+- Wrong fixture ID fails test loudly.
+- Duplicate normalized email fails deterministically.
+- Unsupported credential algorithm fails deterministically.
+- Malformed hash fails without secret leak.
+- Cross-tenant role assignment cannot create authority.
+- Wrong branch assignment cannot create authority.
+- DB unavailable produces typed server error in integration path.
+- Structural fixture errors are not converted into generic PASS.
+- RLS failure is diagnosed before broadening grants.
+- Seed FK failure is fixed by dependency order, not constraint disablement.
+- Permission lookup failure is fixed by canonical code, not arbitrary ID.
+
+# 95. Recovery Strategy
+- Seed failure: fix deterministic insert order.
+- Collision failure: fix synthetic identity, not uniqueness constraint.
+- Hash verification failure: align with R01 encoding contract.
+- Permission mapping failure: verify canonical permission code.
+- Membership failure: verify tenant/branch/role referential integrity.
+- RLS failure: inspect actor/tenant/branch context.
+- Pre-auth denial failure: restore least privilege.
+- Generated type drift: investigate schema difference.
+- Integration state leak: fix transaction-local context.
+- Legacy auth regression: restore unchanged runtime behavior.
+- Do not use production data for recovery.
+- Do not weaken security tests to recover green state.
+
+# 96. Concurrency Considerations
+- R02 is not primarily concurrency work.
+- Do not seed login-throttle failure state.
+- Throttle baseline starts clean after reset.
+- Parallel tests use distinct throttle subjects if needed.
+- R02 must not invalidate R01 atomic throttle behavior.
+- Credential verification should not hold unnecessary DB transaction open.
+- Fixture inserts happen through reset, not concurrent runtime setup.
+- No shared mutable global test actor context.
+- No session-level role mutation.
+- No test race on same temporary membership row without isolation.
+- Keep deterministic logical state under parallel test execution where supported.
+- Report any unavoidable serialization requirement.
+
+# 97. Idempotency Considerations
+- Full reset converges on same logical state.
+- Seed does not rely on previous seed execution.
+- Broad `on conflict do nothing` must not hide duplicate fixture definitions.
+- Role-permission seed remains deterministic.
+- Membership seed remains deterministic.
+- Credential seed remains deterministic.
+- Duplicate fixture IDs should be visible during development.
+- No silent conflict swallowing unless current seed convention explicitly expects update behavior.
+- Tests remain independent of execution order.
+- Cleanup remains deterministic.
+- No stale throttle state reused.
+- No random fixture generation.
+
+# 98. Performance and Resource Safety
+- Keep fixture dataset compact.
+- Keep normalized email lookup indexed through R01 design.
+- Keep membership lookups keyed by stable IDs.
+- Keep permission checks inside existing DB helpers where appropriate.
+- Avoid N+1 permission queries in integration helper design.
+- No credential hash caching.
+- No Redis added.
+- No external fixture service.
+- No huge domain dataset.
+- No long DB transaction during password KDF.
+- No unbounded test password input.
+- No full table scan deliberately introduced.
+
+# 99. Logging and Redaction
+- No raw password logs.
+- No raw password hash logs.
+- No `AUTH_SECRET` logs.
+- No `FOODFLOW_SESSION_SECRET` logs.
+- No `DATABASE_URL` logs.
+- No session token logs.
+- No real user email logs.
+- Synthetic persona names are acceptable in test diagnostics.
+- Permission code is acceptable diagnostic context.
+- Tenant/branch synthetic ID is acceptable test diagnostic context.
+- Do not log whether a real production email exists.
+- Keep fixture diagnostics local/test oriented.
+
+# 100. Observability Boundary
+- No production auth telemetry required in R02.
+- Descriptive test labels required.
+- Test failures identify persona.
+- Test failures identify permission code.
+- Test failures identify expected scope.
+- Test failures identify tenant/branch fixture.
+- Secret material remains redacted.
+- No new analytics dependency.
+- No new tracing backend.
+- No new production log schema.
+- R03/R04 may add operational auth observability later.
+- R02 focuses on deterministic evidence.
+
+# 101. Files to CREATE
+- `supabase/tests/database/p02_r02_identity_authorization_fixtures.test.sql` likely required.
+- `apps/web/next-flow/tests/fixtures/identity.ts` likely useful.
+- `apps/web/next-flow/tests/integration/identity-authorization-contract.test.ts` likely required.
+- `apps/web/next-flow/tests/fixtures/credential-vectors.ts` optional when useful.
+- Create only files supported by actual R01 branch architecture.
+- Do not create duplicate identity module.
+- Do not create production auth config for fixtures.
+- Do not create generic testing framework unnecessarily.
+- Keep fixture helper under test path.
+- Keep SQL tests under current database test path.
+- Keep names focused on R02 responsibility.
+- Record actual paths in PR.
+
+# 102. Files to MODIFY
+- `supabase/seed.sql` likely primary modification.
+- Existing R01 credential integration test may be extended only when appropriate.
+- Existing R04 test may update fixture reference only when necessary.
+- Do not weaken R04 assertions.
+- Do not rewrite R01 test architecture unnecessarily.
+- Generated DB type file only if approved schema change occurs.
+- CI workflow only if test discovery genuinely requires narrow change.
+- Package files should remain unchanged by default.
+- Runtime auth route should remain unchanged.
+- Proxy should remain unchanged.
+- Login UI should remain unchanged.
+- Record every modified file and reason in PR.
+
+# 103. Files NOT to Modify by Default
+- `apps/web/next-flow/src/app/api/auth/login/route.ts`.
+- `apps/web/next-flow/src/app/api/auth/logout/route.ts`.
+- `apps/web/next-flow/src/lib/auth/session.ts`.
+- `apps/web/next-flow/src/lib/auth/token.ts`.
+- `apps/web/next-flow/src/proxy.ts`.
+- Login page/form behavior.
+- Customer menu UI.
+- Customer cart UI.
+- Kitchen UI.
+- Payment integration.
+- Stripe billing integration.
+- Voice ordering implementation.
+- Unrelated infrastructure.
+
+# 104. Dependency Policy
+- Default = no new npm dependency.
+- Use existing Vitest.
+- Use existing Kysely/pg.
+- Use R01 password verifier.
+- Use existing Supabase CLI.
+- No faker dependency for fixed fixtures.
+- No UUID library for fixed constants.
+- No new password library if R01 already provides verifier/generator.
+- No Auth.js package reinstall.
+- No dependency modernization.
+- Package lock should remain unchanged unless justified.
+- Any dependency change requires explicit PR explanation.
+
+# 105. Migration Policy
+- Default = no R02 migration.
+- Fixture-only work should not alter schema.
+- Structural blocker may justify forward migration.
+- Migration must be narrow.
+- Migration must be clean-reset safe.
+- Migration must have dedicated tests.
+- Historical P01 migration must not be rewritten.
+- Historical R01 migration must not be rewritten.
+- Test convenience alone is insufficient reason.
+- No production backfill executed by this round.
+- PR must state schema change YES/NO.
+- PR must justify any migration.
+
+# 106. Clean Database Reset Contract
+- Local Supabase starts successfully.
+- All migrations apply.
+- Seed executes.
+- R02 fixtures exist afterward.
+- No manual SQL required.
+- No production credentials required.
+- No network identity provider required.
+- No Auth.js server required.
+- Same reset can run repeatedly.
+- Synthetic data only.
+- No destructive production connection.
+- Reset evidence recorded in implementation PR.
+
+# 107. Database Lint Contract
+- New SQL remains lint-clean under current rules.
+- No unsafe dynamic SQL introduced.
+- No broad grants introduced.
+- No unsafe SECURITY DEFINER added by default.
+- If function added, fixed search path required.
+- Schema-sensitive references qualified where appropriate.
+- Test-only grants remain transactional when possible.
+- No RLS disablement persists.
+- No BYPASSRLS added.
+- No superuser application role.
+- Existing DB lint scope preserved.
+- PR records DB lint result.
+
+# 108. Generated Type Contract
+- No schema change means no expected generated diff.
+- Unexpected generated diff is blocker until explained.
+- Approved schema change requires regeneration.
+- Run `npm run db:generate` or current equivalent.
+- Run `npm run db:verify-types` or current equivalent.
+- Never hand-edit generated DB types.
+- Fixture additions alone do not alter generated types.
+- Runtime repository should compile against existing types.
+- Test fixture constants need not mirror all DB types.
+- Record generated-type result.
+- Keep R01 generated baseline intact.
+- Investigate drift before PR readiness.
+
+# 109. Application Quality Contract
+- Test helper compiles.
+- Integration tests compile.
+- Production runtime does not import test fixtures.
+- Client components do not import server identity modules.
+- Production server code does not import test passwords.
+- Lint passes.
+- Typecheck passes.
+- Tests pass.
+- Next build passes.
+- Legacy auth tests remain green.
+- No runtime behavior changes from fixture additions alone.
+- PR records actual results.
+
+# 110. Legacy Auth Regression
+- Existing configured temporary credential still logs in until R03.
+- Existing custom session still verifies.
+- Existing logout still clears legacy session.
+- Existing proxy behavior remains unchanged.
+- Existing auth-session tests remain green.
+- R02 fixture credential must not become live authority.
+- No route points to fixture password directly.
+- No legacy env removal.
+- No session cookie rename.
+- No token format change.
+- No Auth.js provider activation.
+- Keep old and new paths separate until cutover.
+
+# 111. Customer Boundary Regression
+- Customer direct entry remains public.
+- Customer menu browsing does not require staff credential.
+- Customer table-session semantics unchanged.
+- Internal fixture credentials never exposed to customer UI.
+- Internal role data not added to customer response.
+- Internal permission data not added to customer response.
+- No customer account table introduced.
+- No customer session migration.
+- No customer cart persistence change.
+- No customer capability redesign.
+- Preserve current public/private separation.
+- Keep R03 staff auth work independent of customer path.
+
+# 112. Security Validation Priority
+- Priority 1: cross-tenant denial.
+- Priority 2: cross-branch denial.
+- Priority 3: suspended user denial.
+- Priority 4: non-active membership denial.
+- Priority 5: disabled credential denial.
+- Priority 6: no-credential denial.
+- Priority 7: self-elevation denial.
+- Priority 8: pre-auth direct-table denial.
+- Positive tests do not replace negative tests.
+- Denial tests should outnumber trivial presence tests where possible.
+- Preserve R01/R04 negative regression coverage.
+- Do not chase test count for appearance.
+
+# 113. Test Naming Standard
+- Include persona in assertion name.
+- Include action/permission in assertion name.
+- Include target tenant/branch when relevant.
+- Include expected allow/deny meaning.
+- Example: `staff A1 cannot resolve order.view for Branch A2`.
+- Example: `disabled credential is not returned by pre-auth lookup`.
+- Example: `revoked membership cannot access Branch A1`.
+- Avoid `test1`.
+- Avoid `works`.
+- Avoid `should fail` without reason.
+- Clear names aid regression diagnosis.
+- Keep naming consistent across SQL and Node tests.
+
+# 114. Test Isolation
+- SQL mutation tests use transaction boundaries.
+- SQL mutation tests rollback.
+- Node tests clean temporary rows.
+- Test files do not depend on previous file order.
+- Credential tests do not permanently modify durable hash rows.
+- Membership mutation tests restore state.
+- Role-permission mutation tests restore state.
+- Throttle subjects distinct when used.
+- No session-level role leakage.
+- No global actor context leakage.
+- No global tenant context leakage.
+- No global branch context leakage.
+
+# 115. Implementation Sequence
+- Fetch current main.
+- Read policy and this spec.
+- Find latest R01 implementation branch.
+- Stop if R01 branch missing.
+- Record R01 head SHA.
+- Re-audit R01 identity/pre-auth contract.
+- Create R02 branch from R01 branch.
+- Audit current seed and R04 fixtures.
+- Define final R02 persona matrix.
+- Add/update deterministic identities and credentials.
+- Add/update roles, permissions, memberships.
+- Add SQL and integration tests.
+
+# 116. Implementation Sequence — Validation
+- Run clean Supabase start/reset.
+- Run SQL tests.
+- Run R01 regression tests.
+- Run R04 regression tests.
+- Run DB lint.
+- Run generated type checks.
+- Run application lint.
+- Run typecheck.
+- Run unit/integration tests.
+- Run DB runtime tests.
+- Run Next build.
+- Inspect final diff for scope discipline.
+
+# 117. Validation Commands — Application
 ```bash
 cd apps/web/next-flow
 npm ci
@@ -3790,1343 +1693,467 @@ npm run typecheck
 npm run test
 npm run build:next
 ```
+- Use actual current scripts if names differ on R01 branch.
+- Record actual execution result.
+- Do not fabricate PASS.
+- Distinguish local evidence from hosted evidence.
+- Package install should be deterministic.
+- No dependency change expected by default.
 
-If script names change on R01 branch, use actual current names.
-
-Record actual results.
-
-Do not fabricate local execution.
-
----
-
-# 132. Validation Commands — Database
-
-Expected local database validation includes:
-
+# 118. Validation Commands — Database
 ```bash
 ./apps/web/next-flow/node_modules/.bin/supabase start
-```
-
-```bash
 ./apps/web/next-flow/node_modules/.bin/supabase db reset --local
-```
-
-```bash
 ./apps/web/next-flow/node_modules/.bin/supabase test db --local
-```
-
-```bash
 ./apps/web/next-flow/node_modules/.bin/supabase db lint --local --schema app,foodflow,payments,audit,private --level warning --fail-on error
 ```
+- Use actual current command forms at execution time.
+- Local/test database only.
+- Never run destructive production reset.
+- Record actual outcome.
 
-Use actual repository command forms at execution time.
-
----
-
-# 133. Validation Commands — Generated Types
-
-Expected:
-
+# 119. Validation Commands — DB Types/Runtime
 ```bash
 cd apps/web/next-flow
 npm run db:generate
-```
-
-Then:
-
-```bash
 npm run db:verify-types
-```
-
-or current equivalent.
-
-If no schema change, verify no unexpected generated diff.
-
----
-
-# 134. Validation Commands — DB Runtime
-
-Expected:
-
-```bash
 npm run test:db-runtime
 ```
-
-or current equivalent.
-
-R02 integration tests should be included in the normal test path or explicitly invoked.
-
-Record the exact command used.
-
----
-
-# 135. Document Validation vs GitHub Actions
-
-This specification document is validated by content.
-
-GitHub Actions are not document-validation authority.
-
-A red GitHub Action does not automatically mean this spec is wrong.
-
-A missing GitHub Action does not automatically mean this spec is wrong.
-
-A queued GitHub Action does not block document correctness.
-
-Implementation PR CI remains important implementation evidence.
-
-This distinction must remain explicit.
-
----
-
-# 136. Expected Implementation Validation Matrix
-
-Application lint:
-
-```text
-PASS required
-```
-
-Typecheck:
-
-```text
-PASS required
-```
-
-Unit/integration tests:
-
-```text
-PASS required
-```
-
-Next build:
-
-```text
-PASS required
-```
-
-Clean DB reset:
-
-```text
-PASS required
-```
-
-SQL tests:
-
-```text
-PASS required
-```
-
-R04 regression:
-
-```text
-PASS required
-```
-
-R01 identity regression:
-
-```text
-PASS required
-```
-
----
-
-# 137. Positive Acceptance Matrix
-
-Owner valid credential lookup:
-
-```text
-PASS
-```
-
-Staff A1 valid credential lookup:
-
-```text
-PASS
-```
-
-Kitchen valid credential lookup:
-
-```text
-PASS if credential-bearing
-```
-
-Cashier valid credential lookup:
-
-```text
-PASS if credential-bearing
-```
-
-Manager Tenant A membership:
-
-```text
-PASS
-```
-
-Staff A1 exact branch membership:
-
-```text
-PASS
-```
-
-Kitchen permission:
-
-```text
-PASS
-```
-
-Cashier permission:
-
-```text
-PASS
-```
-
----
-
-# 138. Negative Acceptance Matrix
-
-Unknown email:
-
-```text
-DENY
-```
-
-Suspended user credential candidate:
-
-```text
-DENY
-```
-
-Disabled credential candidate:
-
-```text
-DENY
-```
-
-No-credential candidate:
-
-```text
-DENY
-```
-
-Invited membership authorization:
-
-```text
-DENY
-```
-
-Suspended membership authorization:
-
-```text
-DENY
-```
-
-Revoked membership authorization:
-
-```text
-DENY
-```
-
-Cross-tenant access:
-
-```text
-DENY
-```
-
-Cross-branch access:
-
-```text
-DENY
-```
-
-Self-elevation:
-
-```text
-DENY
-```
-
----
-
-# 139. Implementation Sequence — Step 01
-
-Fetch current `main`.
-
-Read current policy.
-
-Read this spec.
-
-Find latest R01 implementation branch.
-
-Record R01 branch name.
-
-Record R01 head SHA.
-
-Confirm R01 handoff is stable.
-
-Stop if R01 implementation absent.
-
----
-
-# 140. Implementation Sequence — Step 02
-
-Create R02 branch from R01 lineage tip.
-
-Recommended:
-
-```text
-p02-r02-credential-fixtures-authorization-contracts
-```
-
-Record parent SHA.
-
-Do not create from main when R01 is unmerged but implemented on branch.
-
----
-
-# 141. Implementation Sequence — Step 03
-
-Audit current `supabase/seed.sql`.
-
-List existing fixture IDs.
-
-List current user statuses.
-
-List membership statuses.
-
-List current roles.
-
-List permission mappings.
-
-Identify which R02 personas can reuse existing actors.
-
-Identify minimal new actors required.
-
----
-
-# 142. Implementation Sequence — Step 04
-
-Audit R01 identity implementation.
-
-Record normalized-email storage/lookup design.
-
-Record pre-auth role name.
-
-Record credential lookup function name.
-
-Record password encoding contract.
-
-Record password verifier API.
-
-Record credential repository API.
-
-Do not guess names from this document if R01 differs.
-
----
-
-# 143. Implementation Sequence — Step 05
-
-Define final fixture matrix.
-
-Assign stable emails.
-
-Assign stable IDs for new actors.
-
-Assign stable role IDs if needed.
-
-Assign stable membership IDs.
-
-Assign expected permission codes.
-
-Document test-only passwords centrally.
-
----
-
-# 144. Implementation Sequence — Step 06
-
-Update seed users.
-
-Add emails where needed.
-
-Preserve existing IDs.
-
-Preserve existing status semantics.
-
-Add new kitchen/cashier/no-membership personas only if required.
-
-Avoid unrelated FoodFlow seed changes.
-
----
-
-# 145. Implementation Sequence — Step 07
-
-Add credentials.
-
-Use exact R01 supported algorithm.
-
-Use deterministic test vectors.
-
-Add enabled credentials.
-
-Add disabled credential fixture.
-
-Leave no-credential user without row.
-
-Do not seed throttle failures.
-
----
-
-# 146. Implementation Sequence — Step 08
-
-Add or update roles.
-
-Add kitchen role if needed.
-
-Add cashier role if needed.
-
-Keep roles tenant-scoped.
-
-Do not grant all permissions.
-
-Use canonical permission codes.
-
----
-
-# 147. Implementation Sequence — Step 09
-
-Add role-permission mappings.
-
-Manager mappings intentional.
-
-Staff mappings intentional.
-
-Kitchen mappings intentional.
-
-Cashier mappings intentional.
-
-Tenant B mappings tenant-local.
-
-Avoid duplicate mappings.
-
----
-
-# 148. Implementation Sequence — Step 10
-
-Add memberships.
-
-Use tenant-wide manager membership.
-
-Use exact branch staff memberships.
-
-Use exact branch kitchen membership.
-
-Use exact branch cashier membership.
-
-Preserve invited/suspended/revoked cases.
-
-Add no-membership user with no membership.
-
----
-
-# 149. Implementation Sequence — Step 11
-
-Write SQL fixture-presence tests.
-
-Write credential-state tests.
-
-Write email normalization tests.
-
-Write membership status tests.
-
-Write role-permission tests.
-
-Write RLS positive tests.
-
-Write RLS negative tests.
-
-Write self-elevation tests.
-
----
-
-# 150. Implementation Sequence — Step 12
-
-Create TypeScript fixture constants if useful.
-
-Export IDs.
-
-Export emails.
-
-Export test passwords.
-
-Export expected permission codes.
-
-Keep file test-only.
-
-Do not import into runtime production modules.
-
----
-
-# 151. Implementation Sequence — Step 13
-
-Write credential repository integration tests.
-
-Positive candidate.
-
-Wrong password.
-
-Disabled credential.
-
-Suspended user.
-
-No credential.
-
-Unknown email.
-
-No membership separation.
-
----
-
-# 152. Implementation Sequence — Step 14
-
-Write authorization integration tests.
-
-Manager tenant-wide.
-
-Staff A1 exact branch.
-
-Staff A2 exact branch.
-
-Kitchen permissions.
-
-Cashier permissions.
-
-Tenant B isolation.
-
-Inactive membership denial.
-
----
-
-# 153. Implementation Sequence — Step 15
-
-Run clean DB reset.
-
-Fix deterministic fixture issues.
-
-Run SQL test suite.
-
-Run inherited R04 tests.
-
-Run inherited R01 tests.
-
-Do not skip inherited security tests.
-
----
-
-# 154. Implementation Sequence — Step 16
-
-Run generated type checks.
-
-Confirm no unexpected schema drift.
-
-If schema unchanged, generated file should remain unchanged.
-
-Investigate unexpected diff.
-
----
-
-# 155. Implementation Sequence — Step 17
-
-Run application lint.
-
-Run typecheck.
-
-Run test suite.
-
-Run DB runtime tests.
-
-Run Next build.
-
-Record actual outputs.
-
----
-
-# 156. Implementation Sequence — Step 18
-
-Inspect final diff.
-
-Remove accidental unrelated edits.
-
-Check no live Auth.js cutover.
-
-Check no legacy auth removal.
-
-Check no production secrets.
-
-Check no schema churn without justification.
-
-Open one R02 implementation PR.
-
-Stop.
-
----
-
-# 157. Definition of Done — Lineage
-
+- Use current equivalent scripts when changed.
+- Unexpected generated diff without schema change is blocker.
+- Runtime tests must use deterministic fixtures.
+- Record actual results.
+- No manual generated-file edits.
+- No fake result reporting.
+
+# 120. Document Validation vs GitHub Actions
+- This document is validated by content.
+- GitHub Actions are not document-validation authority.
+- Failed Action does not automatically invalidate the spec.
+- Missing Action does not automatically invalidate the spec.
+- Queued Action does not automatically invalidate the spec.
+- Skipped Action does not automatically invalidate the spec.
+- Hosted rules may still technically prevent merge.
+- Hosted merge restriction must be reported separately.
+- Do not edit CI to make documentation appear valid.
+- Implementation PR CI remains implementation evidence.
+- Document content must specify correct validation plan.
+- This amendment changes spec content only.
+
+# 121. Definition of Done — Lineage
 - [ ] R02 spec exists on main.
-- [ ] R02 spec is READY.
+- [ ] R02 spec READY.
 - [ ] R01 implementation branch exists before R02 starts.
-- [ ] R01 handoff is consumed.
+- [ ] R01 code handoff consumed.
 - [ ] R02 branch descends from R01 branch.
-- [ ] parent branch recorded.
-- [ ] parent SHA recorded.
-- [ ] implementation head SHA recorded.
-
----
-
-# 158. Definition of Done — Fixture Identity
-
-- [ ] deterministic owner/manager fixture exists.
-- [ ] deterministic Branch A1 staff exists.
-- [ ] deterministic Branch A2 staff exists.
-- [ ] deterministic kitchen fixture exists if required.
-- [ ] deterministic cashier fixture exists if required.
-- [ ] deterministic Tenant B fixture exists.
-- [ ] deterministic suspended user exists.
-- [ ] deterministic invited membership exists.
-- [ ] deterministic suspended membership exists.
-- [ ] deterministic revoked membership exists.
-- [ ] deterministic disabled credential exists.
-- [ ] deterministic no-credential user exists.
-- [ ] deterministic no-membership user exists if selected.
-
----
-
-# 159. Definition of Done — Credential
-
-- [ ] stable synthetic emails exist.
-- [ ] normalized emails are unique.
-- [ ] supported algorithm used.
-- [ ] valid positive hash vectors exist.
-- [ ] test passwords centralized.
-- [ ] disabled credential has `disabled_at`.
-- [ ] no-credential fixture has no credential row.
-- [ ] no plaintext password column introduced.
-- [ ] no production credential present.
-- [ ] repository lookup positive case passes.
-- [ ] repository lookup negative cases pass.
-
----
-
-# 160. Definition of Done — Membership
-
-- [ ] manager membership tenant-wide.
-- [ ] Branch A1 membership exact.
-- [ ] Branch A2 membership exact.
-- [ ] Tenant B membership isolated.
-- [ ] invited membership denied.
-- [ ] suspended membership denied.
-- [ ] revoked membership denied.
-- [ ] no-membership case denied.
-- [ ] role tenant matches membership tenant.
-- [ ] branch tenant matches membership tenant.
-
----
-
-# 161. Definition of Done — Permission
-
-- [ ] manager positive permissions proven.
-- [ ] staff positive permission proven.
-- [ ] staff privileged negatives proven.
-- [ ] kitchen positive permissions proven.
-- [ ] kitchen cashier/admin negatives proven.
-- [ ] cashier positive permissions proven.
-- [ ] cashier kitchen/admin negatives proven.
-- [ ] cross-tenant permission denied.
-- [ ] cross-branch permission denied.
-- [ ] canonical permission codes used.
-
----
-
-# 162. Definition of Done — RLS
-
-- [ ] actorless deny proven.
-- [ ] Tenant A manager allow proven.
-- [ ] Tenant A manager Tenant B deny proven.
-- [ ] staff A1 allow proven.
-- [ ] staff A1 A2 deny proven.
-- [ ] staff A2 allow proven.
-- [ ] staff A2 A1 deny proven.
-- [ ] Tenant B allow proven.
-- [ ] Tenant B to Tenant A deny proven.
-- [ ] suspended user deny proven.
-- [ ] invited membership deny proven.
-- [ ] suspended membership deny proven.
-- [ ] revoked membership deny proven.
-
----
-
-# 163. Definition of Done — Self-Elevation
-
-- [ ] staff cannot self-promote role.
-- [ ] staff cannot broaden tenant.
-- [ ] staff cannot broaden branch.
-- [ ] staff cannot grant role permissions.
-- [ ] failed/filtered mutation leaves data unchanged.
-- [ ] existing R04 self-elevation tests remain green.
-
----
-
-# 164. Definition of Done — Pre-Auth Security
-
-- [ ] pre-auth direct user-table broad read denied.
-- [ ] pre-auth direct membership broad read denied.
-- [ ] pre-auth credential table read denied.
-- [ ] pre-auth throttle table read denied.
-- [ ] pre-auth FoodFlow domain read denied.
-- [ ] pre-auth payment read denied.
-- [ ] pre-auth audit read denied.
-- [ ] approved credential lookup function remains allowed.
-- [ ] R01 privilege tests remain green.
-
----
-
-# 165. Definition of Done — Quality
-
-- [ ] clean DB reset succeeds.
-- [ ] seed succeeds.
-- [ ] SQL tests pass.
-- [ ] R04 regression passes.
-- [ ] R01 regression passes.
-- [ ] DB lint passes.
-- [ ] generated type verification passes.
-- [ ] lint passes.
-- [ ] typecheck passes.
-- [ ] unit/integration tests pass.
-- [ ] DB runtime tests pass.
-- [ ] Next build passes.
-
----
-
-# 166. Definition of Done — Scope Discipline
-
-- [ ] Auth.js live cutover not implemented.
-- [ ] legacy session not removed.
-- [ ] legacy login route not replaced.
-- [ ] workspace chooser not implemented.
-- [ ] AccessContext not productized.
-- [ ] route permission cutover not implemented.
-- [ ] command permission cutover not implemented.
-- [ ] customer auth not implemented.
-- [ ] payment feature work not implemented.
-- [ ] realtime feature work not implemented.
-- [ ] voice feature work not implemented.
-- [ ] production DB not modified.
-
----
-
-# 167. PR Evidence Requirements
-
-The implementation PR must state:
-
-```text
-Specification: FLOW_P02_R02_IMPLEMENTATION_SPEC.md
-Phase: 02
-Round: 02
-Previous: FLOW_P02_R01_IMPLEMENTATION_SPEC.md
-```
-
-The PR must record R01 parent branch.
-
-The PR must record R01 parent SHA.
-
-The PR must record R02 head SHA.
-
-The PR must list fixture IDs added/reused.
-
-The PR must list test emails.
-
-The PR must describe test-only password strategy.
-
-The PR must describe credential encoding strategy inherited from R01.
-
-The PR must list roles added/reused.
-
-The PR must list permission mappings.
-
-The PR must list membership scopes.
-
-The PR must state schema changed YES/NO.
-
-The PR must state production DB modified NO.
-
----
-
-# 168. PR Validation Evidence
-
-Record application lint result.
-
-Record typecheck result.
-
-Record unit/integration result.
-
-Record Next build result.
-
-Record clean DB reset result.
-
-Record SQL test result.
-
-Record R04 regression result.
-
-Record R01 regression result.
-
-Record DB lint result.
-
-Record generated-type result.
-
-Record DB runtime result.
-
-Use truthful statuses only.
-
-Do not fabricate local execution.
-
----
-
-# 169. Implementation Merge Boundary
-
-The implementation agent must not merge R02 PR.
-
-The implementation agent must not enable auto-merge.
-
-The implementation agent must not push implementation directly to main.
-
-Owner controls implementation integration.
-
-R03 branch may later descend from R02 branch according to current branch-chain policy once R03 spec is READY.
-
----
-
-# 170. Stop Conditions
-
-Stop if R01 implementation branch does not exist.
-
-Stop if R01 implementation is not meaningful.
-
-Stop if R01 changes normalized-email contract unexpectedly.
-
-Stop if R01 changes credential algorithm unexpectedly.
-
-Stop if R01 changes pre-auth API in a way this spec does not cover.
-
-Stop if R02 branch already exists and should be continued instead of duplicated.
-
-Stop if current main has a superseding R02 amendment.
-
-Stop if production DB access would be required.
-
-Stop if fixture implementation would require doing R03 live cutover.
-
----
-
-# 171. Prohibitions — Identity
-
-NO second `app.users`-like table.
-
-NO parallel membership model.
-
-NO parallel permission catalog.
-
-NO role-name-only authorization.
-
-NO browser-provided tenant authority.
-
-NO browser-provided branch authority.
-
-NO fake actor UUID for authenticated server path.
-
-NO production email fixture.
-
-NO real user data.
-
----
-
-# 172. Prohibitions — Credentials
-
-NO plaintext production password.
-
-NO plaintext credential storage column.
-
-NO reversible password encryption.
-
-NO SHA-only password hashing.
-
-NO unsupported algorithm downgrade.
-
-NO production secret in seed.
-
-NO environment production password as test fixture.
-
-NO credential hash logging.
-
-NO session token logging.
-
----
-
-# 173. Prohibitions — Authorization
-
-NO cross-tenant role reuse.
-
-NO branch scope widening for convenience.
-
-NO broad pre-auth table grants.
-
-NO flow_runtime credential grants.
-
-NO flow_identity credential grants.
-
-NO self-elevation test weakening.
-
-NO RLS disabling for fixture setup.
-
-NO `BYPASSRLS` for application roles.
-
----
-
-# 174. Prohibitions — Delivery
-
-NO direct implementation push to main.
-
-NO implementation PR merge by agent.
-
-NO implementation auto-merge.
-
-NO R03 implementation in R02 branch.
-
-NO historical migration rewrite.
-
-NO production DB reset.
-
-NO production credential insertion.
-
-NO unrelated dependency update.
-
-NO unrelated UI redesign.
-
----
-
-# 175. Handoff Package to R03
-
-R03 must receive one known-valid owner/manager credential fixture.
-
-R03 must receive one known-valid staff credential fixture.
-
-R03 should receive kitchen/cashier fixture credentials if useful for route-session tests.
-
-R03 must receive one disabled credential fixture.
-
-R03 must receive one suspended user fixture.
-
-R03 must receive one no-membership fixture or an explicit equivalent.
-
-R03 must receive exact normalized emails.
-
-R03 must receive exact test password constants.
-
-R03 must receive exact user IDs.
-
-R03 must receive exact tenant/branch expectations.
-
-R03 must receive exact permission expectations.
-
-R03 must receive inherited negative authorization tests.
-
----
-
-# 176. Handoff Contract to R03
-
-R03 may assume:
-
-```text
-fixture identities are stable
-```
-
-R03 may assume:
-
-```text
-credential verification vectors are stable
-```
-
-R03 may assume:
-
-```text
-pre-auth lookup already proven
-```
-
-R03 may assume:
-
-```text
-authorization matrix already proven at DB level
-```
-
-R03 may not assume:
-
-```text
-workspace context already implemented
-```
-
-R03 may not assume:
-
-```text
-route permissions already enforced
-```
-
----
-
-# 177. R03 Readiness Questions
-
-Can a known synthetic active user be resolved by normalized email?
-
-Expected:
-
-```text
-YES
-```
-
-Can the known test password verify?
-
-Expected:
-
-```text
-YES
-```
-
-Can disabled credential resolve?
-
-Expected:
-
-```text
-NO
-```
-
-Can suspended user resolve?
-
-Expected:
-
-```text
-NO
-```
-
-Are membership scopes deterministic?
-
-Expected:
-
-```text
-YES
-```
-
-Are permission expectations deterministic?
-
-Expected:
-
-```text
-YES
-```
-
----
-
-# 178. Document Content Validation Checklist
-
+- [ ] Parent branch recorded.
+- [ ] Parent SHA recorded.
+- [ ] R02 head SHA recorded.
+- [ ] No duplicate R02 branch.
+- [ ] No direct-main implementation.
+- [ ] Branch-chain policy preserved.
+- [ ] Current implementation round not skipped.
+
+# 122. Definition of Done — Fixtures
+- [ ] Stable owner fixture.
+- [ ] Stable staff A1 fixture.
+- [ ] Stable staff A2 fixture.
+- [ ] Stable kitchen fixture when required.
+- [ ] Stable cashier fixture when required.
+- [ ] Stable Tenant B fixture.
+- [ ] Stable suspended user.
+- [ ] Stable invited membership.
+- [ ] Stable suspended membership.
+- [ ] Stable revoked membership.
+- [ ] Stable disabled credential.
+- [ ] Stable no-credential/no-membership cases as selected.
+
+# 123. Definition of Done — Credentials
+- [ ] Stable synthetic emails.
+- [ ] Normalized emails unique.
+- [ ] Supported algorithm used.
+- [ ] Positive credential vectors valid.
+- [ ] Test passwords centralized.
+- [ ] Disabled credential marked disabled.
+- [ ] No-credential fixture truly has no row.
+- [ ] No plaintext DB password field.
+- [ ] No production credential.
+- [ ] Positive lookup passes.
+- [ ] Negative lookup cases pass.
+- [ ] No secret leakage.
+
+# 124. Definition of Done — Membership
+- [ ] Manager tenant-wide membership.
+- [ ] Staff A1 exact membership.
+- [ ] Staff A2 exact membership.
+- [ ] Kitchen exact membership.
+- [ ] Cashier exact membership.
+- [ ] Tenant B isolated membership.
+- [ ] Invited denial.
+- [ ] Suspended denial.
+- [ ] Revoked denial.
+- [ ] No-membership denial.
+- [ ] Role tenant consistency.
+- [ ] Branch tenant consistency.
+
+# 125. Definition of Done — Permission
+- [ ] Manager positive permissions proven.
+- [ ] Staff positive permission proven.
+- [ ] Staff privileged negatives proven.
+- [ ] Kitchen positive permissions proven.
+- [ ] Kitchen cashier/admin negatives proven.
+- [ ] Cashier positive permissions proven.
+- [ ] Cashier kitchen/admin negatives proven.
+- [ ] Cross-tenant permission denied.
+- [ ] Cross-branch permission denied.
+- [ ] Canonical permission codes used.
+- [ ] No role-name-only authority.
+- [ ] No broad all-permission shortcut.
+
+# 126. Definition of Done — RLS
+- [ ] Actorless deny.
+- [ ] Tenant A manager allow.
+- [ ] Tenant A manager Tenant B deny.
+- [ ] Staff A1 allow.
+- [ ] Staff A1 A2 deny.
+- [ ] Staff A2 allow.
+- [ ] Staff A2 A1 deny.
+- [ ] Tenant B allow.
+- [ ] Tenant B to Tenant A deny.
+- [ ] Suspended user deny.
+- [ ] Invited/suspended/revoked membership deny.
+- [ ] No-membership deny.
+
+# 127. Definition of Done — Security
+- [ ] Self-role escalation blocked.
+- [ ] Membership branch broadening blocked.
+- [ ] Membership tenant reassignment blocked.
+- [ ] Unauthorized role-permission mutation blocked.
+- [ ] Pre-auth direct credential read denied.
+- [ ] Pre-auth domain read denied.
+- [ ] flow_runtime credential read denied.
+- [ ] flow_identity credential read denied.
+- [ ] R01 least-privilege tests green.
+- [ ] R04 self-elevation tests green.
+- [ ] No RLS bypass.
+- [ ] No production secret.
+
+# 128. Definition of Done — Quality
+- [ ] Clean DB reset PASS.
+- [ ] Seed PASS.
+- [ ] New SQL tests PASS.
+- [ ] R01 SQL/security regression PASS.
+- [ ] R04 RLS regression PASS.
+- [ ] DB lint PASS.
+- [ ] Generated type verification PASS.
+- [ ] Lint PASS.
+- [ ] Typecheck PASS.
+- [ ] Unit/integration PASS.
+- [ ] DB runtime PASS.
+- [ ] Next build PASS.
+
+# 129. Definition of Done — Scope Discipline
+- [ ] No Auth.js live cutover.
+- [ ] No legacy session removal.
+- [ ] No legacy login route replacement.
+- [ ] No workspace selector.
+- [ ] No AccessContext productization.
+- [ ] No route permission cutover.
+- [ ] No command permission cutover.
+- [ ] No customer auth.
+- [ ] No payments feature work.
+- [ ] No realtime feature work.
+- [ ] No voice work.
+- [ ] No production DB mutation.
+
+# 130. PR Requirements
+- One implementation PR for R02.
+- Include `Specification: FLOW_P02_R02_IMPLEMENTATION_SPEC.md`.
+- Include `Phase: 02`.
+- Include `Round: 02`.
+- Include `Previous: FLOW_P02_R01_IMPLEMENTATION_SPEC.md`.
+- Record R01 parent branch.
+- Record R01 parent SHA.
+- Record R02 head SHA.
+- List fixture IDs added/reused.
+- List test emails.
+- Describe test password/hash strategy.
+- List roles/permissions/memberships changed.
+
+# 131. PR Evidence
+- State schema changed YES/NO.
+- State package changed YES/NO.
+- State production DB modified NO.
+- State Auth.js live cutover NO.
+- State legacy auth removed NO.
+- Record application lint.
+- Record typecheck.
+- Record test suite.
+- Record Next build.
+- Record clean DB reset.
+- Record SQL tests.
+- Record R01/R04 regression.
+- Record DB runtime/type checks.
+
+# 132. Implementation Merge Boundary
+- Development agent does not merge R02 PR.
+- Development agent does not enable auto-merge.
+- Development agent does not push implementation to main.
+- Owner controls implementation integration.
+- R03 may later branch from R02 lineage when R03 spec is READY.
+- R02 implementation PR remains reviewable independently.
+- Do not merge merely because scheduled time arrived.
+- Do not skip owner control.
+- Documentation automation may merge specs, not implementation.
+- Record current branch lineage truthfully.
+- Stop after implementation PR update.
+- No hidden direct-main commit.
+
+# 133. R03 Handoff Package
+- Known-valid owner credential fixture.
+- Known-valid staff credential fixture.
+- Kitchen/cashier credentials when useful.
+- Disabled credential fixture.
+- Suspended user fixture.
+- No-credential fixture.
+- No-membership fixture when selected.
+- Exact normalized emails.
+- Exact test passwords.
+- Exact user IDs.
+- Exact tenant/branch expectations.
+- Exact permission expectations.
+
+# 134. R03 Handoff Assumptions
+- Fixture identities are stable.
+- Credential vectors are stable.
+- Pre-auth lookup is proven.
+- Password verifier is proven by R01/R02 vectors.
+- Tenant/branch authorization matrix is proven.
+- Permission matrix is proven.
+- Workspace selection is NOT implemented.
+- Route permission enforcement is NOT implemented.
+- Legacy session is still live.
+- Auth.js session authority is NOT live yet.
+- R03 should not invent replacement fixture semantics.
+- R03 should consume this deterministic baseline.
+
+# 135. Final R02 Readiness Questions
+- Known active credential resolvable? YES after R02 implementation.
+- Known test password verifiable? YES after R02 implementation.
+- Disabled credential resolvable? NO.
+- Suspended user resolvable? NO.
+- No-credential user resolvable? NO.
+- Tenant-wide membership deterministic? YES.
+- Exact-branch membership deterministic? YES.
+- Cross-tenant denial deterministic? YES.
+- Cross-branch denial deterministic? YES.
+- Permission expectations deterministic? YES.
+- RLS denial deterministic? YES.
+- Auth.js live cutover performed? NO.
+
+# 136. Final Document Validation Checklist
 - [ ] Phase metadata correct.
 - [ ] Round metadata correct.
 - [ ] Previous correct.
 - [ ] Next correct.
 - [ ] R01 dependency explicit.
-- [ ] branch lineage explicit.
-- [ ] current implementation-state caveat explicit.
-- [ ] fixture objectives explicit.
-- [ ] persona matrix explicit.
-- [ ] credential strategy explicit.
-- [ ] role strategy explicit.
-- [ ] permission strategy explicit.
-- [ ] membership strategy explicit.
-- [ ] RLS validation explicit.
-- [ ] negative security validation explicit.
-- [ ] failure handling explicit.
-- [ ] files to create explicit.
-- [ ] files to modify explicit.
-- [ ] do-not-touch files explicit.
-- [ ] implementation sequence explicit.
-- [ ] DoD explicit.
-- [ ] R03 handoff explicit.
+- [ ] Branch lineage explicit.
+- [ ] Current implementation-state caveat explicit.
+- [ ] Fixture objectives explicit.
+- [ ] Persona contracts explicit.
+- [ ] Credential strategy explicit.
+- [ ] Role/permission/membership strategy explicit.
+- [ ] RLS/negative validation explicit.
 
----
+# 137. Final Document Validation Checklist — Architecture
+- [ ] Existing database baseline referenced.
+- [ ] Existing seed baseline referenced.
+- [ ] Existing R04 actor IDs referenced.
+- [ ] Existing tenant/branch IDs referenced.
+- [ ] Canonical permission codes referenced.
+- [ ] Pre-auth role regression included.
+- [ ] Runtime role regression included.
+- [ ] Identity role regression included.
+- [ ] No duplicate identity model proposed.
+- [ ] No duplicate permission model proposed.
+- [ ] No future-round cutover proposed.
+- [ ] File impact bounded.
 
-# 179. Document Line-Count Policy
+# 138. Final Document Validation Checklist — Testing
+- [ ] SQL fixture tests defined.
+- [ ] Credential state tests defined.
+- [ ] Email normalization tests defined.
+- [ ] Membership tests defined.
+- [ ] Permission tests defined.
+- [ ] RLS positive tests defined.
+- [ ] RLS negative tests defined.
+- [ ] Self-elevation tests defined.
+- [ ] Integration tests defined.
+- [ ] Reset reproducibility defined.
+- [ ] Failure handling defined.
+- [ ] Validation commands defined.
 
-Executable spec minimum:
+# 139. Explicit Prohibitions — Identity
+- NO second users table.
+- NO second memberships table.
+- NO second permission catalog.
+- NO role-name-only authorization.
+- NO browser-provided tenant authority.
+- NO browser-provided branch authority.
+- NO fake actor IDs.
+- NO production email fixtures.
+- NO real customer data.
+- NO production credentials.
+- NO undocumented fixture randomness.
+- NO test-order authority.
 
-```text
-1800 lines
-```
+# 140. Explicit Prohibitions — Credentials
+- NO plaintext production password.
+- NO plaintext DB password storage.
+- NO reversible password encryption.
+- NO fast digest password substitute.
+- NO unsupported algorithm downgrade.
+- NO production secret in seed.
+- NO credential hash logging.
+- NO session token logging.
+- NO default password marketed as production-safe.
+- NO live login cutover.
+- NO fixture password imported by production runtime.
+- NO production credential migration.
 
-Executable spec maximum:
+# 141. Explicit Prohibitions — Authorization
+- NO cross-tenant role reuse.
+- NO branch-scope widening for convenience.
+- NO broad pre-auth table grants.
+- NO flow_runtime credential grants.
+- NO flow_identity credential grants.
+- NO self-elevation test weakening.
+- NO RLS disablement for durable fixture setup.
+- NO BYPASSRLS application role.
+- NO superuser application path.
+- NO permission aliases for convenience.
+- NO tenant isolation bypass.
+- NO branch isolation bypass.
 
-```text
-2500 lines
-```
+# 142. Explicit Prohibitions — Delivery
+- NO direct implementation push to main.
+- NO implementation merge by agent.
+- NO implementation auto-merge.
+- NO R03 implementation inside R02.
+- NO historical migration rewrite.
+- NO production DB reset.
+- NO production credential insert.
+- NO unrelated dependency update.
+- NO unrelated UI redesign.
+- NO unrelated CI redesign.
+- NO fake validation claims.
+- NO skipped current implementation round.
 
-The line count must be measured on the actual final file.
-
-Blank-line padding must not be used to satisfy the threshold.
-
-Repeated prose must not be used to satisfy the threshold.
-
-Artificial wrapping must not be used to satisfy the threshold.
-
-This document must remain implementation-dense.
-
----
-
-# 180. Final R02 Acceptance Matrix
-
-Spec on main and READY?
-
-```text
-YES
-```
-
-R01 branch required before R02 code?
-
-```text
-YES
-```
-
-R02 branch parent = latest R01 branch?
-
-```text
-YES
-```
-
-Deterministic fixture IDs?
-
-```text
-YES
-```
-
-Deterministic synthetic emails?
-
-```text
-YES
-```
-
-Deterministic credential vectors?
-
-```text
-YES
-```
-
-Production credentials used?
-
-```text
-NO
-```
-
-Cross-tenant denial covered?
-
-```text
-YES
-```
-
-Cross-branch denial covered?
-
-```text
-YES
-```
-
-Inactive user denial covered?
-
-```text
-YES
-```
-
-Inactive membership denial covered?
-
-```text
-YES
-```
-
-Disabled credential denial covered?
-
-```text
-YES
-```
-
-Self-elevation denial preserved?
-
-```text
-YES
-```
-
-R01 least privilege preserved?
-
-```text
-YES
-```
-
-Live Auth.js cutover in R02?
-
-```text
-NO
-```
-
-Legacy auth removed in R02?
-
-```text
-NO
-```
-
-Production DB modified?
-
-```text
-NO
-```
-
-Implementation PR merged by agent?
-
-```text
-NO
-```
-
----
-
-# 181. Final Development Gate
-
-The legal execution path is:
-
+# 143. Final Development Gate
 ```text
 READ CURRENT MAIN
-        ↓
-VERIFY THIS R02 SPEC IS READY
-        ↓
-FIND LATEST P02/R01 IMPLEMENTATION BRANCH
-        ↓
-IF NO R01 BRANCH → STOP
-        ↓
-RE-AUDIT R01 FINAL IDENTITY/PRE-AUTH CONTRACT
-        ↓
-CREATE R02 BRANCH FROM R01 BRANCH
-        ↓
-EXTEND DETERMINISTIC SEED IDENTITIES
-        ↓
-ADD TEST-ONLY CREDENTIAL VECTORS
-        ↓
-ADD/REUSE ROLE + PERMISSION FIXTURES
-        ↓
-ADD/REUSE MEMBERSHIP FIXTURES
-        ↓
-ADD KITCHEN/CASHIER/NEGATIVE PERSONAS AS NEEDED
-        ↓
-WRITE SQL FIXTURE + AUTHORIZATION TESTS
-        ↓
-WRITE SERVER INTEGRATION TESTS
-        ↓
-PRESERVE R01 SECURITY TESTS
-        ↓
-PRESERVE R04 RLS/SELF-ELEVATION TESTS
-        ↓
-CLEAN DATABASE RESET
-        ↓
-RUN DATABASE QUALITY
-        ↓
-RUN APPLICATION QUALITY
-        ↓
-OPEN ONE P02/R02 IMPLEMENTATION PR
-        ↓
-STOP
-        ↓
-OWNER CONTROLS MERGE
+→ VERIFY R02 SPEC READY
+→ FIND LATEST R01 IMPLEMENTATION BRANCH
+→ IF NO R01 BRANCH: STOP
+→ RE-AUDIT R01 IDENTITY/PRE-AUTH CONTRACT
+→ CREATE R02 FROM R01 LINEAGE
+→ EXTEND DETERMINISTIC SEED IDENTITIES
+→ ADD TEST-ONLY CREDENTIAL VECTORS
+→ ADD/REUSE ROLE + PERMISSION FIXTURES
+→ ADD/REUSE MEMBERSHIP FIXTURES
+→ ADD KITCHEN/CASHIER/NEGATIVE PERSONAS AS NEEDED
+→ WRITE SQL FIXTURE + AUTHORIZATION TESTS
+→ WRITE SERVER INTEGRATION TESTS
+→ PRESERVE R01 SECURITY TESTS
+→ PRESERVE R04 RLS/SELF-ELEVATION TESTS
+→ CLEAN RESET
+→ RUN DATABASE QUALITY
+→ RUN APPLICATION QUALITY
+→ OPEN ONE R02 IMPLEMENTATION PR
+→ STOP
+→ OWNER CONTROLS MERGE
 ```
 
----
-
-# 182. Final Implementation Agent Checklist
-
-## Authority
-
-- [ ] current main fetched.
-- [ ] current policy read.
-- [ ] exact R02 spec read.
+# 144. Final Implementation Agent Checklist — Authority
+- [ ] Current main fetched.
+- [ ] Current policy read.
+- [ ] Exact R02 spec read.
 - [ ] R01 branch found.
 - [ ] R01 head SHA recorded.
-- [ ] R02 parent selected correctly.
+- [ ] R02 parent correct.
+- [ ] No duplicate R02 branch.
+- [ ] R01 code re-audited.
+- [ ] R01 credential contract re-audited.
+- [ ] R01 pre-auth role re-audited.
+- [ ] R01 tests re-audited.
+- [ ] No superseding spec exists.
 
-## Fixtures
+# 145. Final Implementation Agent Checklist — Fixtures
+- [ ] Existing R04 IDs reused where useful.
+- [ ] New actors minimal.
+- [ ] Stable emails defined.
+- [ ] Test passwords centralized.
+- [ ] Credential rows deterministic.
+- [ ] Disabled credential defined.
+- [ ] No-credential actor defined.
+- [ ] No-membership actor defined when selected.
+- [ ] Kitchen persona defined.
+- [ ] Cashier persona defined.
+- [ ] Tenant B isolation persona preserved.
+- [ ] Synthetic-data warnings present.
 
-- [ ] existing R04 IDs reused where useful.
-- [ ] new actors minimal.
-- [ ] stable emails defined.
-- [ ] test passwords centralized.
-- [ ] credential rows deterministic.
-- [ ] disabled credential defined.
-- [ ] no-credential actor defined.
-- [ ] no-membership actor defined if selected.
-
-## Authorization
-
-- [ ] tenant-wide manager covered.
+# 146. Final Implementation Agent Checklist — Authorization
+- [ ] Tenant-wide manager covered.
 - [ ] Branch A1 staff covered.
 - [ ] Branch A2 staff covered.
-- [ ] kitchen covered.
-- [ ] cashier covered.
+- [ ] Kitchen covered.
+- [ ] Cashier covered.
 - [ ] Tenant B covered.
-- [ ] cross-tenant denial covered.
-- [ ] cross-branch denial covered.
-- [ ] inactive statuses covered.
-- [ ] self-elevation covered.
+- [ ] Cross-tenant denial covered.
+- [ ] Cross-branch denial covered.
+- [ ] Suspended user covered.
+- [ ] Invited/suspended/revoked membership covered.
+- [ ] Self-elevation covered.
+- [ ] Pre-auth least privilege covered.
 
-## Security
-
-- [ ] R01 pre-auth grants unchanged.
-- [ ] no broad credential access.
-- [ ] no production secret.
-- [ ] no password logging.
-- [ ] no RLS bypass.
-- [ ] no role-context widening.
-
-## Quality
-
-- [ ] clean reset executed.
+# 147. Final Implementation Agent Checklist — Quality
+- [ ] Clean reset executed.
 - [ ] SQL tests executed.
 - [ ] R01 regression executed.
 - [ ] R04 regression executed.
-- [ ] lint executed.
-- [ ] typecheck executed.
-- [ ] test suite executed.
-- [ ] build executed.
-- [ ] actual results recorded.
+- [ ] DB lint executed.
+- [ ] Generated type verification executed.
+- [ ] Lint executed.
+- [ ] Typecheck executed.
+- [ ] Test suite executed.
+- [ ] DB runtime executed.
+- [ ] Build executed.
+- [ ] Actual results recorded.
 
-## Delivery
-
-- [ ] one R02 implementation PR.
-- [ ] parent/head evidence recorded.
-- [ ] no implementation merge by agent.
-- [ ] no auto-merge.
+# 148. Final Implementation Agent Checklist — Delivery
+- [ ] One R02 implementation PR.
+- [ ] Parent branch recorded.
+- [ ] Parent SHA recorded.
+- [ ] Head SHA recorded.
+- [ ] Fixture matrix summarized.
+- [ ] Credential strategy summarized.
+- [ ] Permission matrix summarized.
+- [ ] Membership matrix summarized.
+- [ ] Production DB modified = NO.
+- [ ] Auth.js live cutover = NO.
+- [ ] Implementation merge by agent = NO.
 - [ ] R03 handoff stated.
 
----
-
-# 183. End State
-
-When implementation eventually satisfies this specification:
-
-```text
-P02/R02 = IMPLEMENTED ON ROUND BRANCH
-```
-
-The round is not made current merely by the existence of this document.
-
-Until R01 implementation exists:
-
-```text
-CURRENT IMPLEMENTATION ROUND = P02/R01
-P02/R02 IMPLEMENTATION = BLOCKED / NOT STARTED
-```
-
-After R02 is implemented, R03 may be prepared/executed only under its own READY specification and current branch-chain policy.
+# 149. Final End State
+- This document may be READY before R02 becomes the current implementation round.
+- R02 implementation remains blocked while R01 implementation branch is absent.
+- Current implementation state at amendment authoring time remains P02/R01 NOT STARTED.
+- When R01 implementation exists, R02 must branch from it.
+- When R02 implementation satisfies this spec, state becomes `P02/R02 = IMPLEMENTED ON ROUND BRANCH`.
+- R03 then consumes deterministic R02 fixtures under its own READY specification.
+- R02 does not authorize R03 automatically.
+- R02 does not authorize live session cutover.
+- R02 does not authorize implementation merge by agent.
+- R02 preserves owner merge control.
+- R02 preserves branch-chain lineage.
+- R02 preserves security boundaries from R01 and R04.
