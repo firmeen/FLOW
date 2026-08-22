@@ -28,13 +28,35 @@ export interface AppRolePermissions { created_at: Generated<Timestamp>; permissi
 export interface AppRoles { code: string; created_at: Generated<Timestamp>; id: Generated<string>; name: string; system: Generated<boolean>; tenant_id: string | null; }
 export interface AppUsers { created_at: Generated<Timestamp>; display_name: string; email: string | null; id: Generated<string>; normalized_email: Generated<string | null>; status: Generated<string>; updated_at: Generated<Timestamp>; }
 export interface AuditEvents { action: string; actor_id: string | null; actor_name_snapshot: string | null; branch_id: string | null; correlation_id: string | null; entity_id: string | null; entity_type: string; id: Generated<string>; metadata: Json | null; occurred_at: Generated<Timestamp>; reason: string | null; restaurant_id: string | null; summary: string; tenant_id: string; }
+export interface FoodflowCartItemModifiers { cart_item_id: string; created_at: Generated<Timestamp>; id: Generated<string>; modifier_choice_id: string; modifier_group_id: string; tenant_id: string; }
+export interface FoodflowCartItems { cart_id: string; created_at: Generated<Timestamp>; id: Generated<string>; menu_item_id: string; quantity: number; special_request: string | null; tenant_id: string; updated_at: Generated<Timestamp>; }
+export interface FoodflowCarts { branch_id: string; created_at: Generated<Timestamp>; customer_capability_digest: string | null; id: Generated<string>; status: Generated<string>; table_id: string; table_session_id: string | null; tenant_id: string; updated_at: Generated<Timestamp>; }
+export interface FoodflowKitchenTicketItems { id: Generated<string>; order_item_id: string; quantity: number; tenant_id: string; ticket_id: string; }
+export interface FoodflowKitchenTickets { branch_id: string; created_at: Generated<Timestamp>; id: Generated<string>; order_id: string; order_number_snapshot: string; problem_note: string | null; ready_at: Timestamp | null; remake_count: Generated<number>; served_at: Timestamp | null; started_at: Timestamp | null; station: string; status: string; table_id: string; table_session_id: string; tenant_id: string; }
+export interface FoodflowMenuAvailabilities { active: Generated<boolean>; created_at: Generated<Timestamp>; id: Generated<string>; name: string; restaurant_id: string; tenant_id: string; timezone: string; type: string; updated_at: Generated<Timestamp>; }
+export interface FoodflowMenuAvailabilityWindows { availability_id: string; created_at: Generated<Timestamp>; day_of_week: string; display_order: Generated<number>; end_time: string; id: Generated<string>; restaurant_id: string; start_time: string; tenant_id: string; }
+export interface FoodflowMenuBadges { active: Generated<boolean>; color: string; created_at: Generated<Timestamp>; icon: string | null; id: Generated<string>; name: string; restaurant_id: string; tenant_id: string; updated_at: Generated<Timestamp>; }
+export interface FoodflowMenuCategories { active: Generated<boolean>; archived_at: Timestamp | null; cover_image_url: string | null; created_at: Generated<Timestamp>; description: string | null; display_order: Generated<number>; id: Generated<string>; name: string; restaurant_id: string; tenant_id: string; thai_name: string | null; updated_at: Generated<Timestamp>; }
+export interface FoodflowMenuItemBadges { badge_id: string; created_at: Generated<Timestamp>; menu_item_id: string; restaurant_id: string; tenant_id: string; }
+export interface FoodflowMenuItemModifierGroups { created_at: Generated<Timestamp>; menu_item_id: string; modifier_group_id: string; restaurant_id: string; tenant_id: string; }
+export interface FoodflowMenuItems { archived_at: Timestamp | null; availability_id: string; base_price_minor: Int8; category_id: string; created_at: Generated<Timestamp>; currency: string; description: Generated<string>; display_order: Generated<number>; estimated_preparation_minutes: Generated<number>; id: Generated<string>; image_key: string | null; image_url: string | null; name: string; preparation_station: string; published_at: Timestamp | null; restaurant_id: string; status: string; tenant_id: string; thai_description: string | null; thai_name: string | null; updated_at: Generated<Timestamp>; vegetarian: Generated<boolean>; }
+export interface FoodflowModifierChoices { active: Generated<boolean>; created_at: Generated<Timestamp>; display_order: Generated<number>; id: Generated<string>; modifier_group_id: string; name: string; price_delta_minor: Generated<Int8>; restaurant_id: string; tenant_id: string; thai_name: string | null; updated_at: Generated<Timestamp>; }
+export interface FoodflowModifierGroups { active: Generated<boolean>; created_at: Generated<Timestamp>; display_order: Generated<number>; id: Generated<string>; kind: string; maximum_selections: Generated<number>; minimum_selections: Generated<number>; name: string; required: Generated<boolean>; restaurant_id: string; tenant_id: string; thai_name: string | null; updated_at: Generated<Timestamp>; }
+export interface FoodflowOrderEvents { actor_id: string | null; branch_id: string; correlation_id: string | null; event_type: string; from_status: string | null; id: Generated<string>; metadata: Json | null; occurred_at: Generated<Timestamp>; order_id: string; reason: string | null; tenant_id: string; to_status: string | null; }
+export interface FoodflowOrderItemModifiers { created_at: Generated<Timestamp>; id: Generated<string>; modifier_choice_id: string | null; modifier_choice_name: string; modifier_group_id: string | null; modifier_group_name: string; order_item_id: string; price_delta_minor: Int8; tenant_id: string; }
+export interface FoodflowOrderItems { created_at: Generated<Timestamp>; id: Generated<string>; line_total_minor: Int8; menu_item_id: string | null; menu_item_name: string; menu_item_thai_name: string | null; order_id: string; preparation_station: string; quantity: number; special_request: string | null; tenant_id: string; unit_price_minor: Int8; }
+export interface FoodflowOrders { accepted_at: Timestamp | null; branch_id: string; closed_at: Timestamp | null; created_at: Generated<Timestamp>; currency: string; customer_note: string | null; customer_status: string; id: Generated<string>; modified_by_staff: string | null; order_number: string; paid_at: Timestamp | null; preparing_at: Timestamp | null; ready_at: Timestamp | null; rejected_at: Timestamp | null; rejection_reason: string | null; restaurant_id: string; served_at: Timestamp | null; status: string; submission_key: string; submitted_at: Timestamp; subtotal_minor: Int8; table_id: string; table_session_id: string; tenant_id: string; updated_at: Generated<Timestamp>; }
+export interface FoodflowRestaurantTables { active: Generated<boolean>; branch_id: string; code: string; created_at: Generated<Timestamp>; display_order: Generated<number>; id: Generated<string>; label: string; qr_code: string; seats: number; tenant_id: string; updated_at: Generated<Timestamp>; }
+export interface FoodflowServiceRequests { acknowledged_at: Timestamp | null; acknowledged_by: string | null; branch_id: string; id: Generated<string>; note: string | null; priority: Generated<string>; requested_at: Generated<Timestamp>; resolved_at: Timestamp | null; resolved_by: string | null; status: string; table_id: string; table_session_id: string; tenant_id: string; type: string; }
+export interface FoodflowTableSessions { branch_id: string; closed_at: Timestamp | null; created_at: Generated<Timestamp>; customer_capability_digest: string | null; guest_count: Generated<number>; id: Generated<string>; notes: string | null; opened_at: Generated<Timestamp>; session_number: string; status: string; table_id: string; tenant_id: string; updated_at: Generated<Timestamp>; }
+export interface PaymentsPaymentAllocations { allocated_amount_minor: Int8; created_at: Generated<Timestamp>; id: Generated<string>; order_id: string; payment_id: string; tenant_id: string; }
+export interface PaymentsPaymentEvents { actor_id: string | null; correlation_id: string | null; event_type: string; id: Generated<string>; metadata: Json | null; occurred_at: Generated<Timestamp>; payment_id: string; reason: string | null; tenant_id: string; }
+export interface PaymentsPayments { branch_id: string; created_at: Generated<Timestamp>; currency: string; discount_amount_minor: Generated<Int8>; discount_bps: number | null; discount_reason: string | null; discount_type: string; discount_value_minor: Int8 | null; id: Generated<string>; method: string; recorded_at: Timestamp; recorded_by: string | null; reference: string; restaurant_id: string; service_charge_amount_minor: Int8; service_charge_bps: number; service_charge_enabled: boolean; status: string; subtotal_minor: Int8; table_id: string; table_session_id: string; tenant_id: string; total_minor: Int8; vat_amount_minor: Int8; vat_bps: number; vat_enabled: boolean; void_reason: string | null; voided_at: Timestamp | null; voided_by: string | null; }
 
-// Existing generated domain table shapes remain intentionally represented structurally here.
-// R01 only adds app.users.normalized_email; regenerate from a clean local database before integration.
 export interface Database {
-  "app.branches": AppBranches;
   "app.branch_opening_hours": AppBranchOpeningHours;
   "app.branch_settings": AppBranchSettings;
+  "app.branches": AppBranches;
   "app.memberships": AppMemberships;
   "app.organizations": AppOrganizations;
   "app.permissions": AppPermissions;
@@ -43,5 +65,28 @@ export interface Database {
   "app.roles": AppRoles;
   "app.users": AppUsers;
   "audit.events": AuditEvents;
-  [table: string]: unknown;
+  "foodflow.cart_item_modifiers": FoodflowCartItemModifiers;
+  "foodflow.cart_items": FoodflowCartItems;
+  "foodflow.carts": FoodflowCarts;
+  "foodflow.kitchen_ticket_items": FoodflowKitchenTicketItems;
+  "foodflow.kitchen_tickets": FoodflowKitchenTickets;
+  "foodflow.menu_availabilities": FoodflowMenuAvailabilities;
+  "foodflow.menu_availability_windows": FoodflowMenuAvailabilityWindows;
+  "foodflow.menu_badges": FoodflowMenuBadges;
+  "foodflow.menu_categories": FoodflowMenuCategories;
+  "foodflow.menu_item_badges": FoodflowMenuItemBadges;
+  "foodflow.menu_item_modifier_groups": FoodflowMenuItemModifierGroups;
+  "foodflow.menu_items": FoodflowMenuItems;
+  "foodflow.modifier_choices": FoodflowModifierChoices;
+  "foodflow.modifier_groups": FoodflowModifierGroups;
+  "foodflow.order_events": FoodflowOrderEvents;
+  "foodflow.order_item_modifiers": FoodflowOrderItemModifiers;
+  "foodflow.order_items": FoodflowOrderItems;
+  "foodflow.orders": FoodflowOrders;
+  "foodflow.restaurant_tables": FoodflowRestaurantTables;
+  "foodflow.service_requests": FoodflowServiceRequests;
+  "foodflow.table_sessions": FoodflowTableSessions;
+  "payments.payment_allocations": PaymentsPaymentAllocations;
+  "payments.payment_events": PaymentsPaymentEvents;
+  "payments.payments": PaymentsPayments;
 }
