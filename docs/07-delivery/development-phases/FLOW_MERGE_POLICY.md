@@ -1,87 +1,109 @@
-# FLOW Validated Automatic Merge Policy
+# FLOW Round Branch and Merge Policy
 
 Status: `ACTIVE`  
-Effective from: `2026-08-19 Asia/Bangkok`  
-Applies to: FLOW phase/round implementation PRs from P01/R05 onward and any still-open implementation PR governed after this policy reaches `main`.
+Applies to: FLOW phase/round implementation work.
 
 ## Purpose
 
-FLOW development runs on fixed scheduled slots. A completed round should not wait for a separate manual merge action when repository evidence already proves the round is safe to merge.
+FLOW separates implementation progression from integration into `main`.
 
-This policy replaces the former default of:
-
-```text
-IMPLEMENT
-→ OPEN PR
-→ PASS CI
-→ WAIT FOR OWNER MANUAL MERGE
-```
-
-with:
+The controlling model is:
 
 ```text
-IMPLEMENT
-→ OPEN OR UPDATE EXACTLY ONE IMPLEMENTATION PR
-→ WAIT FOR ALL REQUIRED CHECKS
-→ VERIFY ALL REQUIRED CHECKS PASS
-→ VERIFY PR IS MERGEABLE AND NON-CONFLICTING
-→ MERGE TO MAIN
-→ VERIFY MERGE SHA ON MAIN
-→ STOP UNTIL THE NEXT SCHEDULED SLOT
+MAIN
+= policy and executable specification authority
+
+LATEST ROUND BRANCH
+= implementation lineage
+
+OWNER
+= PR merge decision
 ```
+
+The development agent creates and validates round branches and opens PRs. It does not merge implementation PRs.
 
 ## Hard Gates
 
 The active FLOW development gates are:
 
 ```text
-NO SPEC = NO DEVELOPMENT
-FAILED REQUIRED CI = NO MERGE
-NO SUCCESSFUL MERGE = NO NEXT ROUND
-6 MERGED ROUNDS = PHASE COMPLETE
-NO NEXT PHASE SPEC = STOP
+NO SPEC ON MAIN = NO DEVELOPMENT
+FAILED REQUIRED CI = ROUND NOT READY
+NO ROUND BRANCH = NO NEXT ROUND BRANCH
+6 IMPLEMENTED ROUND BRANCHES = PHASE IMPLEMENTATION CHAIN COMPLETE
+NO NEXT PHASE SPEC ON MAIN = STOP
 ```
 
 These gates are fail-closed.
 
-## Merge Eligibility
+## Authority Source
 
-An implementation PR may be merged only when all of the following are true at the time of merge:
+Before every round, the development agent must read current `main` and use only `main` for:
 
-1. The exact executable specification exists on the PR base `main`.
-2. The specification status is `READY`.
-3. Phase/Round/Previous/Next metadata is valid and matches the PR metadata.
-4. The previous round is merged and its required checks passed, except for the first allowed round.
-5. The PR contains only the authorized round scope or explicitly documented unavoidable supporting changes permitted by that specification.
-6. Every required check applicable to the round has completed successfully.
-7. No required check is pending, queued, failed, cancelled, timed out, blocked, neutral where success is required, or otherwise incomplete.
-8. The PR is mergeable and has no unresolved merge conflict.
-9. No unresolved blocker owned by the current round remains.
-10. The current `main` and specification still authorize the merge when re-read immediately before merging.
+- `docs/07-delivery/development-phases/README.md`;
+- this policy;
+- `FLOW_PHASE_ROUND_SPEC_TEMPLATE.md`;
+- the exact `FLOW_P{PHASE}_R{ROUND}_IMPLEMENTATION_SPEC.md`;
+- repository instructions such as `CONTRIBUTING.md` / `AGENTS.md` when present;
+- applicable nested instructions.
 
-If any condition is not satisfied:
+An implementation branch, previous round branch, PR description, historical result, or remembered state must not become the specification authority.
+
+## Round Branch Lineage
+
+Each round creates a new dedicated branch.
+
+The new round branch must be created from the latest round implementation branch in the active chain, not from `main`, unless there is no prior round implementation branch for that chain.
+
+Example:
 
 ```text
-DO NOT MERGE
-DO NOT START THE NEXT ROUND
-REPORT THE EXACT BLOCKER
+main
+  \
+   p02-r01-core
+        \
+         p02-r02-auth
+              \
+               p02-r03-order
 ```
+
+Recommended branch naming pattern:
+
+```text
+p{phase}-r{round}-{short-description}
+```
+
+The description should be short, lower-case, and specific.
+
+Examples:
+
+```text
+p02-r01-core
+p02-r02-auth
+p02-r03-order
+```
+
+The agent must inspect only the latest round branch as the implementation parent for the next round. Earlier round branches remain history/evidence but are not alternate development bases.
+
+## Round Entry Eligibility
+
+A round may begin only when all applicable conditions are true:
+
+1. The exact executable specification exists on current `main`.
+2. The specification status is `READY`.
+3. Phase/Round/Previous/Next metadata is valid.
+4. The declared planned execution slot is due when applicable.
+5. The previous round branch exists as the latest implementation parent, unless this is the first round in the active chain.
+6. Required validation inherited by the new round is not failed or unresolved when the specification requires it.
+7. No unresolved blocker prevents starting the exact scope.
+
+The previous round implementation PR does not need to be merged before the next round branch is created.
 
 ## Required Checks
 
-Required checks are determined from the exact round specification and current repository workflows. The agent must not invent a PASS or treat an unrun required check as PASS.
+Required checks are determined from the exact round specification and current repository workflows.
 
-Typical contexts include, when applicable:
-
-```text
-Phase/Round Gate
-Dependency Integrity
-Next Flow Quality
-Supabase Database Quality
-Vercel
-```
-
-Round-specific checks named by an executable specification remain required even when they are not listed above.
+The agent must not fabricate PASS, weaken checks, rename required checks, suppress failures, or treat an unrun required check as PASS.
 
 Validation result vocabulary remains exactly:
 
@@ -93,115 +115,134 @@ BLOCKED
 NOT APPLICABLE
 ```
 
-`NOT RUN`, `BLOCKED`, or `NOT APPLICABLE` may be truthful evidence, but they do not satisfy a check that the specification marks as required to pass.
+Typical contexts include, when applicable:
 
-## Merge Method
+```text
+Phase/Round Gate
+Repository Integrity
+Dependency Integrity
+Next Flow Quality
+Supabase Database Quality
+Vercel
+```
 
-FLOW uses a controlled validated merge performed only after the merge-eligibility gate passes.
+Round-specific checks named by the executable specification remain required even when not listed above.
 
-The repository may use any merge method currently allowed by repository settings. The automation must use an allowed method and must provide the expected PR head SHA when the merge API supports it so a moved head cannot be merged accidentally.
+A failed required validation means the round branch is not ready for owner integration, but it does not authorize hiding or bypassing the failure.
 
-GitHub native Auto-Merge is not required for this policy. The scheduled agent may verify the completed checks and then invoke the repository merge operation directly.
+## PR Policy
 
-Direct pushes to `main` remain prohibited.
+For each implementation round, the agent must create or update exactly one implementation PR for that round when a PR is requested by the workflow.
+
+The PR must include:
+
+- Phase / Round;
+- exact specification filename;
+- implementation parent branch and SHA;
+- implementation head SHA;
+- actual validation results;
+- inherited blockers;
+- scope declarations;
+- next-spec handoff.
+
+The agent must stop after branch implementation, validation, and PR creation/update.
+
+## Merge Ownership
+
+Implementation PR merges are owner-controlled.
+
+The development agent must not:
+
+- merge an implementation PR;
+- enable automatic merge for an implementation PR;
+- treat a successful check run as permission to merge on behalf of the owner;
+- require a merge before creating the next round branch;
+- push implementation changes directly to `main`.
+
+The owner may choose which PR to merge and when to merge it.
+
+## Branch Progression vs Main Integration
+
+Branch progression and `main` integration are intentionally independent:
+
+```text
+ROUND PROGRESSION
+latest round branch
+→ new round branch
+→ next new round branch
+
+INTEGRATION
+owner-selected PR
+→ owner merge decision
+→ main
+```
+
+A later round may therefore contain the accumulated commits of earlier unmerged round branches because it descends from the latest round branch.
+
+This is expected behavior for the branch chain.
 
 ## One Scheduled Slot = At Most One Round
 
-A successful merge does not authorize another round inside the same scheduled execution.
+One scheduled execution may create or update at most one round branch.
 
-Example:
+It must never cascade through multiple rounds in the same slot.
 
-```text
-12:00 slot
-→ execute R05
-→ PR
-→ checks
-→ merge R05
-→ verify main
-→ STOP
+## Historical Specification Precedence
 
-20:00 slot
-→ re-read current main
-→ verify exact R06 spec and all entry gates
-→ only then execute R06
-```
-
-The automation must never cascade through multiple rounds in one slot.
-
-## Legacy Specification Precedence
-
-Specifications written before this policy may contain merge-mechanics language such as:
+Historical specifications may contain previous merge/progression wording such as:
 
 ```text
+Automatic merge allowed: YES
 Automatic merge allowed: NO
-No auto-merge
 Owner/manual merge required
-Stop for owner review
-Waiting for owner merge
+Validated automatic merge
+NO SUCCESSFUL MERGE = NO NEXT ROUND
+6 MERGED ROUNDS = PHASE COMPLETE
 ```
 
-After this policy is merged to `main`, those legacy phrases are superseded **for merge mechanics only** by this file and the current `development-phases/README.md`.
+After this policy is present on `main`, those phrases are superseded only for:
 
-This precedence does **not** change:
+- who performs the merge;
+- whether merge is required before the next branch;
+- branch progression mechanics;
+- phase implementation-chain completion mechanics.
+
+They do not change:
 
 - implementation scope;
 - database/security boundaries;
 - required tests;
 - required CI;
 - Phase/Round/Previous/Next metadata;
-- Definition of Done other than the final merge actor/mechanism;
+- scheduled execution authority;
 - prohibitions unrelated to merge mechanics.
 
-Historical specifications for already-completed rounds should not be rewritten solely to modernize old merge wording. Their repository history remains evidence of the policy that existed when those rounds executed.
+Historical specifications do not need to be rewritten solely to update old merge language.
 
 ## Future Specification Contract
 
-New executable specifications should declare merge policy explicitly:
+New executable specifications should avoid coupling development progression to PR merge state.
+
+They should declare the implementation parent expectation and preserve:
 
 ```text
-Automatic merge allowed: YES
-Merge condition: ALL REQUIRED CHECKS PASS
-Owner approval required before merge: NO
-```
-
-A future specification may require manual owner approval only when it explicitly opts out for a concrete high-risk reason. Such an exception must be visible in metadata and must override this default only for that round.
-
-## PR Evidence After Merge
-
-Before merge, the implementation PR should record:
-
-```text
-MERGE_ELIGIBLE: YES | NO
-REQUIRED_CHECKS_COMPLETE: YES | NO
-REQUIRED_CHECKS_PASS: YES | NO
-PR_MERGEABLE: YES | NO
-UNRESOLVED_ROUND_BLOCKER: NONE | <exact blocker>
-```
-
-After a successful merge, the scheduled run must verify and report:
-
-```text
-PR_MERGED: YES
-MERGE_SHA: <actual merge/result SHA>
-MAIN_SHA_AFTER_MERGE: <actual current main SHA>
-ROUND_STATUS: COMPLETE
-NEXT_SPECIFICATION: <exact Next value>
-NEXT_ROUND_STARTED_THIS_SLOT: NO
+Authority source: main
+Implementation parent: latest round branch
+Owner merge control: YES
+Agent merge allowed: NO
 ```
 
 ## Security and Failure Discipline
 
-Validated automatic merge must never be used to bypass repository safety controls.
+The agent must not:
 
-The automation must not:
-
-- disable or weaken checks to make a PR mergeable;
-- rename required checks to evade a gate;
-- merge with unresolved conflicts;
+- disable or weaken checks;
+- rename checks to evade a gate;
 - fabricate validation results;
 - use secrets in source, PR text, issues, or logs;
-- merge implementation scope that is not authorized by the exact spec;
-- continue to the next round after a failed merge;
-- start another round in the same slot after a successful merge.
+- broaden implementation scope beyond the exact spec on `main`;
+- use an older round branch when a newer round branch is the current implementation parent;
+- use an unmerged spec branch as authority;
+- merge implementation PRs.
 
 The safe default for ambiguity is `STOP`.

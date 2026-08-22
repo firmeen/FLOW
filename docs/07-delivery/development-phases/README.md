@@ -35,75 +35,116 @@ Rules:
 - One phase contains 6 rounds.
 - The normal cadence is 2 days per phase and 3 rounds per day.
 - The normal round times are 04:00, 12:00, and 20:00 Asia/Bangkok.
-- One scheduled slot may execute at most one round, even when that round merges successfully before the slot ends.
+- One scheduled slot may execute at most one round.
 - Do not rename a specification after development for that round has started.
 - Do not reuse a phase/round filename for a different scope.
+
+## Authority and implementation lineage
+
+FLOW uses two separate sources for control and code lineage:
+
+```text
+MAIN
+= policy / specification authority
+
+LATEST ROUND BRANCH
+= implementation parent
+```
+
+Every scheduled round must read the controlling policy and exact executable specification from current `main` only. A round branch, previous round branch, PR body, remembered state, or unmerged documentation branch must never replace `main` as the authority source.
+
+Implementation branches follow a branch chain. Each new round creates a new dedicated short-lived round branch from the latest round implementation branch, not from `main`, unless there is no prior round branch in the active chain.
+
+Example:
+
+```text
+main                  (authority only)
+  \
+   p02-r01-core
+        \
+         p02-r02-auth
+              \
+               p02-r03-order
+```
+
+Recommended short branch pattern:
+
+```text
+p{phase}-r{round}-{short-description}
+```
+
+Examples:
+
+```text
+p02-r01-core
+p02-r02-auth
+p02-r03-order
+```
+
+The description should be short and specific.
 
 ## Development gate
 
 FLOW development must follow these hard gates:
 
 ```text
-NO SPEC = NO DEVELOPMENT
-FAILED REQUIRED CI = NO MERGE
-NO SUCCESSFUL MERGE = NO NEXT ROUND
-6 MERGED ROUNDS = PHASE COMPLETE
-NO NEXT PHASE SPEC = STOP
+NO SPEC ON MAIN = NO DEVELOPMENT
+FAILED REQUIRED CI = ROUND NOT READY
+NO ROUND BRANCH = NO NEXT ROUND BRANCH
+6 IMPLEMENTED ROUND BRANCHES = PHASE IMPLEMENTATION CHAIN COMPLETE
+NO NEXT PHASE SPEC ON MAIN = STOP
 ```
 
 Before starting any round, verify all of the following:
 
-1. The previous round PR is merged, unless this is the first round of the first phase.
-2. Required CI/checks for the previous round have passed.
-3. The current round specification exists on `main` at this directory.
-4. The specification follows the required naming pattern.
-5. The specification identifies the previous and next specification explicitly.
-6. The current implementation scope is taken from the specification; agents must not invent the next round when no specification exists.
+1. The exact current-round specification exists on `main`.
+2. The specification is `READY` and has valid Phase/Round/Previous/Next metadata.
+3. The planned execution slot is due when the specification declares one.
+4. The previous round branch exists and is the latest implementation parent, unless this is the first round in the active branch chain.
+5. Required validation for the previous round branch passed when the current specification depends on that validation.
+6. The current implementation scope is taken only from the specification on `main`; agents must not invent the next round when no specification exists.
+
+A previous round does not need to be merged into `main` before the next round branch is created. Branch progression is based on the latest round branch, while specification authority remains on `main`.
 
 If any required entry gate fails, stop before implementation and report the exact blocker.
 
-## Validated automatic merge policy
-
-The default FLOW merge model is **validated automatic merge after required checks pass**.
-
-The authoritative merge policy is:
-
-```text
-FLOW_MERGE_POLICY.md
-```
+## Branch and PR policy
 
 For every implementation round:
 
 ```text
-IMPLEMENT EXACT SPEC
-→ OPEN OR UPDATE EXACTLY ONE IMPLEMENTATION PR TO MAIN
-→ WAIT FOR ALL REQUIRED CHECKS
-→ VERIFY ALL REQUIRED CHECKS PASS
-→ VERIFY PR IS MERGEABLE / NON-CONFLICTING
-→ MERGE TO MAIN
-→ VERIFY MERGE SHA AND CURRENT MAIN
-→ STOP UNTIL THE NEXT SCHEDULED SLOT
+READ POLICY + EXACT SPEC FROM MAIN
+→ IDENTIFY LATEST ROUND BRANCH
+→ CREATE A NEW ROUND BRANCH FROM THAT BRANCH
+→ IMPLEMENT EXACT SPEC
+→ RUN REQUIRED VALIDATION ON THE NEW ROUND BRANCH
+→ OPEN OR UPDATE THE ROUND PR
+→ STOP
 ```
 
-An implementation PR must not merge while a required check is failed, pending, queued, cancelled, blocked, timed out, or otherwise incomplete. A failed or incomplete merge gate stops progression and must be reported rather than bypassed.
+The development agent must not merge implementation PRs. PR merge timing and selection remain owner-controlled.
 
 Direct push to `main` remains prohibited.
 
-### Legacy specification merge wording
+A round PR may target `main` or another owner-selected integration branch according to the current repository workflow, but creating the next round branch does not depend on that PR being merged.
 
-Specifications authored before `FLOW_MERGE_POLICY.md` may contain historical merge-only language such as:
+## Specification precedence
+
+Executable specifications remain authoritative for implementation scope, security boundaries, required validation, Phase/Round metadata, and non-merge prohibitions.
+
+If a historical specification contains merge-mechanics language such as:
 
 ```text
+Automatic merge allowed: YES
 Automatic merge allowed: NO
 Owner/manual merge required
 Stop for owner review
+No successful merge = no next round
 ```
 
-Once the validated automatic merge policy is present on `main`, `FLOW_MERGE_POLICY.md` and this README supersede those legacy phrases **only for the actor/mechanics of merging**. The executable specification remains authoritative for implementation scope, security boundaries, required validation, Phase/Round metadata, and all non-merge prohibitions.
+current `FLOW_MERGE_POLICY.md` and this README supersede those phrases only for branch progression, PR ownership, and merge mechanics. They do not broaden or reduce implementation scope.
 
-Historical completed-round specs do not need to be rewritten solely to modernize old merge wording.
-
-A future specification may explicitly require manual approval for a concrete high-risk reason. Such an exception must be declared clearly in that round's metadata and is not inferred from legacy wording.
+Historical completed-round specs do not need to be rewritten solely to modernize old workflow wording.
 
 ## Required specification structure
 
@@ -145,9 +186,7 @@ Round: 01
 Status: READY
 Previous: NONE
 Next: FLOW_P01_R02_IMPLEMENTATION_SPEC.md
-Automatic merge allowed: YES
-Merge condition: ALL REQUIRED CHECKS PASS
-Owner approval required before merge: NO
+Planned execution: YYYY-MM-DD HH:mm Asia/Bangkok
 ```
 
 The final round of a phase points to the first round of the next phase:
@@ -156,7 +195,7 @@ The final round of a phase points to the first round of the next phase:
 Next: FLOW_P02_R01_IMPLEMENTATION_SPEC.md
 ```
 
-If the referenced next file is not present on `main`, the development workflow must stop after the current round is completed and merged.
+If the referenced next file is not present on `main`, the development workflow must stop before starting the next phase branch.
 
 ## Upload workflow
 
@@ -166,8 +205,8 @@ For a new round specification:
 2. Rename it using `FLOW_P{PHASE}_R{ROUND}_IMPLEMENTATION_SPEC.md`.
 3. Fill every section required by the scope.
 4. Confirm `Previous` and `Next` are correct.
-5. Confirm merge metadata follows `FLOW_MERGE_POLICY.md` unless the round explicitly documents a manual-approval exception.
+5. Confirm workflow metadata follows `FLOW_MERGE_POLICY.md`.
 6. Open a PR targeting `main`.
-7. Merge the specification before that development round is allowed to start.
+7. Merge the specification to `main` before that development round is allowed to start.
 
 The repository state on `main` is the authoritative source for whether a specification exists and whether development may continue.
