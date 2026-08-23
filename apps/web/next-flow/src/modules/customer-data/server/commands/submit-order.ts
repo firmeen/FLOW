@@ -50,6 +50,16 @@ export async function submitCustomerOrder(
         throw new CustomerCommandError("CUSTOMER_COMMAND_ITEM_UNAVAILABLE");
       }
 
+      const modifiersValid = await repositories.menuAvailability.areModifierSelectionsCurrentlyValid(
+        cart.items.map((item) => ({
+          menuItemId: item.menuItemId,
+          modifierChoiceIds: item.modifiers.map((modifier) => modifier.modifierChoiceId),
+        })),
+      );
+      if (!modifiersValid) {
+        throw new CustomerCommandError("CUSTOMER_COMMAND_ITEM_UNAVAILABLE");
+      }
+
       const draftInput: PersistDraftOrderInput = Object.freeze({
         sourceCartId: cart.id,
         customerNote,
