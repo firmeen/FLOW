@@ -11,14 +11,14 @@ function source(relativePath: string) {
 
 describe("P02/R05 live permission authority", () => {
   it.each([
-    ["app/(operations)/staff/page.tsx", "/staff"],
-    ["app/(operations)/kitchen/page.tsx", "/kitchen"],
-    ["app/(operations)/cashier/page.tsx", "/cashier"],
-    ["app/(management)/admin/page.tsx", "/admin"],
-  ] as const)("guards %s before rendering its privileged surface", (file, path) => {
-    const page = source(file);
-    expect(page).toContain("requireRoutePermission");
-    expect(page).toContain(`requireRoutePermission(\"${path}\")`);
+    ["app/(operations)/staff/layout.tsx", "/staff"],
+    ["app/(operations)/kitchen/layout.tsx", "/kitchen"],
+    ["app/(operations)/cashier/layout.tsx", "/cashier"],
+    ["app/(management)/admin/layout.tsx", "/admin"],
+  ] as const)("guards %s before rendering its privileged route family", (file, path) => {
+    const layout = source(file);
+    expect(layout).toContain("requireRoutePermission");
+    expect(layout).toContain(`requireRoutePermission(\"${path}\")`);
   });
 
   it("keeps permission authority out of Auth.js session and proxy", () => {
@@ -44,9 +44,12 @@ describe("P02/R05 live permission authority", () => {
 
   it("provides an atomic server command boundary rather than trusting route access", () => {
     const commandAuth = source("modules/identity/server/authorized-transaction.ts");
+    const commandMap = source("modules/identity/server/command-permissions.ts");
     expect(commandAuth).toContain("authorizePermissionInTransaction");
     expect(commandAuth).toContain("AuthorizationDeniedError");
     expect(commandAuth).toContain("withTenantTransaction");
+    expect(commandMap).toContain("withAuthorizedCurrentAccessTransaction");
     expect(commandAuth).not.toContain("localStorage");
+    expect(commandMap).not.toContain("roleId ===");
   });
 });
