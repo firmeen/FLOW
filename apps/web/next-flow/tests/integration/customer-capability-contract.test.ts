@@ -1,12 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  issueCustomerCapability,
-  verifyCustomerCapability,
-} from "@/modules/customer-capability/server/capability-codec";
+import { issueCustomerCapability } from "@/modules/customer-capability/server/capability-codec";
 import { resolveCustomerEntry } from "@/modules/customer-capability/server/entry-resolver";
 import { validateCustomerCapabilityScope } from "@/modules/customer-capability/server/repository";
 import type { CustomerCapabilityClaims } from "@/modules/customer-capability/server/types";
+import { validateCustomerCapability } from "@/modules/customer-capability/server/validate-customer-capability";
 import {
   destroyDatabaseRuntimeForTests,
   getDatabaseRuntime,
@@ -44,7 +42,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       await destroyDatabaseRuntimeForTests();
     });
 
-    it("resolves one active public entry and binds the signed scope to server IDs", async () => {
+    it("resolves one active public entry and returns immutable server-authoritative context", async () => {
       const resolution = await resolveCustomerEntry("restaurant-a", "T-A1");
       expect(resolution.status).toBe("resolved");
       if (resolution.status !== "resolved") return;
@@ -59,15 +57,20 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       });
 
       const issued = issueCustomerCapability(resolution.entry, 2_000_000_000);
-      const verified = verifyCustomerCapability(issued.token, 2_000_000_001);
-      expect(verified.status).toBe("valid");
-      if (verified.status !== "valid") return;
-
-      await expect(validateCustomerCapabilityScope(verified.claims)).resolves.toMatchObject({
+      const validated = await validateCustomerCapability(issued.token);
+      expect(validated.status).toBe("resolved");
+      if (validated.status !== "resolved") return;
+      expect(validated.context).toMatchObject({
         tenantId: ids.tenantA,
+        restaurantId: ids.restaurantA,
         branchId: ids.branchA1,
         tableId: ids.tableA1,
+        restaurantSlug: "restaurant-a",
+        tableCode: "T-A1",
       });
+      expect(Object.isFrozen(validated.context)).toBe(true);
+      expect(Object.keys(validated.context)).not.toContain("actorId");
+      expect(Object.keys(validated.context)).not.toContain("permissions");
     });
 
     it("denies sibling-branch and cross-tenant scope substitution", async () => {
