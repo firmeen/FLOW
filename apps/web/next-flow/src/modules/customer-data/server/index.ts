@@ -1,5 +1,26 @@
 import "server-only";
 
+export {
+  addCustomerCartItem,
+  createCustomerCart,
+  CustomerCommandError,
+  removeCustomerCartItem,
+  submitCustomerOrder,
+  toCustomerCommandError,
+  updateCustomerCartItem,
+} from "./commands";
+export type {
+  AddCartItemCommandInput,
+  AddCartItemCommandResult,
+  CreateCartCommandResult,
+  CustomerCommandErrorCode,
+  RemoveCartItemCommandInput,
+  RemoveCartItemCommandResult,
+  SubmitOrderCommandInput,
+  SubmitOrderCommandResult,
+  UpdateCartItemCommandInput,
+  UpdateCartItemCommandResult,
+} from "./commands";
 export { toCustomerDatabaseContext } from "./context";
 export type { CustomerDatabaseContext } from "./context";
 export {
@@ -23,6 +44,7 @@ export type {
   CustomerOrderItemSnapshot,
   CustomerOrderModifierSnapshot,
   CustomerOrderStatus,
+  CustomerSubmittedOrder,
   PersistDraftOrderInput,
   PersistDraftOrderItemInput,
   PersistDraftOrderModifierInput,
