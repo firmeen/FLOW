@@ -124,7 +124,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       }
     });
 
-    it("binds an active table session and revokes it immediately after closure", async () => {
+    it("revokes table-only scope when a session opens and revokes session scope on closure", async () => {
       const { db } = getDatabaseRuntime();
       await db
         .insertInto("foodflow.restaurant_tables")
@@ -139,27 +139,47 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
           active: true,
         })
         .execute();
-      await db
-        .insertInto("foodflow.table_sessions")
-        .values({
-          id: ids.tableSession,
-          tenant_id: ids.tenantA,
-          branch_id: ids.branchA1,
-          table_id: ids.sessionTable,
-          session_number: "P03-R01-TEST-SESSION",
-          status: "ACTIVE",
-          guest_count: 1,
-        })
-        .execute();
 
       try {
-        const resolution = await resolveCustomerEntry("restaurant-a", "P03-R01-SESSION");
-        expect(resolution.status).toBe("resolved");
-        if (resolution.status !== "resolved") return;
-        expect(resolution.entry.tableSessionId).toBe(ids.tableSession);
+        const tableOnlyResolution = await resolveCustomerEntry(
+          "restaurant-a",
+          "P03-R01-SESSION",
+        );
+        expect(tableOnlyResolution.status).toBe("resolved");
+        if (tableOnlyResolution.status !== "resolved") return;
+        expect(tableOnlyResolution.entry.tableSessionId).toBeNull();
+        const tableOnlyClaims = issueCustomerCapability(
+          tableOnlyResolution.entry,
+          2_000_000_000,
+        ).claims;
 
-        const claims = issueCustomerCapability(resolution.entry, 2_000_000_000).claims;
-        await expect(validateCustomerCapabilityScope(claims)).resolves.toMatchObject({
+        await db
+          .insertInto("foodflow.table_sessions")
+          .values({
+            id: ids.tableSession,
+            tenant_id: ids.tenantA,
+            branch_id: ids.branchA1,
+            table_id: ids.sessionTable,
+            session_number: "P03-R01-TEST-SESSION",
+            status: "ACTIVE",
+            guest_count: 1,
+          })
+          .execute();
+
+        await expect(validateCustomerCapabilityScope(tableOnlyClaims)).resolves.toBeNull();
+
+        const sessionResolution = await resolveCustomerEntry(
+          "restaurant-a",
+          "P03-R01-SESSION",
+        );
+        expect(sessionResolution.status).toBe("resolved");
+        if (sessionResolution.status !== "resolved") return;
+        expect(sessionResolution.entry.tableSessionId).toBe(ids.tableSession);
+        const sessionClaims = issueCustomerCapability(
+          sessionResolution.entry,
+          2_000_000_100,
+        ).claims;
+        await expect(validateCustomerCapabilityScope(sessionClaims)).resolves.toMatchObject({
           tableSessionId: ids.tableSession,
         });
 
@@ -169,7 +189,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
           .where("id", "=", ids.tableSession)
           .execute();
 
-        await expect(validateCustomerCapabilityScope(claims)).resolves.toBeNull();
+        await expect(validateCustomerCapabilityScope(sessionClaims)).resolves.toBeNull();
       } finally {
         await db
           .deleteFrom("foodflow.table_sessions")
