@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
-import { requireInternalSession } from "@/lib/auth";
+import { requireCurrentAccessContext } from "@/modules/identity/server/current-access";
 
 export default async function ManagementLayout({ children }: { children: ReactNode }) {
-  await requireInternalSession();
+  await requireCurrentAccessContext({ requireBranch: true, nextPath: "/admin" });
   return children;
 }
