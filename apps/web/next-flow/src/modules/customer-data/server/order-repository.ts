@@ -48,7 +48,7 @@ function validateItem(item: PersistDraftOrderItemInput): void {
   if (!CURRENCY_PATTERN.test(item.currency)) {
     throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
   }
-  if (minor(item.unitPriceMinor) < 0n) {
+  if (minor(item.unitPriceMinor) < BigInt(0)) {
     throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
   }
   requiredText(item.menuItemName);
@@ -71,10 +71,10 @@ function validateItem(item: PersistDraftOrderItemInput): void {
 function calculateLineTotal(item: PersistDraftOrderItemInput): bigint {
   const modifierTotal = item.modifiers.reduce(
     (sum, modifier) => sum + minor(modifier.priceDeltaMinor),
-    0n,
+    BigInt(0),
   );
   const total = (minor(item.unitPriceMinor) + modifierTotal) * BigInt(item.quantity);
-  if (total < 0n) {
+  if (total < BigInt(0)) {
     throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
   }
   return total;
@@ -120,7 +120,7 @@ export class CustomerOrderRepository {
 
     const subtotalMinor = input.items.reduce(
       (sum, item) => sum + calculateLineTotal(item),
-      0n,
+      BigInt(0),
     );
     const orderId = randomUUID();
     const orderNumber = `DRAFT-${orderId.slice(0, 8).toUpperCase()}`;
