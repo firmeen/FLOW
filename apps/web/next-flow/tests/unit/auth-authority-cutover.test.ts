@@ -1,31 +1,38 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-function source(relativePath: string) {
-  return readFileSync(
-    fileURLToPath(new URL(`../../src/${relativePath}`, import.meta.url)),
-    "utf8",
-  );
+function sourceUrl(relativePath: string) {
+  return new URL(`../../src/${relativePath}`, import.meta.url);
 }
 
-describe("P02/R03 authentication authority cutover", () => {
-  it("removes legacy cookie and token verification from the protected proxy", () => {
-    const proxySource = source("proxy.ts");
+function source(relativePath: string) {
+  return readFileSync(fileURLToPath(sourceUrl(relativePath)), "utf8");
+}
 
-    expect(proxySource).toContain("NextAuth(authConfig).auth");
-    expect(proxySource).not.toContain("SESSION_COOKIE_NAME");
-    expect(proxySource).not.toContain("verifySession");
-    expect(proxySource).not.toContain("foodflow_session");
+function sourceExists(relativePath: string) {
+  return existsSync(fileURLToPath(sourceUrl(relativePath)));
+}
+
+describe("P02/R06 authentication authority cleanup", () => {
+  it("physically removes the legacy shared-auth runtime sources", () => {
+    expect(sourceExists("lib/auth/config.ts")).toBe(false);
+    expect(sourceExists("lib/auth/token.ts")).toBe(false);
+    expect(sourceExists("app/api/auth/login/route.ts")).toBe(false);
   });
 
-  it("retires the legacy shared-credential login endpoint", () => {
-    const routeSource = source("app/api/auth/login/route.ts");
+  it("keeps Auth.js as the sole protected session authority", () => {
+    const sessionSource = source("lib/auth/session.ts");
+    const proxySource = source("proxy.ts");
 
-    expect(routeSource).toContain("status: 410");
-    expect(routeSource).not.toContain("credentialsMatch");
-    expect(routeSource).not.toContain("getInternalAuthConfig");
-    expect(routeSource).not.toContain("createSession()");
+    expect(sessionSource).toContain("return auth()");
+    expect(sessionSource).toContain("signOut({ redirect: false })");
+    expect(sessionSource).not.toContain("foodflow_session");
+    expect(sessionSource).not.toContain("SESSION_COOKIE_NAME");
+    expect(sessionSource).not.toContain("createSessionToken");
+    expect(proxySource).toContain("NextAuth(authConfig).auth");
+    expect(proxySource).not.toContain("verifySession");
+    expect(proxySource).not.toContain("getDatabaseRuntime");
   });
 
   it("keeps workspace and permission authority out of Auth.js configuration", () => {
