@@ -33,6 +33,11 @@ export {
   withAuthorizedCurrentAccessTransaction,
 } from "./authorized-transaction";
 export {
+  PRIVILEGED_COMMAND_PERMISSION_REQUIREMENTS,
+  getCommandPermissionRequirement,
+  withAuthorizedCommandTransaction,
+} from "./command-permissions";
+export {
   INTERNAL_ROUTE_PERMISSION_REQUIREMENTS,
   getRoutePermissionRequirement,
   requireRoutePermission,
@@ -63,5 +68,9 @@ export type {
   PermissionScope,
 } from "./authorize-permission";
 export type { PermissionCode } from "./permissions";
+export type {
+  CommandPermissionRequirement,
+  PrivilegedCommandName,
+} from "./command-permissions";
 export type { RoutePermissionRequirement } from "./route-permissions";
 export type { CredentialCandidate, LoginThrottleState } from "./types";
