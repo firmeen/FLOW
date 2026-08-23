@@ -1,15 +1,14 @@
 import "server-only";
 
+import { findActiveCredentialCandidateByEmail } from "./credential-repository";
+import { normalizeLoginEmail } from "./email";
+import { IdentityInputError } from "./errors";
 import {
   clearLoginFailures,
-  findActiveCredentialCandidateByEmail,
-  normalizeLoginEmail,
-  performDummyPasswordVerification,
   readLoginThrottle,
   recordLoginFailure,
-  verifyPassword,
-} from "./index";
-import { IdentityInputError } from "./errors";
+} from "./login-throttle";
+import { verifyPassword, performDummyPasswordVerification } from "./password-verifier";
 import { MAX_PASSWORD_INPUT_LENGTH } from "./policy";
 import { deriveLoginThrottleSubject } from "./throttle-subject";
 import type { CredentialCandidate, LoginThrottleState } from "./types";
