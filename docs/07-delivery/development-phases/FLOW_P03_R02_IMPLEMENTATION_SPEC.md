@@ -1742,7 +1742,38 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - R03 must preserve R02 read behavior/regressions.
 - R03 must not move cart/order authority into browser state.
 
-# 216. Required Next Specification
+# 216. R03 Write Authorization Preconditions
+- R03 spec must inspect actual R02 role name and grants rather than assuming `flow_customer_runtime` exists.
+- Any INSERT/UPDATE/DELETE grant must be tied to exact cart/order operation.
+- R03 must add negative wrong-tenant/wrong-branch write tests.
+- R03 must preserve fixed-search-path rules for any new private mutation functions.
+- R03 must not reuse staff `flow_runtime` as shortcut.
+
+# 217. R03 Persistence Schema Preconditions
+- R03 must inspect existing `foodflow.carts`, `cart_items`, `orders`, and `order_items` schema before migration design.
+- Existing tables must be extended/reused when semantically correct.
+- Do not create duplicate cart/order tables under another schema merely to simplify customer writes.
+- Historical migrations remain immutable.
+- Customer capability/session ownership linkage must be explicit if added.
+
+# 218. R03 Repository Extension Preconditions
+- Cart/order repositories must be transaction-bound like R02 repositories.
+- They must derive scope from trusted context.
+- They must not accept tenant/branch override parameters.
+- They must use exact persistence errors rather than raw DB errors.
+- They must remain server-only.
+
+# 219. Final R02 Acceptance Evidence Required
+- exact customer data transaction path recorded.
+- exact DB role/grants recorded.
+- exact repository paths recorded.
+- exact customer read surface integrated recorded.
+- cross-tenant denial evidence recorded.
+- context leakage/rollback evidence recorded.
+- R03 write privileges remain absent and proven.
+- no cart/order persistence migration is included.
+
+# 220. Required Next Specification
 ```text
 FLOW_P03_R03_IMPLEMENTATION_SPEC.md
 ```
@@ -1750,7 +1781,7 @@ FLOW_P03_R03_IMPLEMENTATION_SPEC.md
 - R02 does not infer R03 schema prematurely.
 - No R03 implementation starts until exact spec exists on `main`.
 
-# 217. Final Acceptance Statement
+# 221. Final Acceptance Statement
 - P03/R02 is READY as an executable specification document.
 - R02 establishes the customer server data-access substrate between capability trust and durable persistence.
 - Customer repositories consume validated context rather than raw client selectors.
