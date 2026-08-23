@@ -63,16 +63,16 @@ select ok(
   'customer runtime cannot read staff roles'
 );
 select ok(
-  not has_table_privilege('flow_customer_runtime', 'foodflow.carts', 'SELECT'),
-  'R02 customer runtime cannot read carts yet'
+  not has_table_privilege('flow_customer_runtime', 'foodflow.carts', 'TRUNCATE'),
+  'later customer persistence rounds do not grant unrestricted cart destruction'
 );
 select ok(
-  not has_table_privilege('flow_customer_runtime', 'foodflow.carts', 'INSERT'),
-  'R02 customer runtime cannot create carts'
+  not has_column_privilege('flow_customer_runtime', 'foodflow.carts', 'tenant_id', 'UPDATE'),
+  'later customer persistence rounds cannot rewrite cart tenant ownership'
 );
 select ok(
-  not has_table_privilege('flow_customer_runtime', 'foodflow.orders', 'INSERT'),
-  'R02 customer runtime cannot create orders'
+  not has_table_privilege('flow_customer_runtime', 'foodflow.orders', 'UPDATE'),
+  'R03 persistence does not grant customer order transition authority'
 );
 select ok(
   not has_table_privilege('flow_customer_runtime', 'payments.payments', 'SELECT'),
