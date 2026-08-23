@@ -103,7 +103,16 @@ async function signInWithDatabaseFixture(page: Page, nextPath: string) {
   await page.getByLabel("Email").fill(E2E_AUTH.email);
   await page.getByLabel("Password").fill(E2E_AUTH.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((url) => url.pathname === nextPath);
+  await page.waitForURL(
+    (url) => url.pathname === nextPath || url.pathname === "/workspace",
+  );
+
+  if (new URL(page.url()).pathname === "/workspace") {
+    await page
+      .getByRole("button", { name: /Tenant A.*Branch A1/i })
+      .click();
+    await page.waitForURL((url) => url.pathname === nextPath);
+  }
 }
 
 for (const surface of publicSurfaces) {
@@ -123,7 +132,7 @@ for (const surface of internalSurfaces) {
     }, testInfo) => {
       test.skip(
         !process.env.DATABASE_URL,
-        "R03 protected-surface browser checks require a seeded local database",
+        "R04 protected-surface browser checks require a seeded local database",
       );
 
       await signInWithDatabaseFixture(page, surface.path);
