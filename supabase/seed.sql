@@ -56,35 +56,53 @@ values
 insert into foodflow.menu_item_modifier_groups (tenant_id, restaurant_id, menu_item_id, modifier_group_id)
 values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000a8');
 
--- P01/R04 deterministic synthetic actor/RBAC fixtures. These are identities only;
--- no passwords, credentials, provider references, or real user data are seeded.
-insert into app.users (id, display_name, status)
+-- P02/R02 deterministic synthetic identity/RBAC fixtures.
+-- These values are local/test-only and are intentionally stable for later rounds.
+insert into app.users (id, email, display_name, status)
 values
-  ('30000000-0000-4000-8000-0000000000a1', 'R04 Tenant A Manager', 'ACTIVE'),
-  ('30000000-0000-4000-8000-0000000000a2', 'R04 Branch A1 Staff', 'ACTIVE'),
-  ('30000000-0000-4000-8000-0000000000a3', 'R04 Branch A2 Staff', 'ACTIVE'),
-  ('30000000-0000-4000-8000-0000000000a4', 'R04 Suspended User', 'SUSPENDED'),
-  ('30000000-0000-4000-8000-0000000000a5', 'R04 Invited Membership User', 'ACTIVE'),
-  ('30000000-0000-4000-8000-0000000000a6', 'R04 Suspended Membership User', 'ACTIVE'),
-  ('30000000-0000-4000-8000-0000000000a7', 'R04 Revoked Membership User', 'ACTIVE'),
-  ('30000000-0000-4000-8000-0000000000b1', 'R04 Tenant B Staff', 'ACTIVE');
+  ('30000000-0000-4000-8000-0000000000a1', 'owner.a@flow.test', 'Tenant A Manager', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000a2', 'staff.a1@flow.test', 'Branch A1 Staff', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000a3', 'staff.a2@flow.test', 'Branch A2 Staff', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000a4', 'suspended.a1@flow.test', 'Suspended User', 'SUSPENDED'),
+  ('30000000-0000-4000-8000-0000000000a5', 'invited.a1@flow.test', 'Invited Membership User', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000a6', 'suspended-member.a1@flow.test', 'Suspended Membership User', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000a7', 'revoked.a1@flow.test', 'Revoked Membership User', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000a8', 'kitchen.a1@flow.test', 'Kitchen A1', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000a9', 'cashier.a2@flow.test', 'Cashier A2', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000aa', 'disabled.a1@flow.test', 'Disabled Credential User', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000ab', 'nocredential.a1@flow.test', 'No Credential User', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000ad', 'nomembership.a1@flow.test', 'No Membership User', 'ACTIVE'),
+  ('30000000-0000-4000-8000-0000000000b1', 'staff.b1@flow.test', 'Tenant B Staff', 'ACTIVE');
 
 insert into app.roles (id, tenant_id, code, name, system)
 values
   ('50000000-0000-4000-8000-0000000000a1', '00000000-0000-0000-0000-0000000000a1', 'R04_MANAGER', 'R04 Manager', false),
   ('50000000-0000-4000-8000-0000000000a2', '00000000-0000-0000-0000-0000000000a1', 'R04_STAFF', 'R04 Staff', false),
+  ('50000000-0000-4000-8000-0000000000a3', '00000000-0000-0000-0000-0000000000a1', 'KITCHEN', 'Kitchen', false),
+  ('50000000-0000-4000-8000-0000000000a4', '00000000-0000-0000-0000-0000000000a1', 'CASHIER', 'Cashier', false),
   ('50000000-0000-4000-8000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', 'R04_STAFF', 'R04 Staff', false);
 
 insert into app.role_permissions (role_id, permission_id)
 select fixture.role_id, permission.id
 from (values
+  ('50000000-0000-4000-8000-0000000000a1'::uuid, 'management.admin.access'),
   ('50000000-0000-4000-8000-0000000000a1'::uuid, 'order.view'),
   ('50000000-0000-4000-8000-0000000000a1'::uuid, 'member.view'),
   ('50000000-0000-4000-8000-0000000000a1'::uuid, 'member.invite'),
   ('50000000-0000-4000-8000-0000000000a1'::uuid, 'member.manage'),
   ('50000000-0000-4000-8000-0000000000a1'::uuid, 'role.view'),
   ('50000000-0000-4000-8000-0000000000a1'::uuid, 'role.manage'),
+  ('50000000-0000-4000-8000-0000000000a2'::uuid, 'operations.staff.access'),
   ('50000000-0000-4000-8000-0000000000a2'::uuid, 'order.view'),
+  ('50000000-0000-4000-8000-0000000000a3'::uuid, 'operations.kitchen.access'),
+  ('50000000-0000-4000-8000-0000000000a3'::uuid, 'kitchen.view'),
+  ('50000000-0000-4000-8000-0000000000a3'::uuid, 'kitchen.manage'),
+  ('50000000-0000-4000-8000-0000000000a3'::uuid, 'order.view'),
+  ('50000000-0000-4000-8000-0000000000a4'::uuid, 'operations.cashier.access'),
+  ('50000000-0000-4000-8000-0000000000a4'::uuid, 'merchant_payment.view'),
+  ('50000000-0000-4000-8000-0000000000a4'::uuid, 'merchant_payment.collect'),
+  ('50000000-0000-4000-8000-0000000000a4'::uuid, 'order.view'),
+  ('50000000-0000-4000-8000-0000000000b1'::uuid, 'operations.staff.access'),
   ('50000000-0000-4000-8000-0000000000b1'::uuid, 'order.view')
 ) as fixture(role_id, permission_code)
 join app.permissions permission on permission.code = fixture.permission_code;
@@ -98,4 +116,24 @@ values
   ('60000000-0000-4000-8000-0000000000a5', '00000000-0000-0000-0000-0000000000a1', '30000000-0000-4000-8000-0000000000a5', '50000000-0000-4000-8000-0000000000a2', '00000000-0000-0000-0000-0000000000a3', 'INVITED'),
   ('60000000-0000-4000-8000-0000000000a6', '00000000-0000-0000-0000-0000000000a1', '30000000-0000-4000-8000-0000000000a6', '50000000-0000-4000-8000-0000000000a2', '00000000-0000-0000-0000-0000000000a3', 'SUSPENDED'),
   ('60000000-0000-4000-8000-0000000000a7', '00000000-0000-0000-0000-0000000000a1', '30000000-0000-4000-8000-0000000000a7', '50000000-0000-4000-8000-0000000000a2', '00000000-0000-0000-0000-0000000000a3', 'REVOKED'),
+  ('60000000-0000-4000-8000-0000000000a8', '00000000-0000-0000-0000-0000000000a1', '30000000-0000-4000-8000-0000000000a8', '50000000-0000-4000-8000-0000000000a3', '00000000-0000-0000-0000-0000000000a3', 'ACTIVE'),
+  ('60000000-0000-4000-8000-0000000000a9', '00000000-0000-0000-0000-0000000000a1', '30000000-0000-4000-8000-0000000000a9', '50000000-0000-4000-8000-0000000000a4', '00000000-0000-0000-0000-0000000000ac', 'ACTIVE'),
+  ('60000000-0000-4000-8000-0000000000aa', '00000000-0000-0000-0000-0000000000a1', '30000000-0000-4000-8000-0000000000aa', '50000000-0000-4000-8000-0000000000a2', '00000000-0000-0000-0000-0000000000a3', 'ACTIVE'),
+  ('60000000-0000-4000-8000-0000000000ab', '00000000-0000-0000-0000-0000000000a1', '30000000-0000-4000-8000-0000000000ab', '50000000-0000-4000-8000-0000000000a2', '00000000-0000-0000-0000-0000000000a3', 'ACTIVE'),
   ('60000000-0000-4000-8000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', '30000000-0000-4000-8000-0000000000b1', '50000000-0000-4000-8000-0000000000b1', '00000000-0000-0000-0000-0000000000b3', 'ACTIVE');
+
+-- Synthetic scrypt-v1 vectors only. Password inputs live in test-only fixture code.
+insert into private.user_credentials (user_id, password_hash, algorithm, disabled_at)
+values
+  ('30000000-0000-4000-8000-0000000000a1', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDEtc2FsdA==$CCg7szLWrWdPOSDyLiHdC2R0YvjvykbKg9T0LBFLQFA=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a2', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDItc2FsdA==$861GD6pNzVHWJkSmhLncchAmO5excSgnpS0fiRO4NVM=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a3', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDMtc2FsdA==$Im7ZphqsTSDwOZext7p14DTz69XGLMZ4dyU8tijLUyk=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a4', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDktc2FsdA==$fd5EV12NVyykmHTtdP4LSXa81KlpddPj5Smay6RgfE0=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a5', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMTAtc2FsdA==$9uBG74GmtpjFeTKIJpWTMOWd7aybknPiq9wwsELhCOU=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a6', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMTEtc2FsdA==$FpZxvnn5DSJ7Aga/Ek8ozyMQEaScpVtPMQwA4cxKkds=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a7', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMTItc2FsdA==$rOZnGQHhj/XtL2YXMSKrRO3BCqjg9k8OpBWtCLTh0Xg=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a8', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDQtc2FsdA==$Gjt6+eYlFeV07WVuJevfkSkjEf3QmW/kOZXZdNKLnJ4=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000a9', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDUtc2FsdA==$Z3/PtPGTLMsclmFBJLcMyTdQ4qYVAHT3nFWnWkDgeZ4=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000aa', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDctc2FsdA==$il3nOfRl9XLWhQ7N5FLtrq75ynzU8c4aPN2lVZy18ag=', 'scrypt-v1', '2026-08-22T00:00:00Z'),
+  ('30000000-0000-4000-8000-0000000000ad', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDgtc2FsdA==$VVsxoU1PQDrdQgSxQVTBOeqU4hjsuzoWrDMERX8nqaY=', 'scrypt-v1', null),
+  ('30000000-0000-4000-8000-0000000000b1', 'scrypt-v1$16384$8$1$Zmxvdy1yMDItMDYtc2FsdA==$oIr9j0s9k2SOEZQUE6gGLWJS3z2sphi1+2FTz8wVFq0=', 'scrypt-v1', null);

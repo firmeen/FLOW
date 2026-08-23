@@ -25,9 +25,7 @@ export default async function LoginPage({
   const nextPath = sanitizeInternalPath(rawNext);
   const session = await getInternalSession();
 
-  if (session) redirect(nextPath);
-
-  const isDevelopment = process.env.NODE_ENV !== "production";
+  if (session?.user?.id) redirect(nextPath);
 
   return (
     <main className="grid min-h-screen place-items-center bg-muted/40 px-4 py-10">
@@ -51,17 +49,10 @@ export default async function LoginPage({
             Sign in to {getInternalExperienceLabel(nextPath)}
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            One internal session provides access to staff, kitchen, cashier, and owner operations.
+            Sign in with your FLOW internal identity. Workspace and permissions are resolved separately.
           </p>
 
-          <LoginForm
-            nextPath={nextPath}
-            developmentCredentials={
-              isDevelopment
-                ? { email: "admin@foodflow.local", password: "foodflow-demo" }
-                : undefined
-            }
-          />
+          <LoginForm nextPath={nextPath} />
         </Card>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">

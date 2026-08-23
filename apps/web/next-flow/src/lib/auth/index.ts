@@ -1,4 +1,8 @@
-export * from "./config";
+import "server-only";
+
 export * from "./redirect";
-export * from "./session";
-export * from "./token";
+export {
+  deleteSession,
+  getInternalSession,
+  requireInternalSession,
+} from "./session";

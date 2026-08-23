@@ -98,6 +98,23 @@ async function expectBrandedResponsiveSurface(
   });
 }
 
+async function signInWithDatabaseFixture(page: Page, nextPath: string) {
+  await page.goto(`/login?next=${encodeURIComponent(nextPath)}`);
+  await page.getByLabel("Email").fill(E2E_AUTH.email);
+  await page.getByLabel("Password").fill(E2E_AUTH.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL(
+    (url) => url.pathname === nextPath || url.pathname === "/workspace",
+  );
+
+  if (new URL(page.url()).pathname === "/workspace") {
+    await page
+      .getByRole("button", { name: /Tenant A.*Branch A1/i })
+      .click();
+    await page.waitForURL((url) => url.pathname === nextPath);
+  }
+}
+
 for (const surface of publicSurfaces) {
   for (const viewport of viewports) {
     test(`${surface.name} has visible FLOW branding without horizontal overflow at ${viewport.width}px`, async ({
@@ -113,14 +130,12 @@ for (const surface of internalSurfaces) {
     test(`${surface.name} has authenticated FLOW branding without horizontal overflow at ${viewport.width}px`, async ({
       page,
     }, testInfo) => {
-      const loginResponse = await page.request.post("/api/auth/login", {
-        data: {
-          email: E2E_AUTH.email,
-          password: E2E_AUTH.password,
-        },
-      });
+      test.skip(
+        !process.env.DATABASE_URL,
+        "R04 protected-surface browser checks require a seeded local database",
+      );
 
-      expect(loginResponse.ok()).toBe(true);
+      await signInWithDatabaseFixture(page, surface.path);
       await expectBrandedResponsiveSurface(page, testInfo, surface, viewport);
     });
   }

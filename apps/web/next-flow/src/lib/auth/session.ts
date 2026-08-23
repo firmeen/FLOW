@@ -1,39 +1,24 @@
-import { cookies } from "next/headers";
+import "server-only";
+
+import type { Session } from "next-auth";
 import { redirect } from "next/navigation";
 
-import { SESSION_COOKIE_NAME, SESSION_DURATION_SECONDS } from "./config";
-import {
-  createSessionToken,
-  verifySession,
-  type InternalSession,
-} from "./token";
+import { auth, signOut } from "@/auth";
 
-export async function createSession(): Promise<InternalSession> {
-  const { token, session } = await createSessionToken();
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_DURATION_SECONDS,
-    expires: new Date(session.expiresAt),
-  });
+import { sanitizeInternalPath } from "./redirect";
 
-  return session;
-}
-
-export async function getInternalSession(): Promise<InternalSession | null> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  return verifySession(token);
+export async function getInternalSession(): Promise<Session | null> {
+  return auth();
 }
 
 export async function deleteSession(): Promise<void> {
-  (await cookies()).delete(SESSION_COOKIE_NAME);
+  await signOut({ redirect: false });
 }
 
-export async function requireInternalSession(): Promise<InternalSession> {
+export async function requireInternalSession(nextPath = "/staff"): Promise<Session> {
   const session = await getInternalSession();
-  if (!session) redirect("/login");
+  if (!session?.user?.id) {
+    redirect(`/login?next=${encodeURIComponent(sanitizeInternalPath(nextPath))}`);
+  }
   return session;
 }
