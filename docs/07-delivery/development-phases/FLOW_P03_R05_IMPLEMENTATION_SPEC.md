@@ -1513,3 +1513,750 @@ FLOW_P03_R06_IMPLEMENTATION_SPEC.md
 - Existing R04 command business logic remains canonical.
 - Database uniqueness and transaction coupling provide the final request concurrency boundary.
 - Phase 03 final end-to-end acceptance remains P03/R06.
+
+# 178. Acquire API Contract
+- Acquisition must return a typed outcome, not throw for ordinary duplicate detection.
+- Candidate outcomes: `ACQUIRED`, `REPLAY`, `MISMATCH`, `RETRYABLE_IN_PROGRESS` only if separate durable in-progress state exists.
+- `ACQUIRED` returns the transaction-bound record identifier needed for finalization.
+- `REPLAY` returns decoded persisted logical result.
+- `MISMATCH` includes no original payload.
+- Database unique violation is translated internally into one of these outcomes.
+- Callers must not inspect raw PostgreSQL errors for normal duplicate handling.
+
+# 179. Finalize Success API Contract
+- Finalize may execute only for the request that owns the acquisition within the transaction.
+- It stores result schema version.
+- It stores stable logical response payload or resource reference.
+- It stores response status when required.
+- It marks status SUCCEEDED atomically.
+- It updates updated_at using database time.
+- It must fail if record fingerprint/command/scope unexpectedly changed.
+- Finalization failure aborts the business transaction.
+
+# 180. Replay Decoder Contract
+- Decoder validates result version.
+- Decoder validates command-specific result shape.
+- Decoder rejects malformed/corrupt JSON.
+- Decoder must not silently coerce unknown versions.
+- Decoder returns typed result to HTTP adapter.
+- Corruption maps to invariant/unavailable without re-execution.
+
+# 181. Command-Specific Result DTO — Add Item
+- Persist only fields needed to represent original successful add intent.
+- At minimum identify cart and affected item when current API exposes them.
+- If original route returns full cart aggregate, implementation may migrate route response to stable mutation DTO if backward compatibility allows.
+- Any DTO change must be explicit in tests.
+- Replay must not duplicate cart item.
+
+# 182. Command-Specific Result DTO — Update Item
+- Result should identify cart item and accepted quantity, or another stable existing API result.
+- Replay does not need current full cart state unless API promises it.
+- This avoids replay result changing after later cart edits.
+
+# 183. Command-Specific Result DTO — Remove Item
+- Stable result should include removed item identifier and success state.
+- It should not depend on querying an already deleted item.
+- Replay remains successful after deletion.
+
+# 184. Command-Specific Result DTO — Submit Order
+- Store/replay order ID.
+- Store/replay final order number.
+- Store/replay submitted/customer status returned by API.
+- Store/replay submitted timestamp if API exposes it.
+- Do not recalculate order number on replay.
+- Do not reload DRAFT-only repository path on replay.
+
+# 185. Repository Acquire Algorithm — Preferred
+```text
+INSERT scoped key + fingerprint
+ON CONFLICT DO NOTHING
+if inserted -> ACQUIRED
+else SELECT existing scoped row
+compare fingerprint
+if mismatch -> MISMATCH
+if success -> REPLAY
+otherwise -> handle only explicitly supported state
+```
+- Exact SQL/Kysely form may differ.
+- Scope predicates must always include trusted tenant/branch/capability/command.
+- Avoid select-then-insert without unique backstop.
+
+# 186. Acquire Race Under One Transaction
+- PostgreSQL unique index may cause loser to wait for winner transaction outcome.
+- If winner commits, loser observes conflict/existing row and replays.
+- If winner rolls back, loser insert may proceed.
+- This behavior should be tested with separate connections.
+- Avoid implementing application-level busy loops around this behavior.
+
+# 187. Acquire Timeout Behavior
+- Database lock wait must remain bounded by platform/database settings.
+- R05 need not globally change lock_timeout unless evidence requires it.
+- If a lock timeout is surfaced, classify as retryable with same key.
+- Do not create a new key automatically.
+
+# 188. Exact Lock Ordering Contract
+```text
+1. validate capability/request outside mutation transaction as appropriate
+2. begin customer data transaction
+3. acquire idempotency scoped-key uniqueness
+4. if new execution: acquire R04 cart/order row lock
+5. execute business mutation
+6. finalize replay result
+7. commit
+```
+- All R05-covered cart/order commands follow this order when both locks exist.
+- This is the default deadlock prevention order.
+
+# 189. Transaction-Bound Command Core Interface
+```ts
+interface CustomerCommandRuntime {
+  context: CustomerDatabaseContext;
+  repositories: CustomerRepositories;
+  trx: DatabaseTransaction;
+}
+```
+- Conceptual only.
+- R04 command core should be callable with this runtime.
+- Public facade owns transaction creation and idempotency.
+- Core must not open its own transaction.
+
+# 190. Public Facade Interface
+```ts
+executeIdempotentCommand<TInput, TResult>({
+  command,
+  idempotencyKey,
+  input,
+  fingerprint,
+  execute,
+})
+```
+- Facade resolves current customer context.
+- Facade opens transaction once.
+- Facade acquires/replays.
+- Facade invokes business core only when acquired.
+- Facade finalizes result.
+- Facade returns executed/replayed classification.
+
+# 191. R04 Command Refactor Acceptance
+- Existing route-visible functions may remain wrappers for backward source compatibility during implementation.
+- No route may bypass R05 facade afterward.
+- Command business logic must exist in one location only.
+- Existing R04 unit/integration tests should be adapted rather than deleted wholesale.
+- Source regression should prove no second divergent path.
+
+# 192. Database Table Minimum Columns
+- `id uuid primary key`.
+- `tenant_id uuid not null`.
+- `branch_id uuid not null`.
+- `customer_capability_id uuid not null` or exact current type.
+- `command_code text not null`.
+- `key_digest text not null`.
+- `request_fingerprint text not null`.
+- `status text not null`.
+- `result_version integer null/non-null according to status`.
+- `result_payload jsonb null/non-null according to status`.
+- `http_status integer null/non-null according to status` when persisted.
+- `created_at timestamptz not null default now()`.
+- `updated_at timestamptz not null default now()`.
+- `expires_at timestamptz not null`.
+
+# 193. Optional Columns
+- restaurant_id if current customer DB context requires explicit RLS binding.
+- table_id/table_session_id if needed for policy or diagnostics.
+- resource_type/resource_id if result payload is intentionally minimal.
+- Do not add fields without actual use.
+
+# 194. Status Constraint Detail
+- If one-transaction design is used, status may be simplified to only `SUCCEEDED` because uncommitted acquired rows are invisible until commit.
+- If row exists within transaction before finalization, temporary state can still be `IN_PROGRESS` but never durable after rollback.
+- Choose the smallest state model consistent with SQL flow.
+- Do not add `FAILED_FINAL` by default.
+
+# 195. Result Integrity Constraint
+- SUCCEEDED row requires non-null result_version.
+- SUCCEEDED row requires non-null result payload/resource reference.
+- HTTP status must be valid integer range if stored.
+- request fingerprint immutable after creation.
+- command/scope/key digest immutable after creation.
+
+# 196. Mutation Restrictions on Replay Records
+- Customer runtime should not have arbitrary DELETE of successful records from application paths.
+- Update should be restricted to finalization path if possible.
+- If direct table CRUD is used, RLS with WITH CHECK must preserve same scope.
+- Narrow functions may provide stronger immutability.
+
+# 197. Retention Minimum Decision
+- Implementation must choose and document exact retention.
+- Baseline recommendation: at least 24 hours.
+- Order submission may justify 72 hours or longer depending operational retry expectations.
+- Do not invent multi-month retention without need.
+- R06 must record final chosen retention.
+
+# 198. Cleanup Operational Contract
+- No cleanup scheduler is required to mark R05 complete.
+- Table must remain query-correct with expired records present.
+- Lookup should reject expired record according to policy.
+- Future maintenance can batch delete by expires_at index.
+- Do not synchronously delete large expired sets on customer request path.
+
+# 199. Expired Existing Record Semantics
+- If scoped key exists but expired and not deleted, implementation must choose deterministic handling.
+- Recommended safe baseline: treat key as expired conflict/retry-window-ended rather than reusing immediately while row exists.
+- This avoids delete/reinsert races.
+- Cleanup later permits reuse only after retention lifecycle.
+- Client normally generates fresh UUIDs, so reuse is unnecessary.
+
+# 200. Replay Result Retention vs Order Lifetime
+- Idempotency result is not permanent order history.
+- After retention, customer should rely on future order/receipt access mechanism, not old request key.
+- R05 must not turn idempotency table into customer history store.
+
+# 201. Request Key Length Contract
+- Define explicit maximum such as 128 characters if allowing opaque strings.
+- If enforcing UUID only, parser should require canonical UUID string.
+- UUID-only simplifies index/key abuse controls.
+- Implementation may choose UUID v4 and document it.
+- Do not accept megabyte-scale arbitrary headers.
+
+# 202. Header Parsing Contract
+- Exactly one effective idempotency key.
+- Duplicate header values must be rejected or normalized deterministically; do not pick arbitrary one.
+- Trim only surrounding OWS if framework returns it.
+- Empty after trim is invalid.
+
+# 203. Proxy/Header Preservation
+- Confirm hosting/proxy preserves `Idempotency-Key` header.
+- No special secret forwarding is needed.
+- If platform strips unknown headers, choose another explicit supported header before implementation.
+- Do not move key into query string as convenience without security review.
+
+# 204. CORS/Same-Origin Compatibility
+- Current customer routes are same-origin by design.
+- Custom header does not require browser preflight for same-origin.
+- If cross-origin client appears later, CORS policy belongs separate scope.
+- Preserve R04 origin checks.
+
+# 205. Request Fingerprint Preimage Contract
+```text
+FLOW-CUSTOMER-COMMAND
+version=v1
+command=<stable-code>
+selector=<ordered normalized selectors>
+payload=<canonical normalized payload>
+```
+- Use an unambiguous serialization delimiter/length encoding or canonical JSON.
+- Avoid concatenation where field boundary collisions are possible.
+
+# 206. Modifier Fingerprint Rules
+- Use modifier identifiers, not display labels, when current command input is identifiers.
+- Quantity/selection ordering must reflect R04 semantics.
+- If duplicate modifier choices are rejected, canonicalizer may sort unique IDs if semantic order irrelevant.
+- Tests must prove reordered equivalent modifiers either match or conflict according to chosen business semantics.
+
+# 207. Free-Text Fingerprint Rules
+- Use post-validation normalized special request/customer note.
+- Do not lowercase customer text.
+- Do not collapse internal whitespace unless R04 already does.
+- Null and empty normalization must match existing command validator exactly.
+
+# 208. Key Digest Contract
+- If raw key digest used, preimage should include normalized key bytes only.
+- SHA-256 hexadecimal or base64url output fixed length.
+- Do not salt if deterministic lookup required.
+- Digest is for storage/log hygiene, not password security.
+
+# 209. Replay Classification in Logs
+- `execution=executed` for winner.
+- `execution=replayed` for exact duplicate success.
+- `execution=mismatch` for reused key/different payload.
+- `execution=retryable_failure` for transient storage path.
+- Keep vocabulary small and searchable.
+
+# 210. Correlation IDs
+- Existing request correlation mechanism may be used if present.
+- Idempotency key digest is not a general tracing ID.
+- Do not expose full key across logs/services unnecessarily.
+- R05 need not add distributed tracing vendor.
+
+# 211. Retry Backoff Guidance
+- Server-side retries only for recognized transaction transient errors.
+- Suggested attempts: 2–3 total maximum.
+- Backoff should be short and bounded.
+- Do not sleep while holding transaction locks.
+- Reopen transaction per retry attempt with same request identity.
+
+# 212. Retry Callback Purity
+- R04 command core must not perform external side effects, which is already an R04 invariant.
+- Therefore transaction retry is safe with respect to external systems.
+- If future code adds side effects, retry boundary must be revisited.
+
+# 213. Unknown Outcome API Guidance
+- If server cannot determine whether commit succeeded after connection error, respond with retryable safe generic error.
+- Client retains same key.
+- Do not return “failed” in a way that encourages new request identity.
+- Documentation should describe same-key retry contract for client developers.
+
+# 214. Client Timeout Contract
+- Timeout does not mean mutation failed.
+- Same-key retry is mandatory recovery path.
+- Client button may remain disabled/pending while retrying.
+- R05 implementation can expose helper but UI overhaul is excluded.
+
+# 215. Double-Click Contract
+- Same user action should reuse same key across duplicate event handlers if UI can double-fire.
+- Disable button is UX defense but not correctness boundary.
+- Server idempotency remains final protection.
+
+# 216. Browser Refresh Contract
+- If refresh occurs during pending submit and client key was only volatile memory, recovery may be lost.
+- If current UI implements submission, consider sessionStorage/local state for pending request key only if security/UX appropriate.
+- Do not store capability bearer secret with it.
+- R05 does not require durable browser persistence when UI not yet wired.
+
+# 217. Mutation Key Ownership in Client Code
+- Key belongs to one semantic mutation attempt.
+- Re-render must not generate new key for same pending attempt.
+- React component state/effect dependencies must avoid regeneration loops.
+- Test helper can model this even if UI not yet production-wired.
+
+# 218. Submit Result Read Access
+- If replay stores only order ID and response reconstruction queries order, implement narrow `findCustomerSubmittedOrderById` or equivalent.
+- It must scope tenant/branch/capability.
+- It must not expose another customer's order.
+- It must not expose staff-only fields.
+- Prefer stored response envelope if simpler and safer.
+
+# 219. Cart Result Snapshot Tradeoff
+- Persisting full cart response on every mutation can increase storage.
+- Persisting operation result only is leaner and stable.
+- R05 should prefer operation-specific DTOs.
+- UI can separately refresh cart after success if needed.
+- This separates replay semantics from mutable aggregate reads.
+
+# 220. HTTP Adapter Replay Header
+- Optional `Idempotency-Replayed: true` may aid diagnostics/tests.
+- If implemented, original execution may omit or set false.
+- Header contains no secret.
+- Do not rely on header for application correctness.
+
+# 221. HTTP Error Body Contract
+- Use existing `{ ok: false, error: ... }` shape.
+- Add stable public code for key mismatch.
+- Do not include fingerprint/key digest.
+- Retryable unavailable may include a safe retry hint without exposing internals.
+
+# 222. Database Test — Role Grants
+- Verify `flow_customer_runtime` has intended table/function privilege.
+- Verify `flow_customer_entry` denied.
+- Verify `flow_identity` denied.
+- Verify anon/authenticated denied.
+- Verify no accidental grant on broader schemas.
+
+# 223. Database Test — Cross-Capability RLS
+- Set transaction customer capability A.
+- Insert/acquire A record.
+- Switch to capability B in separate transaction.
+- B cannot select/update A record.
+- Same tenant/branch is insufficient without capability match.
+
+# 224. Database Test — Cross-Tenant RLS
+- A tenant record invisible from B tenant context.
+- Insert with forged tenant denied.
+- Update scope columns denied.
+
+# 225. Database Test — Immutable Fingerprint
+- Successful record fingerprint cannot be altered through normal runtime path.
+- Successful record command code cannot be altered.
+- Successful record scope cannot be altered.
+
+# 226. Integration Test — Callback Counter
+- Inject callback with counter where architecture allows.
+- Run two identical same-key concurrent requests.
+- Assert callback invoked exactly once.
+- Assert both callers observe success.
+
+# 227. Integration Test — Winner Rollback
+- First transaction acquires then throws before commit.
+- Second same-key attempt should eventually acquire and execute.
+- No stuck durable record.
+- Callback total successful execution exactly one.
+
+# 228. Integration Test — Mismatch During Concurrency
+- Request A key X payload A starts.
+- Request B key X payload B races.
+- Only A or B wins based on acquisition.
+- Loser receives mismatch after winner scope/fingerprint becomes visible.
+- No second mutation.
+
+# 229. Integration Test — Retention Boundary
+- When feasible use injected clock/database fixture to create expired record.
+- Confirm expired behavior matches chosen policy.
+- Avoid flaky real-time sleeps.
+
+# 230. Integration Test — Replay Decode Version
+- Persist supported v1 result.
+- Replay decodes.
+- Unsupported result version causes invariant error, no command re-execution.
+
+# 231. Integration Test — Storage Unavailable
+- Simulate repository failure during initial lookup/acquire.
+- Command callback must not run.
+- HTTP maps to unavailable/retryable.
+
+# 232. Integration Test — Finalization Failure
+- Inject finalization failure after business core mutation in same transaction.
+- Transaction rollback removes mutation.
+- Retry works normally.
+- This is mandatory proof of atomicity.
+
+# 233. Integration Test — Submitted Cart Replay Ordering
+- First submit succeeds and converts cart.
+- Replay same key reaches replay lookup before cart DRAFT validation.
+- Returns original order result.
+- If implementation validates cart state first, test must fail.
+
+# 234. Source Regression — Route Coverage
+- Every state-changing customer route is inventoried.
+- Covered mutation routes require idempotency facade.
+- No direct import of transaction-bound command core from route.
+- Read-only routes exempt.
+
+# 235. Source Regression — Command Core Single Authority
+- Search for duplicate add/update/remove/submit business logic.
+- Exactly one canonical core per command.
+- Facade wraps rather than duplicates.
+
+# 236. Source Regression — No External Calls
+- R05-covered transaction core contains no fetch/payment/realtime/notification call.
+- Preserve this before enabling transaction retry.
+
+# 237. Generated Type Drift Acceptance
+- Migration table appears in generated database types.
+- column nullability/types match SQL.
+- no unrelated generated drift.
+- verification script passes during implementation.
+
+# 238. Fresh Database Acceptance
+- Fresh Supabase start/reset applies all migrations including R05.
+- Existing R01-R04 database tests remain green.
+- New idempotency pgTAP suite green.
+- No production linked DB mutation used for validation.
+
+# 239. Incremental Migration Acceptance
+- Migration applies on schema containing R04 data.
+- Existing carts/orders unaffected.
+- No required table rewrite/backfill of large business tables.
+- New indexes build acceptably for expected current scale.
+
+# 240. Deployment Failure — App Before Migration
+- If new app reaches instance before migration, idempotency storage missing.
+- Must fail closed/unavailable rather than execute unprotected mutation.
+- Deployment runbook/process should order migration appropriately.
+
+# 241. Deployment Failure — Migration Before App
+- New table existing while old R04 app still serves requests is backward compatible.
+- Old app may still accept non-idempotent requests during rollout window.
+- Minimize mixed-version window.
+- Current deployment platform strategy should be documented in PR if relevant.
+
+# 242. Compatibility Decision — Require Key Immediately
+- Preferred after R05 deployment: all covered mutation routes require key.
+- Do not silently synthesize server keys for missing client keys because retry identity would be lost.
+- If current customer UI is not yet using routes, tests/clients must update together.
+
+# 243. Compatibility Decision — Legacy Client
+- If a real legacy client exists and cannot send key, implementation must explicitly block or design bounded transition.
+- Do not maintain indefinite optional-idempotency mode.
+- No evidence currently requires legacy compatibility.
+
+# 244. Database Cleanup Future Runbook
+- Document SQL pattern for deleting expired records in bounded batches if operational docs are updated.
+- Do not run production cleanup from this round.
+- Do not add destructive scheduled job without owner-approved operational scope.
+
+# 245. Security Threat — Key Guessing
+- High-entropy UUID prevents practical guessing.
+- Even guessed key cannot authorize without CustomerContext.
+- RLS provides second boundary.
+- Error responses resist existence enumeration cross-scope.
+
+# 246. Security Threat — Key Reuse Attack
+- Attacker with same authorized capability could intentionally reuse key with different payload.
+- Mismatch conflict prevents mutation substitution.
+- Same-key replay returns original result only within authorized scope.
+
+# 247. Security Threat — Replay After Logout/Expiry
+- Customer capability validation still runs.
+- Idempotency record alone cannot restore authority.
+- Revoked/expired context fails closed.
+
+# 248. Security Threat — Header Injection
+- Framework parses header values.
+- Bound character set/UUID parser rejects control characters.
+- Never interpolate header into logs/SQL unsafely.
+
+# 249. Security Threat — Replay Payload Data Leakage
+- Stored result contains only safe customer-facing response.
+- No internal DB diagnostics.
+- No staff fields.
+- No capability token.
+- Cross-scope RLS denies access.
+
+# 250. Failure Taxonomy — Idempotency Specific
+```text
+IDEMPOTENCY_KEY_REQUIRED
+IDEMPOTENCY_KEY_INVALID
+IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST
+IDEMPOTENCY_STORE_UNAVAILABLE
+IDEMPOTENCY_RESULT_INVALID
+```
+- Exact enum names may follow existing style.
+- Public messages remain safe.
+- Retry classification explicit.
+
+# 251. Error Mapping — Required
+- required/invalid key -> input error.
+- mismatch -> conflict.
+- store unavailable -> unavailable/retry same key.
+- invalid stored result -> internal/unavailable, no execute.
+- recognized transient DB transaction error -> bounded retry before public unavailable.
+
+# 252. Business Error Interaction
+- Existing R04 `CART_NOT_DRAFT`, not-found, availability, modifier validation remain canonical.
+- Do not translate all business conflicts into idempotency conflicts.
+- New-key request reaching terminal cart gets R04 business error.
+- Same-key successful replay bypasses re-execution and gets original success.
+
+# 253. Command Validation Ordering
+```text
+transport/origin/body limits
+→ customer capability
+→ idempotency key format
+→ command DTO validation/normalization
+→ fingerprint
+→ idempotency acquire/replay
+→ mutable business-state validation + command execution
+```
+- This ordering prevents invalid payload records while preserving successful replay before mutable-state rejection.
+
+# 254. Fingerprint vs Capability Validation Ordering
+- Capability must be validated before DB replay lookup.
+- Fingerprint may be computed before transaction after DTO validation.
+- Trusted scope comes only from CustomerContext.
+
+# 255. Result Finalization Ordering
+- Business core returns stable logical result.
+- Validate/serialize result envelope.
+- Persist final result.
+- Only then allow transaction commit.
+- HTTP conversion occurs after commit.
+
+# 256. Serialization Failure Ordering
+- If JSON serialization/result validation fails before persisted finalization, transaction rolls back.
+- Do not discover unsupported result only after commit.
+- Test this using invalid injected result when possible.
+
+# 257. Operational Debug Procedure
+- Given safe record ID/digest, inspect status/result version without exposing raw customer data.
+- Compare command code and timestamps.
+- Do not manually mutate successful record as normal recovery.
+- Production repair belongs controlled ops procedure, not customer endpoint.
+
+# 258. No Manual Replay Endpoint
+- R05 does not create admin endpoint to replay customer commands.
+- Normal client retry with same key is sufficient.
+- Avoid privileged operational surface expansion.
+
+# 259. No Global Deduplication
+- Different customers may legitimately use same raw UUID/key by astronomical coincidence or test fixture.
+- Scope isolates them.
+- Different command namespaces can remain independent according to chosen contract.
+
+# 260. No Content-Based Dedup Without Key
+- Identical payload sent with different keys represents potentially distinct user intents.
+- Do not dedupe only by fingerprint.
+- Key + fingerprint together define replay identity.
+
+# 261. No Time-Window Heuristic Dedup
+- Do not say “same request within 5 seconds” and dedupe heuristically.
+- Explicit idempotency key is deterministic.
+- Time only governs retention, not intent equality.
+
+# 262. No Client-Generated Resource ID as Sole Key
+- Cart/order/resource IDs may participate in fingerprint but do not replace request key.
+- Submit order resource ID is server-generated in current flow.
+- Request key exists before response/resource ID.
+
+# 263. Package/Dependency Validation
+- Expected dependency additions: none.
+- If package files change only test scripts, record that accurately.
+- If new dependency added, Dependency Integrity required.
+- Prefer built-in crypto/JSON utilities.
+
+# 264. Environment Variables
+- No new secret expected.
+- Retention may be fixed code constant.
+- Avoid operational env knob unless current deployment needs configurable retention.
+- If added, validate bounds and document default.
+
+# 265. Performance Acceptance Thresholds
+- No unindexed scoped replay lookup.
+- No N+1 business query added by replay path.
+- Replay path should be cheaper than execution path.
+- Same-key concurrency should wait only on DB transaction/unique lock, not app polling loop.
+
+# 266. Resource Exhaustion Controls
+- Key/header length bounded.
+- Result payload bounded by known DTO.
+- JSONB result cannot contain arbitrary request body.
+- Retention bounded operationally.
+- Index cardinality proportional to mutation count.
+
+# 267. R06 Acceptance Evidence Required from R05
+- exact idempotency table/function schema.
+- exact key scope.
+- exact fingerprint algorithm/version.
+- exact retention.
+- exact command coverage.
+- exact replay result DTOs.
+- concurrency proof.
+- ambiguous-response proof.
+- cross-scope denial proof.
+- all R01-R04 regressions.
+
+# 268. R06 Must Not Repair R05 Silently
+- If R05 hands off uncovered mutation route, R06 should fail acceptance and return defect to R05 ownership.
+- If same-key duplicate can execute twice, R06 should fail.
+- If replay can bypass capability authorization, R06 should fail.
+- If mismatch executes, R06 should fail.
+- If mutation can commit without replay record, R06 should fail.
+
+# 269. Handoff — Complete Customer Command Reliability Chain
+```text
+CustomerContext
+→ normalized command intent
+→ idempotency key + fingerprint
+→ scoped acquisition
+→ one transaction
+→ R04 command core
+→ R03 persistence
+→ success result record
+→ commit
+→ deterministic replay on retry
+```
+
+# 270. Implementation Order
+1. Re-read current main policy/spec and latest R04 branch.
+2. Inventory every customer mutation route and current command transaction shape.
+3. Decide exact scoped key/command/fingerprint contract.
+4. Design additive idempotency schema/constraints/RLS.
+5. Add migration + DB tests.
+6. Regenerate DB types.
+7. Add fingerprint/key/result types and unit tests.
+8. Add transaction-bound idempotency repository.
+9. Refactor R04 command cores only as needed for transaction injection.
+10. Add canonical idempotent facade.
+11. Wire route headers/facade.
+12. Add concurrent/replay/failure integration tests.
+13. Run full inherited validation.
+14. Open one R05 implementation PR and stop.
+
+# 271. Implementation Anti-Pattern — Separate Success Record Transaction
+- Do not commit business mutation first then write replay record in a second transaction.
+- Crash between commits would violate replay recovery.
+- Atomicity requires shared transaction for current database-only commands.
+
+# 272. Implementation Anti-Pattern — Precommitted Lock Row
+- Do not add durable IN_PROGRESS lease table pattern unless necessary.
+- Current commands are short DB transactions.
+- Unique uncommitted row already serializes same key under PostgreSQL.
+- Simpler one-transaction design is preferred.
+
+# 273. Implementation Anti-Pattern — Cache-Only Idempotency
+- Process memory cache fails across serverless instances/restarts.
+- Edge cache/CDN is not durable command authority.
+- PostgreSQL record is required baseline.
+
+# 274. Implementation Anti-Pattern — Optional Key on Submit
+- Submit route must not quietly skip idempotency when header absent after R05 cutover.
+- Missing key should fail before command execution.
+- Server-generated fallback key defeats retry identity.
+
+# 275. Implementation Anti-Pattern — Fingerprint Raw JSON Text
+- Raw request body formatting/key order differences would conflict incorrectly.
+- Parse, validate, normalize, canonicalize semantic DTO first.
+
+# 276. Implementation Anti-Pattern — Persist Raw Request
+- Do not store customer note/modifier payload merely to compare requests.
+- Store fingerprint.
+- Store safe response result only.
+
+# 277. Implementation Anti-Pattern — Replay by Re-execution
+- “Retry same command and hope uniqueness prevents duplicate” is not sufficient.
+- Replay must detect original success and return original logical result without business re-execution.
+
+# 278. Implementation Anti-Pattern — Authorization After Replay
+- Never lookup/reveal replay result before validating current CustomerContext.
+- Idempotency store must not become unauthenticated result cache.
+
+# 279. Implementation Anti-Pattern — Broad Retry
+- Do not retry validation errors.
+- Do not retry permission/capability errors.
+- Do not retry arbitrary SQL constraint errors.
+- Retry only known transient transaction failures.
+
+# 280. Document Final Validation Checklist
+- metadata sequence correct.
+- R04 observed SHA correct.
+- R04 PR evidence noted.
+- scope limited to R05.
+- DB storage justified.
+- key transport/scope explicit.
+- fingerprint/version explicit.
+- success atomicity explicit.
+- replay ordering explicit.
+- lock ordering explicit.
+- retry classes explicit.
+- retention explicit.
+- client behavior explicit.
+- RLS/security explicit.
+- tests explicit.
+- deployment explicit.
+- R06 handoff explicit.
+
+# 281. Final Definition of Done
+- Every covered mutation has deterministic idempotency behavior.
+- Same-key same-intent mutation executes at most once and replays successfully.
+- Same-key changed-intent mutation never executes and returns conflict.
+- Ambiguous committed success is recoverable by same-key retry.
+- Current authorization remains mandatory for replay.
+- R04 command logic remains single canonical authority.
+- R03 persistence invariants remain intact.
+- R02 least-privilege transaction context remains intact.
+- R01 capability semantics remain intact.
+- All required implementation validations are truthful.
+- One implementation PR is opened/updated.
+- Implementation agent does not merge it.
+
+# 282. Final Handoff Summary
+- R05 converts R04 from single-request transactional correctness into retry-safe command correctness.
+- The customer-facing database mutation plane now has explicit request identity.
+- Replay is deterministic within retention and authorized capability scope.
+- Duplicate delivery cannot duplicate covered mutations.
+- Different intents remain distinct by key/fingerprint rules.
+- R06 can focus on integrated acceptance rather than adding new reliability mechanics.
+
+# 283. Required Next Specification
+```text
+FLOW_P03_R06_IMPLEMENTATION_SPEC.md
+```
+- It must be authored from actual R05 implementation state.
+- Until that file exists on current `main`, R06 implementation must not begin.
+
+# 284. Final Acceptance Statement
+- P03/R05 is READY as an executable specification document.
+- It defines a persistence-backed, transaction-coupled idempotency boundary for customer mutations.
+- It preserves CustomerContext as authorization authority and R04 commands as business authority.
+- It explicitly handles exact replay, payload mismatch, same-key concurrency, transient retry, and ambiguous post-commit response loss.
+- It does not claim exactly-once semantics for future external side effects.
+- Phase 03 final acceptance remains P03/R06.
