@@ -1239,7 +1239,31 @@ interface CustomerContext {
 - cross-tenant re-entry resolves only after new valid exchange.
 - no implicit scope widening from old cookie.
 
-# 138. Database Test Matrix
+# 138. Browser Refresh / Navigation Matrix
+- refresh after successful exchange keeps same valid customer scope.
+- direct navigation to protected customer page with valid cookie resolves CustomerContext.
+- direct navigation without cookie returns entry-required behavior.
+- browser back to original QR URL does not broaden current capability.
+- opening original QR again may reissue/refresh capability only after revalidation.
+- expiry during navigation produces deterministic recovery rather than silent fallback.
+
+# 139. Multi-Tab Behavior Matrix
+- same browser tabs may share customer capability cookie.
+- both tabs resolve same scope while capability valid.
+- one tab re-entering different table may replace shared cookie for subsequent requests.
+- existing already-rendered tab must still revalidate on next server request.
+- do not create per-tab privilege storage in client JS to avoid this.
+- document chosen UX consequence in implementation PR.
+
+# 140. Capability Replacement Semantics
+- Replacement occurs only after new entry is fully validated.
+- Old token must not be overwritten before new issuance succeeds.
+- If new issuance fails, old valid capability may remain unless security policy intentionally clears it.
+- Cross-tenant replacement must create a completely new scope, never merge claims.
+- If opaque rows are used, old row may remain valid until expiry unless explicitly revoked by replacement policy.
+- Replacement policy must be covered by integration tests.
+
+# 141. Database Test Matrix
 - customer capability role/function cannot read staff credentials.
 - cannot read arbitrary memberships.
 - cannot mutate roles/permissions.
@@ -1249,7 +1273,7 @@ interface CustomerContext {
 - public/anon direct reads denied if introduced.
 - fixed search_path for SECURITY DEFINER if introduced.
 
-# 139. Database Test Matrix — Context Leakage
+# 142. Database Test Matrix — Context Leakage
 - customer DB role returns to previous role after transaction.
 - tenant context does not persist to next pooled transaction if set.
 - branch context does not persist.
@@ -1257,7 +1281,7 @@ interface CustomerContext {
 - no fake actor context remains.
 - sequential Tenant A then Tenant B customer requests remain isolated.
 
-# 140. Failure-Path Test Matrix
+# 143. Failure-Path Test Matrix
 - missing secret.
 - malformed token.
 - expired token.
@@ -1270,14 +1294,14 @@ interface CustomerContext {
 - cookie write failure where testable.
 - no partial durable domain state created.
 
-# 141. Concurrency Test Matrix
+# 144. Concurrency Test Matrix
 - two simultaneous validations succeed consistently for valid token.
 - validation racing with revocation: post-revocation attempt denies according to transaction freshness.
 - two issuance requests do not corrupt state.
 - opaque row uniqueness/cleanup semantics remain valid.
 - no global mutable singleton stores customer context.
 
-# 142. Security Negative Matrix
+# 145. Security Negative Matrix
 - customer token cannot become staff token.
 - Auth.js JWT cannot be accepted as customer capability unless explicitly exchanged through customer entry.
 - wrong cookie name ignored.
@@ -1288,7 +1312,7 @@ interface CustomerContext {
 - external redirect rejected.
 - token in query is not accepted after exchange unless design explicitly defines one-time inbound token path.
 
-# 143. Regression Suites
+# 146. Regression Suites
 - Phase 02 Auth.js tests remain green.
 - Phase 02 workspace/access tests remain green.
 - Phase 02 permission tests remain green.
@@ -1297,7 +1321,7 @@ interface CustomerContext {
 - existing database/RLS suites remain green.
 - build/type/lint remain green during implementation validation.
 
-# 144. Validation Commands — Future Implementation
+# 147. Validation Commands — Future Implementation
 - Inspect package scripts first.
 - Run lint.
 - Run typecheck.
@@ -1308,7 +1332,7 @@ interface CustomerContext {
 - If DB migration is added: local Supabase start/reset, DB tests, lint, codegen/drift, DB runtime integration.
 - Record actual results only.
 
-# 145. Validation Vocabulary
+# 148. Validation Vocabulary
 - `PASS` only for executed success.
 - `FAIL` for observed failure.
 - `NOT RUN` for unexecuted.
@@ -1316,14 +1340,14 @@ interface CustomerContext {
 - `NOT APPLICABLE` when legitimately irrelevant.
 - Do not fabricate PASS from source inspection.
 
-# 146. Expected CI Applicability
+# 149. Expected CI Applicability
 - Next Flow Quality should perform real work when app code changes.
 - Dependency Integrity performs real work when manifest/lockfile changes.
 - Supabase Database Quality performs real work when migration/DB runtime paths change according to current workflow classifier.
 - Repository/Phase gate remain inherited.
 - Implementation PR must report actual hosted outcomes but this document does not use them for document validity.
 
-# 147. Implementation Order — Step 1
+# 150. Implementation Order — Step 1
 - Re-fetch current main.
 - Read README/policy/template.
 - Read exact R01 spec.
@@ -1331,7 +1355,7 @@ interface CustomerContext {
 - Use that lineage as implementation parent according to current policy.
 - Confirm P02 modern auth/authz chain is intact.
 
-# 148. Implementation Order — Step 2
+# 151. Implementation Order — Step 2
 - Audit existing public customer entry routes/components.
 - Audit QR/link parameter format.
 - Audit table/table-session schema.
@@ -1339,61 +1363,61 @@ interface CustomerContext {
 - Audit RLS/public DB access.
 - Decide whether signed or opaque capability is justified.
 
-# 149. Implementation Order — Step 3
+# 152. Implementation Order — Step 3
 - Write architecture decision note in implementation PR description or code comments/tests where durable.
 - Lock capability version/lifetime.
 - Lock CustomerContext fields.
 - Lock failure-result taxonomy.
 - Avoid route integration until pure contracts are tested.
 
-# 150. Implementation Order — Step 4
+# 153. Implementation Order — Step 4
 - Define pure capability types/version/lifetime.
 - Define CustomerContext.
 - Define typed validation result.
 - Add unit tests before route integration.
 - Keep staff identity types separate.
 
-# 151. Implementation Order — Step 5
+# 154. Implementation Order — Step 5
 - Implement authoritative entry resolver.
 - Reuse current DB/query infrastructure.
 - Add least-privilege boundary if needed.
 - Add cross-tenant/wrong-branch tests.
 - Avoid cart/order writes.
 
-# 152. Implementation Order — Step 6
+# 155. Implementation Order — Step 6
 - Implement capability issuer.
 - Implement signer/opaque persistence as chosen.
 - Implement bounded expiry.
 - Implement secret handling.
 - Add tamper/expiry tests.
 
-# 153. Implementation Order — Step 7
+# 156. Implementation Order — Step 7
 - Implement transport cookie/header pattern.
 - Implement current-context validator.
 - Add cookie/session confusion tests.
 - Add staff/customer separation tests.
 
-# 154. Implementation Order — Step 8
+# 157. Implementation Order — Step 8
 - Integrate minimal customer entry surface.
 - Valid entry receives capability.
 - Invalid entry gets safe error/retry.
 - Existing menu behavior preserved where possible.
 - No broad UI redesign.
 
-# 155. Implementation Order — Step 9
+# 158. Implementation Order — Step 9
 - Add DB/integration tests.
 - Add migration only if required.
 - Validate pool/role leakage if DB role/context introduced.
 - Run inherited Phase 02 regressions.
 
-# 156. Implementation Order — Step 10
+# 159. Implementation Order — Step 10
 - Run implementation validation.
 - Record actual results.
 - Open exactly one P03/R01 implementation PR.
 - Stop.
 - Do not implement R02 in same branch.
 
-# 157. Definition of Done — Architecture
+# 160. Definition of Done — Architecture
 - one canonical customer capability authority exists.
 - one canonical CustomerContext exists.
 - QR/raw selectors are not runtime authorization authority.
@@ -1401,7 +1425,7 @@ interface CustomerContext {
 - later rounds can consume CustomerContext without re-parsing entry selectors.
 - no cart/order persistence is prematurely introduced.
 
-# 158. Definition of Done — Issuance
+# 161. Definition of Done — Issuance
 - public entry is resolved server-side.
 - invalid/cross-scope entry issues no capability.
 - capability lifetime/version explicit.
@@ -1409,7 +1433,7 @@ interface CustomerContext {
 - chosen signed/opaque design documented.
 - no product mutation occurs from issuance alone.
 
-# 159. Definition of Done — Validation
+# 162. Definition of Done — Validation
 - one canonical validator exists.
 - malformed/tampered/unknown token fails closed.
 - expiry enforced.
@@ -1417,7 +1441,7 @@ interface CustomerContext {
 - validator returns immutable CustomerContext.
 - downstream code does not need raw token.
 
-# 160. Definition of Done — Security
+# 163. Definition of Done — Security
 - bounded capability lifetime.
 - tamper/unknown token denial.
 - cross-tenant denial.
@@ -1428,7 +1452,7 @@ interface CustomerContext {
 - no staff-to-customer implicit authority.
 - no raw token/secret logging.
 
-# 161. Definition of Done — Database
+# 164. Definition of Done — Database
 - no broad grants.
 - no weakening staff RLS.
 - any new role/function is least-privileged.
@@ -1437,7 +1461,7 @@ interface CustomerContext {
 - generated types synchronized when needed.
 - production DB not mutated.
 
-# 162. Definition of Done — Runtime
+# 165. Definition of Done — Runtime
 - entry issuance works.
 - capability persists across intended navigation.
 - expiry/re-entry works.
@@ -1445,7 +1469,7 @@ interface CustomerContext {
 - DB unavailable fails closed for protected customer state actions.
 - staff Auth.js remains unaffected.
 
-# 163. Definition of Done — UX
+# 166. Definition of Done — UX
 - valid entry reaches intended customer surface.
 - invalid entry shows safe state.
 - expired/revoked entry has recovery path.
@@ -1453,7 +1477,7 @@ interface CustomerContext {
 - accessibility basics preserved.
 - no internal IDs/secrets leak in error UI.
 
-# 164. Definition of Done — Tests
+# 167. Definition of Done — Tests
 - pure capability tests.
 - transport tests.
 - entry resolution integration tests.
@@ -1463,7 +1487,7 @@ interface CustomerContext {
 - inherited Phase 02 regressions.
 - build/type/lint validation.
 
-# 165. Explicit Prohibitions
+# 168. Explicit Prohibitions
 - do not create internal staff user for anonymous customer.
 - do not reuse staff AccessContext as CustomerContext.
 - do not grant customer capability staff permissions.
@@ -1481,7 +1505,7 @@ interface CustomerContext {
 - do not merge implementation PR.
 - do not enable implementation auto-merge.
 
-# 166. PR Requirements — Metadata
+# 169. PR Requirements — Metadata
 - Phase `03`.
 - Round `01`.
 - exact specification filename.
@@ -1495,7 +1519,7 @@ interface CustomerContext {
 - dependency change YES/NO.
 - environment change YES/NO.
 
-# 167. PR Requirements — Architecture Evidence
+# 170. PR Requirements — Architecture Evidence
 - exact CustomerContext type path.
 - exact entry resolver path.
 - exact issuer path.
@@ -1505,7 +1529,7 @@ interface CustomerContext {
 - explanation of stable QR vs runtime capability model.
 - explanation of current table-session relation.
 
-# 168. PR Requirements — Security Evidence
+# 171. PR Requirements — Security Evidence
 - cross-tenant deny.
 - sibling/wrong-branch deny.
 - invalid table deny.
@@ -1517,7 +1541,7 @@ interface CustomerContext {
 - token/secret redaction.
 - revocation/closed-scope behavior.
 
-# 169. PR Requirements — Validation Evidence
+# 172. PR Requirements — Validation Evidence
 - lint.
 - typecheck.
 - unit.
@@ -1528,7 +1552,7 @@ interface CustomerContext {
 - inherited Phase 02 regression result.
 - use only approved validation vocabulary.
 
-# 170. PR Requirements — Failure Evidence
+# 173. PR Requirements — Failure Evidence
 - invalid entry response.
 - missing capability response.
 - expired capability response.
@@ -1537,7 +1561,16 @@ interface CustomerContext {
 - re-entry recovery behavior.
 - no partial domain mutation.
 
-# 171. PR Requirements — Scope Declarations
+# 174. PR Requirements — Browser Evidence
+- valid QR exchange.
+- refresh with valid capability.
+- expired capability recovery.
+- customer cookie cannot access internal routes.
+- staff session does not bypass customer exchange.
+- different-table re-entry follows documented replacement behavior.
+- external redirect is rejected.
+
+# 175. PR Requirements — Scope Declarations
 ```text
 PHASE: P03
 ROUND: R01
@@ -1553,7 +1586,7 @@ PRODUCTION_DB_DESTRUCTIVE_CHANGE: NO
 IMPLEMENTATION_AGENT_MERGE: NO
 ```
 
-# 172. P03/R02 Handoff
+# 176. P03/R02 Handoff
 - R02 receives canonical validated CustomerContext.
 - R02 receives exact tenant/branch/table scope semantics.
 - R02 receives capability failure taxonomy.
@@ -1562,7 +1595,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - R02 must not duplicate capability cryptography/session lookup.
 - R02 builds reusable data access/transaction primitives for customer-domain operations.
 
-# 173. R02 Required Reuse
+# 177. R02 Required Reuse
 - reuse CustomerContext type.
 - reuse require/get customer context helper.
 - reuse server-resolved tenant/branch/table IDs.
@@ -1570,7 +1603,16 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - reuse customer DB role/transaction helper if R01 introduced one.
 - do not fork a second customer session concept.
 
-# 174. R02 Expected Focus
+# 178. R02 Consumption Contract
+- Data repositories receive `CustomerContext` or a narrower immutable derivative.
+- They never receive raw capability bearer value.
+- They never receive raw QR token as authority.
+- Tenant/branch/table predicates come from context.
+- If R02 needs request freshness near query execution, it may call the canonical context resolver once at the server boundary rather than reimplement validation.
+- Error mapping from invalid context remains owned by R01 helpers.
+- R02 focuses on data access, not session mechanics.
+
+# 179. R02 Expected Focus
 - customer-safe data access layer.
 - repositories/services for branch/menu/customer-domain access.
 - transaction composition.
@@ -1580,7 +1622,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - no cart/order persistence yet unless exact future R02 spec says otherwise.
 - no command orchestration yet.
 
-# 175. R02 Data Access Requirements Inherited
+# 180. R02 Data Access Requirements Inherited
 - repositories accept CustomerContext or narrower derived scope.
 - tenant/branch/table are not accepted from arbitrary client body as authority.
 - queries remain parameterized.
@@ -1588,7 +1630,15 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - no staff permission helper substitution.
 - no duplicate capability validation code.
 
-# 176. Phase 03 Future Boundary — R03
+# 181. R02 Failure Contract Inherited
+- missing context => entry/session recovery, not data query.
+- invalid/tampered context => deny.
+- expired context => re-entry.
+- revoked/closed context => deny/re-entry.
+- unavailable context verification => fail closed for protected server data.
+- R02 repository errors must not reinterpret these states as empty successful data.
+
+# 182. Phase 03 Future Boundary — R03
 - durable cart persistence.
 - durable order persistence foundation.
 - schema/repository integration.
@@ -1596,7 +1646,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - customer context ownership fields.
 - R01 must not implement these now.
 
-# 177. Phase 03 Future Boundary — R04
+# 183. Phase 03 Future Boundary — R04
 - command orchestration.
 - validated customer actions.
 - transactional mutations.
@@ -1604,7 +1654,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - event/side-effect ordering.
 - R01 must not implement these now.
 
-# 178. Phase 03 Future Boundary — R05
+# 184. Phase 03 Future Boundary — R05
 - request idempotency.
 - retry safety.
 - duplicate submission defense.
@@ -1612,14 +1662,14 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - dedupe persistence/keys where appropriate.
 - R01 must not implement these now.
 
-# 179. Phase 03 Future Boundary — R06
+# 185. Phase 03 Future Boundary — R06
 - full customer data-plane acceptance.
 - end-to-end entry → context → persistence → command → idempotency proof.
 - regression/security acceptance.
 - exact Phase 04 handoff.
 - R01 must not implement these now.
 
-# 180. Current-Code Assumptions to Revalidate at Implementation Time
+# 186. Current-Code Assumptions to Revalidate at Implementation Time
 - Phase 02 Auth.js session remains current internal authority.
 - customer entry route still exists in expected form.
 - FoodFlow tables/table_sessions schema remains present.
@@ -1628,7 +1678,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - if equivalent module exists, extend/reuse rather than duplicate.
 - re-read latest parent branch before coding.
 
-# 181. Repository Paths to Discover Before Coding
+# 187. Repository Paths to Discover Before Coding
 - actual customer page route under `src/app`.
 - actual QR/table entry link builder/generator.
 - actual `restaurant_tables` schema fields.
@@ -1639,7 +1689,35 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - any existing customer-side cookie helper.
 - implementation must update spec assumptions to actual code within round scope, not duplicate equivalent functionality.
 
-# 182. Stop Conditions During Implementation
+# 188. Implementation Evidence Checklist — Source
+- [ ] canonical customer module exists.
+- [ ] CustomerContext is server-only.
+- [ ] entry resolver uses actual schema.
+- [ ] capability issuer has bounded expiry.
+- [ ] validator revalidates required current state.
+- [ ] customer cookie isolated from Auth.js.
+- [ ] no raw token logging.
+- [ ] no cart/order persistence added.
+
+# 189. Implementation Evidence Checklist — Database
+- [ ] no broad grants.
+- [ ] no staff RLS weakening.
+- [ ] dedicated role/function is narrow if added.
+- [ ] migration is forward-only if added.
+- [ ] generated types updated only if schema changed.
+- [ ] cross-tenant/wrong-branch DB tests exist where DB boundary changed.
+- [ ] pooled role/context leakage tested when new transaction context exists.
+
+# 190. Implementation Evidence Checklist — Runtime
+- [ ] valid entry issues capability.
+- [ ] refresh retains intended scope.
+- [ ] invalid entry issues nothing.
+- [ ] expired capability recovers safely.
+- [ ] different-table re-entry follows explicit replacement rule.
+- [ ] customer capability cannot enter staff/admin surfaces.
+- [ ] staff session cannot skip customer entry validation.
+
+# 191. Stop Conditions During Implementation
 - exact spec missing/not READY on main.
 - latest P02/R06 implementation lineage cannot be identified.
 - current entry flow differs materially and requires product redesign beyond capability boundary.
@@ -1650,18 +1728,18 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - required QR/table ownership relation cannot be established safely.
 - in these cases report blocker rather than improvise.
 
-# 183. Stop Condition — Existing Equivalent Capability
+# 192. Stop Condition — Existing Equivalent Capability
 - If latest parent already contains a customer capability/session primitive from unrelated work, do not create duplicate abstraction.
 - Audit whether it satisfies this spec.
 - Extend/harden it in-place when ownership is clear.
 - If existing behavior conflicts fundamentally with this spec, report exact conflict before destructive replacement.
 
-# 184. Stop Condition — Table Lifecycle Ambiguity
+# 193. Stop Condition — Table Lifecycle Ambiguity
 - If schema cannot determine whether a table/session is active enough for issuance, do not invent lifecycle status in application code silently.
 - Either define minimal DB invariant within R01 if legitimately required or report blocker.
 - Do not issue broad never-expiring capability as workaround.
 
-# 185. Document Validation Checklist
+# 194. Document Validation Checklist
 - [x] canonical filename P03/R01.
 - [x] Phase 03.
 - [x] Round 01.
@@ -1680,11 +1758,13 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - [x] DB least privilege explicit.
 - [x] server/client boundary explicit.
 - [x] concurrency semantics explicit.
+- [x] browser/re-entry semantics explicit.
+- [x] R02 consumption contract explicit.
 - [x] test matrices explicit.
 - [x] later-round boundaries explicit.
 - [x] implementation merge owner-controlled.
 
-# 186. Document Internal Consistency Check
+# 195. Document Internal Consistency Check
 - Metadata says R01 only.
 - No section authorizes cart/order persistence.
 - No section makes customer capability a staff identity.
@@ -1694,21 +1774,21 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - Failure vocabulary remains coherent across transport/service/UI.
 - R02 handoff receives capability abstraction rather than implementation-specific bearer details.
 
-# 187. Document-Only Validation Policy
+# 196. Document-Only Validation Policy
 - Document correctness is based on metadata, sequence, current repository evidence, scope, architecture, security, failure/recovery, validation plan, and handoff.
 - GitHub Actions are not document-validation authority.
 - Failed/queued/skipped/missing Actions do not semantically invalidate this document.
 - Hosted GitHub enforcement may technically block docs merge; report as hosted merge restriction if it occurs.
 - Documentation task must not alter runtime/CI to force merge.
 
-# 188. Implementation Validation Policy
+# 197. Implementation Validation Policy
 - Future implementation validation remains separate from this document validation.
 - Implementation must run repository-local tests/checks where applicable.
 - Do not treat this spec's source audit as runtime proof.
 - Required CI failures remain truthful implementation blockers under current repository policy.
 - Implementation agent still must not merge its PR.
 
-# 189. Final Development Gate
+# 198. Final Development Gate
 ```text
 NO SPEC ON MAIN = NO DEVELOPMENT
 FAILED REQUIRED CI = ROUND NOT READY
@@ -1721,7 +1801,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - Future implementation agent must stop after implementation/validation/PR creation.
 - Owner controls implementation merge.
 
-# 190. Final Handoff Contract
+# 199. Final Handoff Contract
 - Output primitive: CustomerContext.
 - Authority source: validated customer capability plus current server state.
 - Scope: tenant + branch + optional explicit table/session.
@@ -1730,7 +1810,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - R02 receives no requirement to understand token cryptography.
 - R02 receives no permission to trust original QR parameters.
 
-# 191. Final Acceptance Statement
+# 200. Final Acceptance Statement
 - P03/R01 is READY as an executable specification document.
 - The round creates the customer trust primitive that later server persistence depends on.
 - The customer capability is intentionally narrower than internal staff authentication.
