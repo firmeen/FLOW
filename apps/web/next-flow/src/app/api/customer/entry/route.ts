@@ -3,12 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { issueCustomerCapability } from "@/modules/customer-capability/server/capability-codec";
 import {
   buildCustomerEntryPath,
-  parseCustomerEntrySelector,
+  parseCustomerEntrySearchParams,
 } from "@/modules/customer-capability/server/entry-selector";
 import { resolveCustomerEntry } from "@/modules/customer-capability/server/entry-resolver";
 import { setCustomerCapabilityCookie } from "@/modules/customer-capability/server/transport";
 
 export const runtime = "nodejs";
+
+function noStore(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
+}
 
 function entryErrorUrl(
   request: NextRequest,
@@ -24,12 +29,9 @@ function entryErrorUrl(
 }
 
 export async function GET(request: NextRequest) {
-  const selector = parseCustomerEntrySelector(
-    request.nextUrl.searchParams.get("restaurantSlug"),
-    request.nextUrl.searchParams.get("tableCode"),
-  );
+  const selector = parseCustomerEntrySearchParams(request.nextUrl.searchParams);
   if (!selector) {
-    return NextResponse.redirect(entryErrorUrl(request, "invalid"));
+    return noStore(NextResponse.redirect(entryErrorUrl(request, "invalid")));
   }
 
   const resolution = await resolveCustomerEntry(
@@ -37,12 +39,14 @@ export async function GET(request: NextRequest) {
     selector.tableCode,
   );
   if (resolution.status !== "resolved") {
-    return NextResponse.redirect(
-      entryErrorUrl(
-        request,
-        resolution.status === "unavailable" ? "unavailable" : "invalid",
-        selector.restaurantSlug,
-        selector.tableCode,
+    return noStore(
+      NextResponse.redirect(
+        entryErrorUrl(
+          request,
+          resolution.status === "unavailable" ? "unavailable" : "invalid",
+          selector.restaurantSlug,
+          selector.tableCode,
+        ),
       ),
     );
   }
@@ -53,14 +57,16 @@ export async function GET(request: NextRequest) {
       new URL(buildCustomerEntryPath(selector), request.url),
     );
     setCustomerCapabilityCookie(response, token, claims.expiresAt);
-    return response;
+    return noStore(response);
   } catch {
-    return NextResponse.redirect(
-      entryErrorUrl(
-        request,
-        "unavailable",
-        selector.restaurantSlug,
-        selector.tableCode,
+    return noStore(
+      NextResponse.redirect(
+        entryErrorUrl(
+          request,
+          "unavailable",
+          selector.restaurantSlug,
+          selector.tableCode,
+        ),
       ),
     );
   }
