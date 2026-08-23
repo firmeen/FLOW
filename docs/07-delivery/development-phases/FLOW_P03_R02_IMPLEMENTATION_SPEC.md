@@ -353,13 +353,20 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - If a repository can run both standalone and composed, provide a single top-level service wrapper rather than dual hidden transaction behavior.
 - Nested transaction semantics should not be invented unless Kysely/current runtime explicitly supports the required behavior.
 
-# 31. Read-Only vs Read-Write Composition
+# 31. Nested Transaction Prohibition
+- Repository methods must not silently start nested top-level customer transactions.
+- Service composition owns the transaction boundary.
+- If an existing helper starts its own transaction, refactor or provide an injected-transaction variant inside R02 scope.
+- Savepoints are not required for R02 read flows.
+- Future R03/R04 may choose savepoints only with explicit spec justification.
+
+# 32. Read-Only vs Read-Write Composition
 - R02 may expose a generic customer transaction wrapper capable of later writes only if privilege remains least-privileged.
 - Do not grant future cart/order write permissions in R02 merely to prepare.
 - Prefer current read-only privileges and later forward migration in R03 for writes.
 - Architectural transaction wrapper can be reusable without pre-granting write authority.
 
-# 32. Error Taxonomy
+# 33. Error Taxonomy
 - Introduce explicit customer data-access errors/results.
 - Distinguish invalid/missing customer context before repository entry.
 - Distinguish not-found within authorized scope.
@@ -368,7 +375,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Distinguish authorization/scope denial when relevant.
 - Do not expose raw SQL errors to browser.
 
-# 33. Suggested Error Codes
+# 34. Suggested Error Codes
 - `CUSTOMER_CONTEXT_REQUIRED`.
 - `CUSTOMER_RESOURCE_NOT_FOUND`.
 - `CUSTOMER_SCOPE_DENIED`.
@@ -377,41 +384,41 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Exact names may follow project conventions.
 - Error messages should be safe and stable.
 
-# 34. Error Ownership by Layer
+# 35. Error Ownership by Layer
 - Repository may throw/return repository-specific internal error types.
 - Service layer maps infrastructure detail to customer data-domain result.
 - Route/page maps domain result to HTTP/redirect/render state.
 - UI should not parse PostgreSQL codes directly.
 - Keep one mapping point to avoid divergent public behavior.
 
-# 35. Not-Found vs Unauthorized
+# 36. Not-Found vs Unauthorized
 - Do not reveal whether an out-of-scope resource exists.
 - Wrong-tenant resource should usually map to the same public not-found/invalid result as absent resource.
 - Internal logs may retain safe reason codes without exposing other tenant identifiers unnecessarily.
 - Avoid enumeration via response timing/detail when practical.
 
-# 36. Infrastructure Failure Mapping
+# 37. Infrastructure Failure Mapping
 - Connection failure must map to safe unavailable state.
 - Database timeout must map to safe unavailable state.
 - SQL syntax/schema drift during development should be surfaced to implementation diagnostics but not customer UI.
 - Do not swallow all errors into empty arrays because that hides real outages.
 - Distinguish empty legitimate data from infrastructure failure.
 
-# 37. Empty-State Contract
+# 38. Empty-State Contract
 - Empty menu is legitimate if branch has no currently available items.
 - It is not equivalent to database unavailable.
 - Empty modifier set may be legitimate.
 - Missing branch/storefront under valid context is an invariant/security issue, not generic empty state.
 - Repository return types should make these distinctions possible.
 
-# 38. Cancellation / Timeout Safety
+# 39. Cancellation / Timeout Safety
 - Avoid long unbounded queries.
 - Use current database driver timeout conventions if present.
 - Do not implement a new global timeout framework unless needed.
 - Ensure aborted HTTP requests do not leave transactions open indefinitely.
 - Rely on DB driver transaction cleanup and test failure paths where possible.
 
-# 39. Concurrency Scope in R02
+# 40. Concurrency Scope in R02
 - R02 is mostly read/data-layer architecture.
 - Full mutation concurrency belongs R03–R05.
 - Still prove transaction-local context isolation under concurrent reads.
@@ -419,7 +426,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Two concurrent branches of same tenant must remain isolated.
 - Customer and staff transactions must not leak roles/context into one another.
 
-# 40. Pool Leakage Test
+# 41. Pool Leakage Test
 - Run customer transaction A with Tenant A/Branch A.
 - End transaction.
 - Run customer transaction B with Tenant B/Branch B on pooled runtime.
@@ -428,7 +435,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Assert app context variables reset.
 - Include failure/rollback variant.
 
-# 41. Cross-Authority Leakage Test
+# 42. Cross-Authority Leakage Test
 - Run staff `flow_runtime` transaction.
 - Then run customer transaction.
 - Customer must not inherit staff role.
@@ -437,7 +444,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Staff must not inherit customer role/session variables.
 - This protects mixed pooled runtime.
 
-# 42. Concurrent Scope Isolation Test
+# 43. Concurrent Scope Isolation Test
 - Start A and B customer transactions concurrently when test runtime permits.
 - Each reads a context-observable DB helper or scoped row.
 - A sees only A tenant/branch.
@@ -445,14 +452,14 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - One callback delay must not allow the other request's role/context to overwrite its transaction-local settings.
 - This validates use of transaction-local context rather than process globals.
 
-# 43. RLS Strategy
+# 44. RLS Strategy
 - RLS remains preferred defense in depth for customer domain tables when customer role gains table access.
 - If customer access uses execute-only `SECURITY DEFINER` functions, functions must enforce scope explicitly.
 - Do not disable RLS.
 - Do not grant bypassrls.
 - Do not reuse database owner runtime for customer requests.
 
-# 44. SECURITY DEFINER Rules
+# 45. SECURITY DEFINER Rules
 - Use only when direct RLS/table grants would be broader than necessary.
 - Set fixed `search_path`.
 - Qualify schema references.
@@ -462,14 +469,14 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Validate parameters against context.
 - Return narrow columns.
 
-# 45. Direct Table Grant Rules
+# 46. Direct Table Grant Rules
 - Grant only required operations.
 - R02 read layer should primarily require SELECT when direct table access is used.
 - Do not pre-grant INSERT/UPDATE/DELETE for R03.
 - Restrict schemas deliberately.
 - Add privilege-denial tests for unrelated schemas/tables.
 
-# 46. Customer Role Privilege Decision Table
+# 47. Customer Role Privilege Decision Table
 | Surface | R02 default | Rationale |
 |---|---|---|
 | `private.user_credentials` | DENY | internal identity secret data |
@@ -483,33 +490,41 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 | customer-safe branch/storefront reads | NARROW ALLOW | required current scope display |
 | private read functions | EXECUTE ONLY WHEN NEEDED | reduce broad table privilege |
 
-# 47. Database Migration Scope
+# 48. Function Denial Cases
+- Public role cannot execute customer private functions unless explicitly intended.
+- `anon` cannot execute session-bound customer functions by default.
+- `authenticated` Supabase role does not gain execution automatically.
+- `flow_runtime` need not execute customer-only functions unless shared domain requirement exists.
+- `flow_customer_entry` cannot execute future mutation functions.
+- `flow_customer_runtime` cannot call staff permission helper as privilege authority.
+
+# 49. Database Migration Scope
 - A forward-only R02 migration is allowed when needed to create customer runtime role/functions/RLS/indexes.
 - Do not rewrite historical R01 migration.
 - Do not rewrite P02 migrations.
 - Avoid migration if current DB boundary already safely supports the required read layer.
 - Schema changes must be justified by actual access needs.
 
-# 48. Index Audit
+# 50. Index Audit
 - Inspect existing indexes for menu/category/availability branch lookups.
 - Inspect restaurant/branch lookup indexes.
 - Add only missing high-value indexes that support actual R02 query shape.
 - Avoid duplicate indexes.
 - Do not optimize speculative R03 cart/order queries yet.
 
-# 49. Index Evidence Requirement
+# 51. Index Evidence Requirement
 - If index added, identify exact query predicate/order it supports.
 - Prefer existing composite index when adequate.
 - Do not add index solely because a foreign key column exists if query does not need it.
 - Include migration/test evidence for uniqueness only when uniqueness is part of invariant.
 
-# 50. Generated Types
+# 52. Generated Types
 - If migration changes schema/functions recognized by type generation, regenerate database types.
 - Verify drift.
 - Do not hand-edit generated types when generator is canonical.
 - If no schema change, generated types should remain unchanged.
 
-# 51. Existing Files to Reuse
+# 53. Existing Files to Reuse
 - `src/modules/customer-capability/server/types.ts` for `CustomerContext`.
 - `src/modules/customer-capability/server/current-context.ts` for current capability/context access.
 - `src/modules/customer-capability/server/validate-customer-capability.ts` for trust validation.
@@ -518,7 +533,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Existing generated database types.
 - Existing menu/storefront domain schema.
 
-# 52. Files to CREATE — Core Data Layer
+# 54. Files to CREATE — Core Data Layer
 - Candidate: `src/modules/customer-data/server/context.ts`.
 - Responsibility: derive/narrow trusted DB context from `CustomerContext`.
 - Candidate: `src/modules/customer-data/server/errors.ts`.
@@ -531,7 +546,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Responsibility: narrow server-only exports.
 - Reuse equivalent existing module if present at implementation time.
 
-# 53. File Contract — `context.ts`
+# 55. File Contract — `context.ts`
 - Import `CustomerContext` from R01 module rather than redefining it.
 - Export pure mapper from `CustomerContext` to DB scope.
 - Validate required UUIDs only if R01 type can be constructed outside validation boundary.
@@ -540,14 +555,14 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Do not query database.
 - Keep it unit-testable.
 
-# 54. File Contract — `errors.ts`
+# 56. File Contract — `errors.ts`
 - Define stable error/result identifiers.
 - Do not expose database driver classes as public contract.
 - Preserve original error only as internal cause when current runtime supports `cause`.
 - Ensure redacted messages.
 - Avoid one generic `Error` string comparison pattern.
 
-# 55. File Contract — `transaction.ts`
+# 57. File Contract — `transaction.ts`
 - Use current Kysely runtime.
 - Start exactly one database transaction per top-level call.
 - Set role locally.
@@ -557,21 +572,21 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Rollback automatically on thrown error.
 - Never expose transaction beyond callback lifecycle.
 
-# 56. File Contract — `repositories.ts`
+# 58. File Contract — `repositories.ts`
 - Construct repository objects from transaction + immutable scope.
 - Avoid global mutable registry.
 - Keep repository dependency graph explicit.
 - Export interfaces/factory only as needed.
 - Future R03 cart/order repositories should plug into same pattern without changing callers drastically.
 
-# 57. Files to CREATE — Storefront Repository
+# 59. Files to CREATE — Storefront Repository
 - Candidate: `src/modules/customer-data/server/storefront-repository.ts`.
 - Input: trusted customer transaction/context.
 - Output: customer-safe storefront/branch/table display model.
 - Must not query by arbitrary tenant/branch supplied by caller.
 - Must not expose internal configuration.
 
-# 58. Files to CREATE — Menu Repository
+# 60. Files to CREATE — Menu Repository
 - Candidate: `src/modules/customer-data/server/menu-repository.ts`.
 - Input: trusted customer transaction/context.
 - Output: customer menu read model.
@@ -580,7 +595,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Must use deterministic ordering.
 - Must avoid N+1 query pattern.
 
-# 59. Files to CREATE — Types
+# 61. Files to CREATE — Types
 - Candidate: `src/modules/customer-data/server/types.ts`.
 - Define read-model interfaces.
 - Define transaction context interfaces.
@@ -588,7 +603,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Keep types server-safe.
 - Do not duplicate `CustomerContext` authority type.
 
-# 60. Storefront Read Model Suggested Fields
+# 62. Storefront Read Model Suggested Fields
 - restaurant/storefront ID only if client routing needs it.
 - restaurant/storefront customer-visible name.
 - branch customer-visible name.
@@ -597,7 +612,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - customer-visible availability/open state if schema supports it.
 - Do not include internal settings JSON wholesale.
 
-# 61. Menu Category Read Model Suggested Fields
+# 63. Menu Category Read Model Suggested Fields
 - category ID.
 - name.
 - description only if customer-visible.
@@ -605,7 +620,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - optional image reference when current schema supports it.
 - Do not include tenant/branch ownership fields in client projection unless debugging/internal server composition requires them.
 
-# 62. Menu Item Read Model Suggested Fields
+# 64. Menu Item Read Model Suggested Fields
 - item ID.
 - category ID.
 - customer-visible name.
@@ -617,7 +632,7 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - modifier-group references.
 - Avoid internal cost, margin, audit metadata.
 
-# 63. Modifier Group Read Model Suggested Fields
+# 65. Modifier Group Read Model Suggested Fields
 - modifier group ID.
 - name.
 - min selections.
@@ -627,40 +642,40 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - choices with exact price delta representation.
 - availability/active filtering.
 
-# 64. Files to MODIFY — Customer Pages
+# 66. Files to MODIFY — Customer Pages
 - Existing customer menu/entry page may switch from fixture/client-local data source to server data layer only where current architecture supports it.
 - Do not redesign UI.
 - Do not add cart/order persistence.
 - If customer menu currently reads static/mock data, R02 may establish server read integration as proof of the new layer.
 - Preserve current responsive/accessibility behavior.
 
-# 65. Files to MODIFY — Database Runtime
+# 67. Files to MODIFY — Database Runtime
 - Current DB runtime/client may need no change.
 - Add customer transaction helper in a dedicated file rather than weakening staff transaction API.
 - Reuse shared UUID validation helper if safe.
 - Do not create global mutable request context.
 
-# 66. Files to MODIFY — Package Scripts
+# 68. Files to MODIFY — Package Scripts
 - Add/extend test script only if current test discovery excludes new suites.
 - Avoid dependency churn.
 - No new ORM/database library is expected.
 - Do not add caching library in R02.
 
-# 67. Files to MODIFY — Stable Quality Gate
+# 69. Files to MODIFY — Stable Quality Gate
 - Workflow changes are not expected by default.
 - Modify only if new R02 test path would otherwise never execute despite being relevant.
 - Keep change narrow.
 - Do not weaken or rename existing checks.
 - Documentation validation remains independent of Actions.
 
-# 68. Files to REMOVE
+# 70. Files to REMOVE
 - No implementation file removal is required by default.
 - Do not remove R01 capability modules.
 - Do not remove Phase 02 authz modules.
 - Do not remove client UI solely because server reads are added.
 - Remove only duplicate/obsolete temporary data-access helper if an actual equivalent is proven superseded.
 
-# 69. Files Explicitly NOT to Touch
+# 71. Files Explicitly NOT to Touch
 - Auth.js provider/session authority unless a compile-only import fix is unavoidable.
 - Internal staff AccessContext semantics.
 - Internal permission catalog/mapping.
@@ -671,46 +686,46 @@ withCustomerDataTransaction(context, async ({ trx, repositories }) => {
 - Cart/order persistence migrations.
 - Production deployment settings.
 
-# 70. Public Catalog vs Capability-Bound Reads
+# 72. Public Catalog vs Capability-Bound Reads
 - Some menu/storefront data may be safe without customer capability.
 - Do not force capability requirement on universally public data without reason.
 - But branch/table-session-specific data must remain scoped.
 - Define repository boundary so public catalog query cannot accidentally gain customer session mutation authority.
 - Separate transport/authority at the server layer.
 
-# 71. Public Catalog Decision Matrix
+# 73. Public Catalog Decision Matrix
 - If menu is intentionally public by restaurant/branch slug, it may use a public read resolver that still validates tenant/branch ownership.
 - If menu is table-entry-only in current product, require validated CustomerContext.
 - If prices/items differ by branch, branch scope is mandatory even for public read.
 - If table-specific availability exists, capability-bound path is required for that state.
 - Never use this decision to grant generic anonymous table access.
 
-# 72. Current Context Helper
+# 74. Current Context Helper
 - R02 should consume a single `getCurrentCustomerContext()`-style helper from R01 where present.
 - Do not read cookies directly in every repository/service.
 - Cookie parsing stays in capability module.
 - Data layer accepts context object, not request/cookie primitives.
 
-# 73. Required Context Helper
+# 75. Required Context Helper
 - A convenience `requireCurrentCustomerContext()` may be added only if not already present and useful.
 - It should map missing/invalid/expired/revoked capability into stable server flow.
 - It must not hide infrastructure unavailable state as unauthenticated.
 - UI route behavior may redirect to re-entry/error page according to current R01 conventions.
 
-# 74. Customer Data Service Layer
+# 76. Customer Data Service Layer
 - R02 may add small service composition above repositories for read models.
 - Service should orchestrate repositories, not contain raw SQL.
 - Do not invent large domain service architecture.
 - Keep future R03/R04 mutation services separate.
 
-# 75. Storefront Aggregate Read
+# 77. Storefront Aggregate Read
 - If page needs storefront + menu together, define one service/transaction composition.
 - Both reads should use same trusted context.
 - Both may share same transaction snapshot.
 - Return a purpose-built aggregate to server page.
 - Do not return DB transaction object to React components.
 
-# 76. Aggregate Result Contract
+# 78. Aggregate Result Contract
 ```ts
 interface CustomerStorefrontSnapshot {
   storefront: CustomerStorefrontView;
@@ -722,119 +737,125 @@ interface CustomerStorefrontSnapshot {
 - Avoid embedding `CustomerContext` wholesale if UI does not need it.
 - Server may pass safe table label/branch display separately.
 
-# 77. Caching Boundary
+# 79. Caching Boundary
 - Do not cache context-bound data under keys that omit tenant/branch.
 - Server caching may be deferred unless current app already uses it.
 - Public menu caching must include tenant/branch/version dimensions.
 - Capability-bound state should not be globally cached.
 - Avoid introducing cache invalidation complexity in R02.
 
-# 78. Next.js Server/Client Boundary
+# 80. Next.js Server/Client Boundary
 - Customer data repositories are server-only.
 - Mark server modules with `server-only` where current project uses it.
 - Client components receive serialized safe read models.
 - Do not import Kysely/database client into client components.
 - Do not expose connection strings or DB error details.
 
-# 79. Route Handler Boundary
+# 81. Route Handler Boundary
 - API route may call customer data service after validating context.
 - Route must not accept arbitrary tenant/branch authority.
 - Query/body resource IDs remain subordinate to current context.
 - Use safe status/error mapping.
 - Do not create generic SQL proxy endpoints.
 
-# 80. Server Component Boundary
+# 82. Server Component Boundary
 - Server page may validate/get customer context.
 - Server page may call data service/repository composition.
 - Server page maps domain result to UI props.
 - Keep redirects/error states consistent with R01 entry flow.
 - Avoid leaking infrastructure exceptions into rendered stack/details.
 
-# 81. Server Action Boundary
+# 83. Server Action Boundary
 - R02 does not need customer mutations by default.
 - If a read-triggering action exists, it must still use validated context.
 - Do not introduce cart/order actions yet.
 - Mutation action architecture belongs R04 after R03 persistence.
 
-# 82. Pagination Strategy
+# 84. Pagination Strategy
 - Menu/storefront data is likely bounded enough for one page in pilot.
 - Do not add generic pagination framework unless actual data volume requires it.
 - If list can become large, repository API may support limit/cursor cleanly.
 - Do not use unbounded arbitrary client limit.
 
-# 83. Sorting Strategy
+# 85. Sorting Strategy
 - Use business-defined display/order columns where present.
 - Tie-break with stable ID when needed.
 - Do not rely on database natural order.
 - Consistent ordering improves deterministic UI/tests.
 
-# 84. Input Validation
+# 86. Input Validation
 - Validate resource IDs before SQL when inputs are external.
 - Validate enum/filter fields.
 - Bound free-text search length if search is introduced.
 - Do not accept raw SQL fragments/order columns from client.
 - Use Kysely parameterization/sql template safely.
 
-# 85. SQL Injection Safety
+# 87. SQL Injection Safety
 - Use parameterized Kysely queries.
 - Do not concatenate user strings into SQL.
 - Dynamic identifiers require explicit allowlists.
 - Private DB function arguments remain typed.
 - Tests should include malformed input where relevant.
 
-# 86. XSS/Data Rendering Safety
+# 88. XSS/Data Rendering Safety
 - Repository returns plain data.
 - Do not store/render arbitrary HTML from menu descriptions without sanitization policy.
 - React escaping remains default.
 - R02 should not introduce `dangerouslySetInnerHTML` for storefront/menu data.
 
-# 87. Secret Handling
+# 89. Secret Handling
 - Customer data layer needs no new public secrets by default.
 - DB credentials remain server-only environment.
 - Capability signing secret remains R01 ownership.
 - Do not duplicate capability secret into data module.
 - Do not log tokens/cookies.
 
-# 88. Observability
+# 90. Observability
 - Log stable error category and request correlation where current logging exists.
 - Include tenant/branch identifiers only when allowed by current privacy/logging policy.
 - Never log capability bearer token.
 - Never log DB credentials.
 - Avoid logging full raw SQL parameters containing sensitive values.
 
-# 89. Customer Capability Correlation
+# 91. Observability Evidence
+- Implementation PR should name the error categories actually emitted.
+- If no logging framework exists, do not introduce one solely for R02; document that observability is limited to existing mechanism.
+- Tests should confirm public error response is redacted even when internal cause contains SQL detail.
+- Correlation IDs must not become authorization inputs.
+
+# 92. Customer Capability Correlation
 - `capabilityId` may be useful as pseudonymous correlation ID.
 - Treat it as security-sensitive metadata, not a secret bearer value.
 - Do not expose internal correlation logs to customer UI.
 - Do not use capability ID as proof of authority without validating current capability.
 
-# 90. Restaurant Identity
+# 93. Restaurant Identity
 - R01 `CustomerContext` includes restaurant ID/slug/name.
 - R02 repository should use tenant/branch as primary authorization scope.
 - Restaurant ID may constrain menu/storefront joins where schema requires it.
 - Validate restaurant belongs to same tenant/branch relationship.
 - Do not trust URL restaurantSlug after context is established.
 
-# 91. Table Identity
+# 94. Table Identity
 - Table ID comes from trusted context.
 - Storefront page may display table code/label from context or refreshed read.
 - Do not let query parameter switch table silently.
 - If current context table becomes invalid, R01 validation/re-entry semantics apply.
 
-# 92. Table Session Read
+# 95. Table Session Read
 - R02 may read current table-session status if necessary for data-plane decisions.
 - Do not implement session mutation/open/close flows unless already R01 responsibility.
 - If table session is closed/revoked, downstream data access should fail closed according to R01 context validation.
 - Avoid treating stale tableSessionId as independent authority.
 
-# 93. Menu Category Contract
+# 96. Menu Category Contract
 - Return category ID.
 - Return customer-visible name.
 - Return display order.
 - Return only active/visible category status.
 - Keep tenant/branch internal authority fields server-side unless UI needs stable IDs.
 
-# 94. Menu Item Contract
+# 97. Menu Item Contract
 - Return item ID.
 - Return customer-visible name.
 - Return description where safe.
@@ -843,33 +864,33 @@ interface CustomerStorefrontSnapshot {
 - Return image reference if current schema supports it.
 - Do not include internal cost/margin fields.
 
-# 95. Money Representation
+# 98. Money Representation
 - Preserve current schema monetary representation.
 - Prefer integer minor units or exact numeric mapping already used.
 - Do not introduce floating-point price calculations in data layer.
 - R02 is read-focused; financial mutation belongs later.
 - Tests should verify exact price serialization if exposed.
 
-# 96. Modifier Contract
+# 99. Modifier Contract
 - Return group and choice IDs/names/prices needed to render selection.
 - Preserve required/min/max selection metadata if schema provides it.
 - Do not enforce cart selection rules yet beyond read model representation.
 - R04 later validates commands against authoritative menu data.
 
-# 97. Menu Availability Windows
+# 100. Menu Availability Windows
 - Filter or represent current availability based on existing semantics.
 - Define current time source.
 - Tests should use deterministic time injection if availability logic is pure/application-side.
 - If DB handles availability, test SQL boundary.
 - Avoid flaky wall-clock tests.
 
-# 98. Read Model Versioning
+# 101. Read Model Versioning
 - No explicit API version is required unless public API contract already exists.
 - Keep internal TypeScript interfaces stable for R03/R04 consumption.
 - Breaking changes should be deliberate.
 - Avoid embedding database row shape directly in UI contracts.
 
-# 99. Transaction API Example
+# 102. Transaction API Example
 ```ts
 await withCustomerDataTransaction(customerContext, async (scope) => {
   const menu = await scope.repositories.menu.listAvailable();
@@ -881,19 +902,19 @@ await withCustomerDataTransaction(customerContext, async (scope) => {
 - Wrapper sets customer role/context transaction-locally.
 - Repository cannot override tenant/branch.
 
-# 100. Repository Construction Rule
+# 103. Repository Construction Rule
 - Construct repository with transaction and trusted scope.
 - Avoid singleton repository carrying request context.
 - Avoid mutable global context.
 - Request-specific state must be lexical/function-scoped.
 
-# 101. Type Boundary
+# 104. Type Boundary
 - Prefer branded/narrow types only if they improve actual safety.
 - Do not over-engineer wrapper types for every UUID.
 - At minimum separate `CustomerContext` from staff `AccessContext` in imports/types.
 - Keep domain read models distinct from DB rows.
 
-# 102. Error Boundary Example
+# 105. Error Boundary Example
 ```ts
 type CustomerDataResult<T> =
   | { status: "ok"; data: T }
@@ -904,70 +925,70 @@ type CustomerDataResult<T> =
 - Do not mix both inconsistently across repositories.
 - Infrastructure errors should be translated once at service boundary.
 
-# 103. Retry Behavior
+# 106. Retry Behavior
 - Read-only transient DB failure may be retried by request/user refresh.
 - Do not add automatic aggressive retry loops inside repositories by default.
 - Avoid retrying deterministic schema/query errors.
 - Mutation retries belong later with idempotency design.
 
-# 104. Atomicity Scope
+# 107. Atomicity Scope
 - R02 transaction wrapper guarantees one callback transaction.
 - Read aggregate sees coherent snapshot.
 - Any incidental scoped write added solely for metadata must be justified; avoid it by default.
 - R03 later uses same transaction composition for persistence.
 
-# 105. Rollback Contract
+# 108. Rollback Contract
 - Any callback exception rolls back transaction.
 - Transaction-local role/context clears.
 - No partial future mutation should survive when wrapper is reused later.
 - Add test with deliberate thrown error and subsequent context leakage check.
 
-# 106. Database Function Contract
+# 109. Database Function Contract
 - If private read function is introduced, name it narrowly.
 - Function should take resource-specific parameters, not arbitrary tenant ID authority.
 - Tenant/branch should derive from current customer DB context where possible.
 - Fixed search path required.
 - Return contract should be stable and narrow.
 
-# 107. Public Schema Exposure
+# 110. Public Schema Exposure
 - Do not create anonymous broad views of private/customer-sensitive data.
 - Use server DB role/functions only.
 - Supabase anon/authenticated API roles should not gain new unrestricted customer data access unless explicitly designed.
 - Existing client-side Supabase access should not become authority for this round.
 
-# 108. Supabase Client Boundary
+# 111. Supabase Client Boundary
 - If current app has browser Supabase client, R02 should not use it to bypass server CustomerContext.
 - Customer server data plane should remain server-mediated.
 - Realtime subscription architecture is later scope.
 - Do not expose service-role key to browser.
 
-# 109. Tenant Isolation Tests
+# 112. Tenant Isolation Tests
 - Tenant A customer context reads Tenant A storefront/menu only.
 - Tenant B customer context reads Tenant B only.
 - Tenant A cannot request Tenant B item by UUID and receive it.
 - Same item-like code/slug across tenants remains correctly scoped.
 - Out-of-scope resource maps safely.
 
-# 110. Branch Isolation Tests
+# 113. Branch Isolation Tests
 - Branch A1 context reads A1 availability/configuration.
 - Branch A1 cannot read A2 branch-only content when schema differentiates.
 - Tenant-wide catalog data shared across branches may be visible only according to business model.
 - Tests should distinguish tenant-owned versus branch-owned rows.
 
-# 111. Table Scope Tests
+# 114. Table Scope Tests
 - Table A1 context cannot switch to another table by request body/query.
 - Table-specific state read uses current context table.
 - Non-table menu read can remain branch-scoped.
 - Repositories should not overconstrain menu data by table when not required.
 
-# 112. Invalid Context Tests
+# 115. Invalid Context Tests
 - Missing context rejected before DB domain query.
 - Expired capability handled by R01 helper.
 - Revoked capability handled by R01 helper.
 - Malformed context cannot be constructed from untrusted payload through public API.
 - Direct repository unit invocation still expects trusted context type/validation boundary.
 
-# 113. Unit Test Matrix — Context Derivation
+# 116. Unit Test Matrix — Context Derivation
 - maps CustomerContext tenant correctly.
 - maps branch correctly.
 - maps capability ID correctly.
@@ -976,28 +997,28 @@ type CustomerDataResult<T> =
 - does not accept override tenant.
 - immutable/read-only behavior where implemented.
 
-# 114. Unit Test Matrix — Error Mapping
+# 117. Unit Test Matrix — Error Mapping
 - DB unavailable maps unavailable.
 - not-found maps not-found.
 - out-of-scope maps safe not-found/denied result.
 - invariant violation remains distinguishable internally.
 - raw SQL error text not surfaced.
 
-# 115. Unit Test Matrix — Menu Mapping
+# 118. Unit Test Matrix — Menu Mapping
 - DB row maps customer-safe item.
 - internal columns omitted.
 - price remains exact.
 - ordering preserved.
 - unavailable item excluded or represented according to chosen contract.
 
-# 116. Unit Test Matrix — Repository Factory
+# 119. Unit Test Matrix — Repository Factory
 - all repositories receive same transaction object.
 - all repositories receive same immutable scope.
 - caller cannot override tenant/branch through method options.
 - constructing a second scope creates independent repositories.
 - no module-level mutable context.
 
-# 117. Integration Test Matrix — Transaction Context
+# 120. Integration Test Matrix — Transaction Context
 - customer role set locally.
 - tenant context set locally.
 - branch context set locally.
@@ -1006,14 +1027,14 @@ type CustomerDataResult<T> =
 - role absent after transaction.
 - rollback clears context.
 
-# 118. Integration Test Matrix — Storefront
+# 121. Integration Test Matrix — Storefront
 - valid A1 context returns A storefront.
 - B context returns B storefront.
 - wrong/out-of-scope IDs cannot override.
 - missing underlying branch treated as invariant/unavailable as designed.
 - internal config not returned.
 
-# 119. Integration Test Matrix — Menu
+# 122. Integration Test Matrix — Menu
 - categories/items scoped correctly.
 - availability filters correctly.
 - modifier relationships resolve correctly.
@@ -1022,14 +1043,14 @@ type CustomerDataResult<T> =
 - no sibling-branch leakage where branch-specific.
 - no internal staff data in result.
 
-# 120. Integration Test Matrix — Aggregate Snapshot
+# 123. Integration Test Matrix — Aggregate Snapshot
 - storefront and menu read in one transaction.
 - both use same tenant/branch.
 - failure in menu does not return misleading successful aggregate.
 - repeated read gives deterministic shape for stable fixtures.
 - no transaction object escapes serialization boundary.
 
-# 121. Database Test Matrix
+# 124. Database Test Matrix
 - customer role has only expected privileges.
 - customer role cannot read credentials.
 - customer role cannot read memberships/roles/permissions unless explicitly needed and safe.
@@ -1039,7 +1060,7 @@ type CustomerDataResult<T> =
 - private functions have fixed search path.
 - public/anon roles do not gain unintended execute/table grants.
 
-# 122. Negative Authorization Matrix
+# 125. Negative Authorization Matrix
 - forged tenant selector ignored/denied.
 - forged branch selector ignored/denied.
 - forged table ID ignored/denied.
@@ -1048,14 +1069,14 @@ type CustomerDataResult<T> =
 - customer role cannot become `flow_runtime`.
 - customer role cannot set arbitrary actor ID authority.
 
-# 123. Concurrency Matrix
+# 126. Concurrency Matrix
 - concurrent Tenant A/Tenant B reads isolated.
 - concurrent A1/A2 reads isolated.
 - thrown error in A request does not affect B.
 - staff/customer transaction interleaving does not leak role/context.
 - pool reuse remains safe.
 
-# 124. Regression Requirements — R01
+# 127. Regression Requirements — R01
 - customer capability codec tests remain green.
 - entry selector/resolver tests remain green.
 - customer capability DB tests remain green.
@@ -1063,7 +1084,7 @@ type CustomerDataResult<T> =
 - capability expiry/revocation behavior preserved.
 - customer/staff session isolation preserved.
 
-# 125. Regression Requirements — Phase 02
+# 128. Regression Requirements — Phase 02
 - Auth.js internal login remains green.
 - workspace AccessContext remains green.
 - permission route enforcement remains green.
@@ -1071,7 +1092,7 @@ type CustomerDataResult<T> =
 - RLS cross-tenant denial remains green.
 - legacy auth remains removed.
 
-# 126. Application Validation
+# 129. Application Validation
 - run lint.
 - run typecheck.
 - run unit tests.
@@ -1080,7 +1101,7 @@ type CustomerDataResult<T> =
 - run customer E2E subset when page/data source changes.
 - record actual results in implementation PR.
 
-# 127. Database Validation
+# 130. Database Validation
 - start/reset local Supabase where migration/DB tests require it.
 - run database SQL tests.
 - run database lint.
@@ -1089,14 +1110,14 @@ type CustomerDataResult<T> =
 - run DB runtime integration tests.
 - do not use production/linked destructive DB operations.
 
-# 128. Validation Command Discipline
+# 131. Validation Command Discipline
 - Inspect `package.json` and workflow scripts before running commands.
 - Use repository-defined scripts rather than inventing unsupported commands.
 - Record `NOT RUN` when connector/runtime cannot execute a command.
 - Do not convert CI absence to PASS.
 - Do not modify workflow scope merely to make unrelated check report green.
 
-# 129. Implementation Order — 1
+# 132. Implementation Order — 1
 - re-fetch current main.
 - read exact R02 spec.
 - identify latest R01 implementation lineage.
@@ -1104,44 +1125,44 @@ type CustomerDataResult<T> =
 - inspect any intervening R01 changes.
 - do not branch from docs branch.
 
-# 130. Implementation Order — 2
+# 133. Implementation Order — 2
 - audit existing customer capability module.
 - audit DB roles/grants from R01 migration.
 - audit current menu/storefront queries.
 - audit schema indexes and RLS.
 - decide whether new customer runtime role is needed.
 
-# 131. Implementation Order — 3
+# 134. Implementation Order — 3
 - define customer data context and errors.
 - define transaction wrapper contract.
 - write pure unit tests.
 - preserve separation from staff AccessContext.
 
-# 132. Implementation Order — 4
+# 135. Implementation Order — 4
 - implement database transaction role/context setup.
 - add leakage/rollback integration tests.
 - keep privileges minimal.
 - add migration only if required.
 
-# 133. Implementation Order — 5
+# 136. Implementation Order — 5
 - implement storefront repository.
 - implement menu repository.
 - use transaction-bound context.
 - add repository unit/integration tests.
 
-# 134. Implementation Order — 6
+# 137. Implementation Order — 6
 - implement service/read aggregate where customer page needs it.
 - keep SQL out of UI/routes.
 - map safe errors/empty states.
 - avoid UI redesign.
 
-# 135. Implementation Order — 7
+# 138. Implementation Order — 7
 - integrate one real customer read surface as proof if current app is still static/mock.
 - preserve existing navigation/entry flow.
 - do not add cart/order persistence.
 - add E2E regression if user-visible data path changes.
 
-# 136. Implementation Order — 8
+# 139. Implementation Order — 8
 - run database privilege and cross-tenant tests.
 - run R01 regressions.
 - run Phase 02 regressions.
@@ -1149,7 +1170,7 @@ type CustomerDataResult<T> =
 - open one R02 implementation PR.
 - stop without merging it.
 
-# 137. Definition of Done — Architecture
+# 140. Definition of Done — Architecture
 - one canonical customer data transaction boundary exists.
 - repositories consume trusted customer context.
 - repositories do not parse capability token.
@@ -1157,7 +1178,7 @@ type CustomerDataResult<T> =
 - R03 can reuse transaction/repository patterns.
 - staff/customer trust models remain separate.
 
-# 138. Definition of Done — Security
+# 141. Definition of Done — Security
 - client cannot override tenant/branch/table authority.
 - customer DB role is least-privileged.
 - no broad staff runtime privilege granted to customer.
@@ -1166,7 +1187,7 @@ type CustomerDataResult<T> =
 - pooled role/context leakage tests exist.
 - raw DB errors/secrets/tokens are not exposed.
 
-# 139. Definition of Done — Data Reads
+# 142. Definition of Done — Data Reads
 - customer storefront reads through canonical layer.
 - customer menu reads through canonical layer when in scope.
 - deterministic ordering is defined.
@@ -1174,7 +1195,7 @@ type CustomerDataResult<T> =
 - empty state is distinct from unavailable failure.
 - internal-only fields are omitted.
 
-# 140. Definition of Done — Database
+# 143. Definition of Done — Database
 - migration is forward-only if added.
 - customer role/grants/functions are narrowly scoped.
 - RLS remains enabled where applicable.
@@ -1182,7 +1203,7 @@ type CustomerDataResult<T> =
 - no R03 cart/order write privileges are granted prematurely.
 - production DB remains untouched.
 
-# 141. Definition of Done — Tests
+# 144. Definition of Done — Tests
 - context derivation unit tests.
 - repository mapping tests.
 - transaction leakage/rollback integration tests.
@@ -1191,7 +1212,7 @@ type CustomerDataResult<T> =
 - real customer read integration coverage.
 - inherited R01/Phase02 regressions remain covered.
 
-# 142. Explicit Prohibitions
+# 145. Explicit Prohibitions
 - do not implement durable cart persistence.
 - do not implement durable order persistence.
 - do not create cart/order lifecycle migrations.
@@ -1206,7 +1227,7 @@ type CustomerDataResult<T> =
 - do not grant customer role broad table privileges.
 - do not merge implementation PR.
 
-# 143. PR Requirements — Metadata
+# 146. PR Requirements — Metadata
 - Phase `03`.
 - Round `02`.
 - Specification `FLOW_P03_R02_IMPLEMENTATION_SPEC.md`.
@@ -1219,7 +1240,7 @@ type CustomerDataResult<T> =
 - generated types changed YES/NO.
 - user-visible read integration changed YES/NO.
 
-# 144. PR Requirements — Validation
+# 147. PR Requirements — Validation
 - lint result.
 - typecheck result.
 - unit test result.
@@ -1231,7 +1252,7 @@ type CustomerDataResult<T> =
 - cross-tenant/branch denial result.
 - use PASS/FAIL/NOT RUN/BLOCKED/NOT APPLICABLE only.
 
-# 145. PR Requirements — Architecture Evidence
+# 148. PR Requirements — Architecture Evidence
 - exact transaction helper implementation.
 - exact repository factory pattern.
 - exact read model contracts.
@@ -1239,7 +1260,7 @@ type CustomerDataResult<T> =
 - explain public-vs-capability read split.
 - explain whether customer page switched from static/mock to database-backed read.
 
-# 146. PR Requirements — Scope Declaration
+# 149. PR Requirements — Scope Declaration
 ```text
 PHASE: P03
 ROUND: R02
@@ -1255,7 +1276,7 @@ PAYMENT_RUNTIME_CHANGED: NO
 IMPLEMENTATION_AGENT_MERGE: NO
 ```
 
-# 147. R03 Handoff Contract
+# 150. R03 Handoff Contract
 - R03 receives validated `CustomerContext` from R01.
 - R03 receives customer DB transaction composition from R02.
 - R03 receives repository conventions and error mapping from R02.
@@ -1264,7 +1285,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - R03 should add write privileges only for the exact persisted operations it owns.
 - R03 should preserve customer/staff authority separation.
 
-# 148. Exact R03 Ownership
+# 151. Exact R03 Ownership
 - durable cart storage.
 - durable cart item storage.
 - durable order storage foundation.
@@ -1275,14 +1296,14 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - persistence repository implementations.
 - R02 must not implement these prematurely.
 
-# 149. R03 Write-Privilege Handoff
+# 152. R03 Write-Privilege Handoff
 - R02 customer role should finish with read-only/customer-safe privileges.
 - R03 must explicitly add only required INSERT/UPDATE operations.
 - R03 must add RLS/function rules for those writes.
 - R03 must not infer write authority from R02 role name.
 - R03 should preserve R02 negative write-denial test and amend it deliberately when exact writes are introduced.
 
-# 150. R04 Boundary
+# 153. R04 Boundary
 - command input validation.
 - add/remove/update cart command orchestration.
 - submit order command orchestration.
@@ -1290,64 +1311,64 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - domain failure mapping at command boundary.
 - R02 does not implement these command flows.
 
-# 151. R05 Boundary
+# 154. R05 Boundary
 - idempotency key contract.
 - retry/dedupe persistence.
 - duplicate-submit defense.
 - race handling for customer mutations.
 - R02 does not add generic idempotency infrastructure.
 
-# 152. R06 Boundary
+# 155. R06 Boundary
 - end-to-end customer data-plane acceptance.
 - entry → capability → data access → persistence → command → idempotency proof.
 - Phase 04 handoff.
 - R02 does not claim Phase 03 completion.
 
-# 153. Failure Case Matrix — Context Missing
+# 156. Failure Case Matrix — Context Missing
 - no customer cookie/context.
 - expected: stop before customer DB transaction.
 - UI: re-entry path according to R01.
 - DB: no domain query.
 - logs: safe category only.
 
-# 154. Failure Case Matrix — Capability Revoked
+# 157. Failure Case Matrix — Capability Revoked
 - R01 returns revoked/invalid context state.
 - R02 must not compensate by accepting URL tenant/table selectors.
 - no domain query should execute under guessed scope.
 - customer is directed to re-enter/rescan.
 
-# 155. Failure Case Matrix — Database Unavailable
+# 158. Failure Case Matrix — Database Unavailable
 - context may be valid but DB read fails.
 - return unavailable state.
 - do not show empty menu as if legitimate.
 - allow safe retry.
 - no raw connection error exposed.
 
-# 156. Failure Case Matrix — Out-of-Scope Resource
+# 159. Failure Case Matrix — Out-of-Scope Resource
 - caller supplies item ID from another tenant/branch.
 - repository applies trusted scope.
 - no row is returned/operation denied.
 - response does not reveal other tenant ownership.
 
-# 157. Failure Case Matrix — Schema Drift
+# 160. Failure Case Matrix — Schema Drift
 - query/function missing after bad migration state.
 - implementation tests fail.
 - runtime returns safe unavailable/internal error.
 - do not silently fallback to unscoped query.
 
-# 158. Failure Case Matrix — Transaction Throw
+# 161. Failure Case Matrix — Transaction Throw
 - repository/service throws inside callback.
 - transaction rolls back.
 - role/context clears.
 - next pooled request starts clean.
 
-# 159. Failure Case Matrix — Partial Aggregate Read
+# 162. Failure Case Matrix — Partial Aggregate Read
 - storefront read succeeds.
 - menu read fails in same aggregate transaction.
 - return failure rather than partially trusted aggregate unless product explicitly supports partial state.
 - transaction/read snapshot ends safely.
 
-# 160. Failure Case Matrix — Empty Menu
+# 163. Failure Case Matrix — Empty Menu
 - database query succeeds.
 - context remains valid.
 - zero available items returned.
@@ -1355,7 +1376,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - UI may show customer-safe empty state.
 - do not classify as outage.
 
-# 161. Error Logging Contract
+# 164. Error Logging Contract
 - record error class/code.
 - record subsystem.
 - optionally record request/correlation ID.
@@ -1363,46 +1384,53 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - do not log AUTH_SECRET/DB secret.
 - avoid logging unrelated tenant resource details on denial.
 
-# 162. Query Performance Contract
+# 165. Query Performance Contract
 - bounded menu query count.
 - no per-item modifier query loop where avoidable.
 - select only needed columns.
 - index predicates on tenant/branch/status/foreign keys where appropriate.
 - no premature caching complexity.
 
-# 163. Query Count Evidence
+# 166. Query Count Evidence
 - Implementation PR should state actual expected query count for storefront/menu aggregate.
 - If one SQL query is overly complex, a small fixed number of queries is acceptable.
 - N+1 means query count grows with item/category count and is prohibited unless explicitly justified.
 - Tests may spy repository calls or inspect query composition where practical.
 
-# 164. Resource Safety
+# 167. Performance Budget Guidance
+- Storefront-only read should normally be constant-query complexity.
+- Menu aggregate should remain constant-query complexity with respect to item count.
+- Serialized payload should contain customer-visible fields only.
+- Avoid loading full audit/settings/permission JSON blobs.
+- If actual dataset size makes one aggregate impractical, document bounded pagination without adding generic framework.
+
+# 168. Resource Safety
 - bound any search/filter input.
 - avoid unbounded full-table customer query.
 - avoid client-controlled arbitrary sorting SQL.
 - use deterministic default limits if future list can grow large.
 
-# 165. Customer Data Module Export Discipline
+# 169. Customer Data Module Export Discipline
 - export only service/repository/context APIs intended for server callers.
 - keep low-level SQL helpers private.
 - do not export DB runtime to client imports.
 - use `server-only` consistently.
 
-# 166. Test Fixture Reuse
+# 170. Test Fixture Reuse
 - reuse deterministic Tenant A/Tenant B/branch fixtures.
 - reuse customer entry fixture/table from R01.
 - add menu/storefront fixture only if current seed lacks needed deterministic data.
 - avoid creating duplicated tenant identities.
 - fixture additions must remain non-production.
 
-# 167. Seed Changes
+# 171. Seed Changes
 - Seed changes are allowed only for deterministic local/test customer read data.
 - Do not add production customer data.
 - Keep IDs deterministic.
 - Keep cross-tenant/branch fixtures sufficient for negative tests.
 - If existing seed already covers menu data, do not duplicate it.
 
-# 168. Database Role Privilege Matrix
+# 172. Database Role Privilege Matrix
 - credentials/private auth tables: DENY.
 - memberships/roles/permissions: DENY by default.
 - audit events: DENY.
@@ -1411,7 +1439,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - customer-safe menu/storefront reads: ALLOW narrowly.
 - private customer read functions: EXECUTE narrowly if used.
 
-# 169. Customer vs Staff Context Matrix
+# 173. Customer vs Staff Context Matrix
 - CustomerContext has no actorId.
 - Staff AccessContext has actorId.
 - customer transaction does not set staff actor authority.
@@ -1419,127 +1447,127 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - repositories for customer public data should not require staff permissions.
 - internal admin paths continue using R05 permission checks.
 
-# 170. Capability ID Semantics
+# 174. Capability ID Semantics
 - capabilityId is correlation/scope metadata.
 - it is not permission code.
 - it is not DB user.
 - it is not primary tenant authority without validated CustomerContext.
 - future cart/order may reference capability/session lineage only if R03 spec chooses it.
 
-# 171. Table Session Semantics
+# 175. Table Session Semantics
 - R02 reads only what current table session contract needs.
 - do not invent ownership mutation.
 - closed session should prevent context validation before data mutation later.
 - menu/catalog read policy for closed session should follow R01/product entry semantics.
 - document any distinction clearly.
 
-# 172. Public Menu Without Table Session
+# 176. Public Menu Without Table Session
 - If product allows browsing before active table session, data layer may support branch-scoped catalog read with validated entry context.
 - Do not invent anonymous branch enumeration.
 - Entry resolution still establishes branch safely.
 - Keep mutation capability stricter than browse capability if differentiated.
 
-# 173. URL Selector Handling After Entry
+# 177. URL Selector Handling After Entry
 - restaurantSlug/tableCode may remain in URL for UX.
 - repositories must not treat them as authoritative after capability/context exists.
 - mismatched URL and context should redirect/re-enter or display safe error, not switch authority.
 - add regression test if page route retains selectors.
 
-# 174. Browser Refresh Behavior
+# 178. Browser Refresh Behavior
 - refresh rehydrates current customer context through R01.
 - data service reruns safe reads.
 - no client-local cached tenant override.
 - expired/revoked context follows R01 recovery.
 
-# 175. Multi-Tab Behavior
+# 179. Multi-Tab Behavior
 - tabs sharing customer cookie may share capability context.
 - data reads remain scoped by validated context each request.
 - changing URL in one tab cannot expand scope.
 - no per-tab DB authority state stored globally.
 
-# 176. Customer Re-entry Behavior
+# 180. Customer Re-entry Behavior
 - new valid entry may replace capability according to R01.
 - subsequent data reads use new context.
 - stale server/browser data from old context must not be reused across tenant/branch.
 - client state caches should reset when context identity changes where relevant.
 
-# 177. Cache-Key Safety
+# 181. Cache-Key Safety
 - Any server cache key must include tenant and branch at minimum.
 - Any client query key must include a safe context identity when cross-entry reuse is possible.
 - Do not cache by item ID alone across tenants.
 - Avoid caching context-bound response globally.
 
-# 178. SSR Data Safety
+# 182. SSR Data Safety
 - Server-rendered customer page must fetch under request-specific context.
 - Do not build static page containing tenant-specific private state unless explicitly public and keyed correctly.
 - Avoid cross-request module-level mutable caches.
 
-# 179. Build-Time Safety
+# 183. Build-Time Safety
 - Build should not require live production DB.
 - Customer server modules must not execute DB query at module import time.
 - Runtime env validation may happen lazily/at server request according to current conventions.
 - Static metadata generation must not need capability secret.
 
-# 180. Environment Variables
+# 184. Environment Variables
 - No new variable expected unless new customer runtime configuration is truly required.
 - Do not duplicate R01 capability secret.
 - Database URL remains existing server runtime config.
 - If a query timeout config is introduced, justify it and document default.
 
-# 181. Dependency Policy
+# 185. Dependency Policy
 - Prefer existing Kysely/Postgres stack.
 - No new ORM.
 - No new cache library.
 - No new validation library unless existing stack lacks required capability and benefit is concrete.
 - Avoid package churn.
 
-# 182. Migration Naming
+# 186. Migration Naming
 - Follow timestamp + `p03_r02` descriptive naming convention.
 - Migration must be forward-only.
 - Preserve historical files.
 - Add comments explaining new customer role/function boundary.
 
-# 183. Migration Rollback Planning
+# 187. Migration Rollback Planning
 - Production rollback is operationally forward-fix by default.
 - Do not rely on editing historical migration after deployment.
 - New role/function can be replaced/revoked in future migration if needed.
 - Tests must verify clean bootstrap from scratch.
 
-# 184. Database Function Search Path Test
+# 188. Database Function Search Path Test
 - inspect `proconfig` or function definition if pgTAP supports it.
 - verify fixed search path.
 - verify public execute revoked.
 - verify intended role execute granted.
 - verify function cannot expose unrelated tenant rows.
 
-# 185. Privilege Escalation Test
+# 189. Privilege Escalation Test
 - customer role cannot `set role flow_runtime` unless role membership explicitly absent.
 - customer role cannot modify roles/grants.
 - customer runtime user/login arrangement remains server-owned.
 - no database superuser assumption in application runtime.
 
-# 186. RLS Write Denial Test
+# 190. RLS Write Denial Test
 - if cart/order tables are visible through schema grants, customer role must still lack writes in R02.
 - INSERT cart denied.
 - UPDATE order denied.
 - DELETE order denied.
 - R03 later adds exact required rights intentionally.
 
-# 187. Read Function Abuse Test
+# 191. Read Function Abuse Test
 - invalid resource ID returns no data/safe error.
 - other-tenant resource ID returns no data.
 - branch mismatch returns no data.
 - null/malformed parameter behavior deterministic.
 - function cannot be used to enumerate tenants.
 
-# 188. Storefront Mapping Test
+# 192. Storefront Mapping Test
 - display name correct.
 - branch name correct.
 - table label correct when present.
 - no internal secret/config fields.
 - no staff membership data.
 
-# 189. Menu Mapping Test
+# 193. Menu Mapping Test
 - item IDs stable.
 - category grouping stable.
 - modifier group relationships stable.
@@ -1547,36 +1575,36 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - inactive items absent.
 - ordering deterministic.
 
-# 190. Availability Boundary Test
+# 194. Availability Boundary Test
 - currently unavailable item excluded/flagged according to contract.
 - future window becomes available under deterministic clock when tested.
 - branch timezone honored if model exists.
 - no browser timezone authority.
 
-# 191. Database Unavailable Integration Test
+# 195. Database Unavailable Integration Test
 - inject/force repository failure where test infrastructure allows.
 - service returns unavailable.
 - UI error state is not empty menu.
 - no sensitive message leak.
 
-# 192. Repository Not-Found Test
+# 196. Repository Not-Found Test
 - authorized-scope missing ID returns not-found.
 - unauthorized other-tenant ID returns same public contract.
 - internal diagnostics can differentiate safely if needed.
 
-# 193. Route/API Direct Bypass Test
+# 197. Route/API Direct Bypass Test
 - direct API request with forged tenant ID does not expand context.
 - direct API request with forged branch ID does not expand context.
 - direct API request without capability fails when context required.
 - valid capability gets scoped result.
 
-# 194. Client Boundary Test
+# 198. Client Boundary Test
 - client bundle does not import DB module.
 - client bundle does not contain DB secret.
 - client bundle does not contain capability signing secret.
 - client receives only read model.
 
-# 195. Implementation Evidence — Architecture
+# 199. Implementation Evidence — Architecture
 - exact data module paths.
 - exact transaction wrapper path.
 - exact repository paths.
@@ -1584,14 +1612,14 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - explanation why role was reused or newly created.
 - explanation of public vs capability-bound read split.
 
-# 196. Implementation Evidence — Security
+# 200. Implementation Evidence — Security
 - proof tenant cannot be overridden.
 - proof branch cannot be overridden.
 - proof customer role cannot access auth/private/staff tables.
 - proof customer/staff context does not leak.
 - proof no write authority granted prematurely.
 
-# 197. Implementation Evidence — Database
+# 201. Implementation Evidence — Database
 - migration YES/NO.
 - generated types YES/NO.
 - role/function/grant changes.
@@ -1599,47 +1627,47 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - new indexes and reason.
 - clean reset/bootstrap result.
 
-# 198. Implementation Evidence — Application
+# 202. Implementation Evidence — Application
 - page/API integration changed YES/NO.
 - static/mock read replaced YES/NO.
 - loading/empty/error states impacted.
 - E2E coverage added/updated.
 - no cart/order mutation included.
 
-# 199. Implementation Evidence — Performance
+# 203. Implementation Evidence — Performance
 - query count for menu aggregate.
 - N+1 avoided.
 - indexes used/added where relevant.
 - selected columns bounded.
 - no global context-bound cache.
 
-# 200. Stop Condition — R01 Contract Drift
+# 204. Stop Condition — R01 Contract Drift
 - If latest R01 branch no longer exposes trustworthy `CustomerContext`, stop and reconcile actual parent state.
 - Do not invent alternate authority.
 - If only path/name changed but semantics remain, adapt implementation without scope expansion.
 
-# 201. Stop Condition — Broad Privilege Required
+# 205. Stop Condition — Broad Privilege Required
 - If proposed read layer appears to require broad `flow_runtime` or service-role privileges, stop.
 - Reassess DB function/RLS boundary.
 - Do not weaken Phase 02 security to make customer reads easy.
 
-# 202. Stop Condition — Persistence Required
+# 206. Stop Condition — Persistence Required
 - If desired read feature cannot work without durable cart/order writes, leave it for R03.
 - Do not implement partial persistence hidden inside R02.
 - Document exact dependency in PR handoff.
 
-# 203. Stop Condition — Schema Ambiguity
+# 207. Stop Condition — Schema Ambiguity
 - If menu/storefront schema cannot express tenant/branch ownership safely, report exact ambiguity.
 - Add only minimal invariant migration if it legitimately belongs to data-access security.
 - Do not redesign business schema broadly.
 
-# 204. Stop Condition — Production Mutation
+# 208. Stop Condition — Production Mutation
 - No linked/prod DB reset.
 - No production destructive migration experiment.
 - No secret extraction.
 - Local/CI validation only unless separately authorized.
 
-# 205. Document Validation Checklist
+# 209. Document Validation Checklist
 - [x] canonical filename P03/R02.
 - [x] Phase 03.
 - [x] Round 02.
@@ -1660,7 +1688,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - [x] R03 boundary explicit.
 - [x] no cart/order persistence in R02.
 
-# 206. Document Internal Consistency
+# 210. Document Internal Consistency
 - Metadata identifies R02 only.
 - R02 owns primitives, not persisted cart/order domain state.
 - CustomerContext remains R01 authority.
@@ -1670,21 +1698,21 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - No section authorizes implementation merge by agent.
 - No section pre-grants R03 write privileges.
 
-# 207. Document-Only Validation Policy
+# 211. Document-Only Validation Policy
 - Validate metadata, sequence, repository evidence, architecture, security, failure behavior, tests, and handoff.
 - GitHub Actions are not document-validation authority.
 - Missing/failed/queued/skipped Actions do not semantically invalidate this document.
 - Hosted enforcement may technically block docs merge; report as hosted merge restriction if that occurs.
 - Documentation task must not modify implementation/workflows merely to force docs merge.
 
-# 208. Implementation Validation Policy
+# 212. Implementation Validation Policy
 - Future implementation must run actual applicable repository checks.
 - Document source audit is not runtime proof.
 - Failed required implementation checks remain truthful blockers.
 - Implementation PR remains owner-controlled.
 - Do not fabricate PASS.
 
-# 209. Final Development Gate
+# 213. Final Development Gate
 ```text
 NO SPEC ON MAIN = NO DEVELOPMENT
 FAILED REQUIRED CI = ROUND NOT READY
@@ -1697,7 +1725,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - Documentation branch is never implementation parent.
 - Owner controls implementation integration.
 
-# 210. Final Handoff to R03
+# 214. Final Handoff to R03
 - Trusted authority input remains `CustomerContext` from R01.
 - R02 supplies reusable customer DB transaction composition.
 - R02 supplies customer-safe storefront/menu repository patterns.
@@ -1706,7 +1734,15 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - R02 supplies context-leakage and cross-tenant regression protection.
 - R03 can add durable cart/order persistence without re-solving authority or generic query architecture.
 
-# 211. Required Next Specification
+# 215. R03 Acceptance Inputs
+- R03 must reuse the exact R02 transaction helper or its final equivalent.
+- R03 must reuse the exact R02 scope mapper.
+- R03 must extend repository composition rather than bypass it.
+- R03 must inspect R02 role/grants before adding writes.
+- R03 must preserve R02 read behavior/regressions.
+- R03 must not move cart/order authority into browser state.
+
+# 216. Required Next Specification
 ```text
 FLOW_P03_R03_IMPLEMENTATION_SPEC.md
 ```
@@ -1714,7 +1750,7 @@ FLOW_P03_R03_IMPLEMENTATION_SPEC.md
 - R02 does not infer R03 schema prematurely.
 - No R03 implementation starts until exact spec exists on `main`.
 
-# 212. Final Acceptance Statement
+# 217. Final Acceptance Statement
 - P03/R02 is READY as an executable specification document.
 - R02 establishes the customer server data-access substrate between capability trust and durable persistence.
 - Customer repositories consume validated context rather than raw client selectors.
