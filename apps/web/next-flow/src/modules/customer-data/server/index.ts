@@ -11,6 +11,22 @@ export type {
   CustomerDataErrorCode,
   CustomerDataResult,
 } from "./errors";
+export { CustomerCartRepository } from "./cart-repository";
+export { CustomerOrderRepository } from "./order-repository";
+export type {
+  AddCustomerCartItemInput,
+  CustomerCartAggregate,
+  CustomerCartItemSnapshot,
+  CustomerCartModifierSnapshot,
+  CustomerCartStatus,
+  CustomerDraftOrderAggregate,
+  CustomerOrderItemSnapshot,
+  CustomerOrderModifierSnapshot,
+  CustomerOrderStatus,
+  PersistDraftOrderInput,
+  PersistDraftOrderItemInput,
+  PersistDraftOrderModifierInput,
+} from "./persistence-types";
 export { loadCustomerStorefrontSnapshot } from "./storefront-service";
 export { withCustomerDataTransaction } from "./transaction";
 export type { CustomerDataTransactionScope } from "./transaction";
