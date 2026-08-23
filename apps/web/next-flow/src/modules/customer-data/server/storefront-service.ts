@@ -14,10 +14,8 @@ export async function loadCustomerStorefrontSnapshot(
 ): Promise<CustomerDataResult<CustomerStorefrontSnapshot>> {
   try {
     const data = await withCustomerDataTransaction(context, async ({ repositories }) => {
-      const [storefront, menu] = await Promise.all([
-        repositories.storefront.getCurrent(),
-        repositories.menu.listAvailable(),
-      ]);
+      const storefront = await repositories.storefront.getCurrent();
+      const menu = await repositories.menu.listAvailable();
       return Object.freeze({ storefront, menu });
     });
     return { status: "ok", data };
