@@ -79,27 +79,27 @@ export class CustomerMenuRepository {
             availability.type = 'SCHEDULED'
             and exists (
               select 1
-              from foodflow.menu_availability_windows as window
-              where window.tenant_id = item.tenant_id
-                and window.restaurant_id = item.restaurant_id
-                and window.availability_id = availability.id
+              from foodflow.menu_availability_windows as availability_window
+              where availability_window.tenant_id = item.tenant_id
+                and availability_window.restaurant_id = item.restaurant_id
+                and availability_window.availability_id = availability.id
                 and (
                   (
-                    window.start_time < window.end_time
-                    and window.day_of_week = upper(trim(to_char(timezone(availability.timezone, now()), 'Day')))
-                    and timezone(availability.timezone, now())::time >= window.start_time
-                    and timezone(availability.timezone, now())::time < window.end_time
+                    availability_window.start_time < availability_window.end_time
+                    and availability_window.day_of_week = upper(trim(to_char(timezone(availability.timezone, now()), 'Day')))
+                    and timezone(availability.timezone, now())::time >= availability_window.start_time
+                    and timezone(availability.timezone, now())::time < availability_window.end_time
                   )
                   or (
-                    window.start_time > window.end_time
+                    availability_window.start_time > availability_window.end_time
                     and (
                       (
-                        window.day_of_week = upper(trim(to_char(timezone(availability.timezone, now()), 'Day')))
-                        and timezone(availability.timezone, now())::time >= window.start_time
+                        availability_window.day_of_week = upper(trim(to_char(timezone(availability.timezone, now()), 'Day')))
+                        and timezone(availability.timezone, now())::time >= availability_window.start_time
                       )
                       or (
-                        window.day_of_week = upper(trim(to_char(timezone(availability.timezone, now()) - interval '1 day', 'Day')))
-                        and timezone(availability.timezone, now())::time < window.end_time
+                        availability_window.day_of_week = upper(trim(to_char(timezone(availability.timezone, now()) - interval '1 day', 'Day')))
+                        and timezone(availability.timezone, now())::time < availability_window.end_time
                       )
                     )
                   )
