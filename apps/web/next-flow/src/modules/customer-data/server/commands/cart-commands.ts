@@ -54,6 +54,14 @@ export async function addCustomerCartItem(
       if (cart.status !== "DRAFT") {
         throw new CustomerCommandError("CUSTOMER_COMMAND_CART_NOT_EDITABLE");
       }
+
+      const validSelection = await repositories.menuAvailability.areModifierSelectionsCurrentlyValid([
+        { menuItemId, modifierChoiceIds },
+      ]);
+      if (!validSelection) {
+        throw new CustomerCommandError("CUSTOMER_COMMAND_INVALID_INPUT");
+      }
+
       return repositories.carts.addItem(cartId, {
         menuItemId,
         quantity,
