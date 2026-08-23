@@ -87,6 +87,10 @@ select ok(
   'DRAFT order persistence supports customer scope without an active table session'
 );
 
+-- Test-only pgTAP harness access. This GRANT is transaction-local because the
+-- entire test file rolls back; product migrations do not grant extensions usage.
+grant usage on schema extensions to flow_customer_runtime;
+
 set local role flow_customer_runtime;
 select set_config('app.tenant_id', '00000000-0000-0000-0000-0000000000a1', true);
 select set_config('app.restaurant_id', '00000000-0000-0000-0000-0000000000a2', true);
