@@ -57,6 +57,21 @@ test.describe("P03/R01 customer capability entry", () => {
     expect(second?.value).not.toBe(first?.value);
   });
 
+  test("failed re-entry preserves the previously valid customer capability", async ({ page }) => {
+    await page.goto("/r/restaurant-a/table/T-A1");
+    const first = (await page.context().cookies()).find(
+      (candidate) => candidate.name === capabilityCookie,
+    );
+    expect(first).toBeDefined();
+
+    await page.goto("/r/restaurant-a/table/UNKNOWN");
+    await expect(page).toHaveURL(/\/customer-entry-error\?state=invalid/);
+    const afterFailedEntry = (await page.context().cookies()).find(
+      (candidate) => candidate.name === capabilityCookie,
+    );
+    expect(afterFailedEntry?.value).toBe(first?.value);
+  });
+
   test("customer capability alone never authenticates an internal staff route", async ({ page }) => {
     await page.goto("/r/restaurant-a/table/T-A1");
     await page.goto("/staff");
