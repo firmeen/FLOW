@@ -52,7 +52,9 @@ function parsePayload(encoded: string): CapabilityPayload | null {
       typeof value.branchId !== "string" ||
       typeof value.tableId !== "string" ||
       (value.tableSessionId !== null && typeof value.tableSessionId !== "string") ||
+      typeof value.iat !== "number" ||
       !Number.isInteger(value.iat) ||
+      typeof value.exp !== "number" ||
       !Number.isInteger(value.exp)
     ) {
       return null;
