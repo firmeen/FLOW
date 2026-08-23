@@ -70,9 +70,8 @@ export function createInternalAuthenticator(
       return { status: "unavailable" };
     }
 
-    const subjectDigest = dependencies.deriveThrottleSubject(normalizedEmail);
-
     try {
+      const subjectDigest = dependencies.deriveThrottleSubject(normalizedEmail);
       const throttle = await dependencies.readThrottle(subjectDigest);
       if (throttle?.isBlocked) {
         return { status: "rejected", reason: "blocked" };
