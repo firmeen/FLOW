@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { CustomerContext } from "@/modules/customer-capability/server/types";
 import { getCurrentCustomerContext } from "@/modules/customer-capability/server/current-context";
 
 import {
@@ -18,10 +19,9 @@ export const defaultCustomerCommandDependencies: CustomerCommandDependencies = O
   withCustomerDataTransaction,
 });
 
-export async function withCurrentCustomerCommandTransaction<T>(
-  callback: (scope: CustomerDataTransactionScope) => Promise<T>,
+export async function requireCurrentCustomerContext(
   dependencies: CustomerCommandDependencies = defaultCustomerCommandDependencies,
-): Promise<T> {
+): Promise<CustomerContext> {
   let resolution: Awaited<ReturnType<typeof getCurrentCustomerContext>>;
   try {
     resolution = await dependencies.getCurrentCustomerContext();
@@ -31,7 +31,7 @@ export async function withCurrentCustomerCommandTransaction<T>(
 
   switch (resolution.status) {
     case "resolved":
-      return dependencies.withCustomerDataTransaction(resolution.context, callback);
+      return resolution.context;
     case "missing":
       throw new CustomerCommandError("CUSTOMER_COMMAND_CONTEXT_REQUIRED");
     case "invalid":
@@ -41,4 +41,30 @@ export async function withCurrentCustomerCommandTransaction<T>(
     case "unavailable":
       throw new CustomerCommandError("CUSTOMER_COMMAND_UNAVAILABLE");
   }
+}
+
+export function customerCommandDependenciesForScope(
+  customerContext: CustomerContext,
+  scope: CustomerDataTransactionScope,
+): CustomerCommandDependencies {
+  const reuseTransaction: typeof withCustomerDataTransaction = async <T>(
+    _customerContext: CustomerContext,
+    callback: (innerScope: CustomerDataTransactionScope) => Promise<T>,
+  ): Promise<T> => callback(scope);
+
+  return Object.freeze({
+    getCurrentCustomerContext: async () => ({
+      status: "resolved" as const,
+      context: customerContext,
+    }),
+    withCustomerDataTransaction: reuseTransaction,
+  });
+}
+
+export async function withCurrentCustomerCommandTransaction<T>(
+  callback: (scope: CustomerDataTransactionScope) => Promise<T>,
+  dependencies: CustomerCommandDependencies = defaultCustomerCommandDependencies,
+): Promise<T> {
+  const context = await requireCurrentCustomerContext(dependencies);
+  return dependencies.withCustomerDataTransaction(context, callback);
 }

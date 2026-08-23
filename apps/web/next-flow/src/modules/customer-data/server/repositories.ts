@@ -4,6 +4,7 @@ import type { DatabaseTransaction } from "@/server/db/types";
 
 import type { CustomerDatabaseContext } from "./context";
 import { CustomerCartRepository } from "./cart-repository";
+import { CustomerIdempotencyRepository } from "./idempotency/repository";
 import { CustomerMenuAvailabilityRepository } from "./menu-availability-repository";
 import { CustomerMenuRepository } from "./menu-repository";
 import { CustomerOrderRepository } from "./order-repository";
@@ -15,6 +16,7 @@ export interface CustomerRepositories {
   readonly menuAvailability: CustomerMenuAvailabilityRepository;
   readonly carts: CustomerCartRepository;
   readonly orders: CustomerOrderRepository;
+  readonly idempotency: CustomerIdempotencyRepository;
 }
 
 export function createCustomerRepositories(
@@ -27,5 +29,6 @@ export function createCustomerRepositories(
     menuAvailability: new CustomerMenuAvailabilityRepository(trx, context),
     carts: new CustomerCartRepository(trx, context),
     orders: new CustomerOrderRepository(trx, context),
+    idempotency: new CustomerIdempotencyRepository(trx),
   });
 }

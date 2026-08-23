@@ -11,6 +11,11 @@ export type CustomerCommandErrorCode =
   | "CUSTOMER_COMMAND_CART_NOT_EDITABLE"
   | "CUSTOMER_COMMAND_CART_EMPTY"
   | "CUSTOMER_COMMAND_ITEM_UNAVAILABLE"
+  | "CUSTOMER_COMMAND_IDEMPOTENCY_KEY_REQUIRED"
+  | "CUSTOMER_COMMAND_IDEMPOTENCY_KEY_INVALID"
+  | "CUSTOMER_COMMAND_IDEMPOTENCY_MISMATCH"
+  | "CUSTOMER_COMMAND_IDEMPOTENCY_EXPIRED"
+  | "CUSTOMER_COMMAND_IDEMPOTENCY_INVARIANT"
   | "CUSTOMER_COMMAND_UNAVAILABLE";
 
 const SAFE_MESSAGES: Record<CustomerCommandErrorCode, string> = {
@@ -22,6 +27,11 @@ const SAFE_MESSAGES: Record<CustomerCommandErrorCode, string> = {
   CUSTOMER_COMMAND_CART_NOT_EDITABLE: "The cart is no longer editable.",
   CUSTOMER_COMMAND_CART_EMPTY: "The cart is empty.",
   CUSTOMER_COMMAND_ITEM_UNAVAILABLE: "One or more cart items are unavailable.",
+  CUSTOMER_COMMAND_IDEMPOTENCY_KEY_REQUIRED: "A request identity is required.",
+  CUSTOMER_COMMAND_IDEMPOTENCY_KEY_INVALID: "The request identity is invalid.",
+  CUSTOMER_COMMAND_IDEMPOTENCY_MISMATCH: "The request identity was already used for a different request.",
+  CUSTOMER_COMMAND_IDEMPOTENCY_EXPIRED: "The request identity is no longer replayable.",
+  CUSTOMER_COMMAND_IDEMPOTENCY_INVARIANT: "The prior request result is temporarily unavailable.",
   CUSTOMER_COMMAND_UNAVAILABLE: "The request is temporarily unavailable.",
 };
 

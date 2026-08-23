@@ -33,6 +33,16 @@ export type {
   CustomerDataResult,
 } from "./errors";
 export { CustomerCartRepository } from "./cart-repository";
+export {
+  addCustomerCartItemIdempotent,
+  removeCustomerCartItemIdempotent,
+  submitCustomerOrderIdempotent,
+  updateCustomerCartItemIdempotent,
+} from "./idempotency";
+export type {
+  CustomerIdempotencyCommand,
+  IdempotentCustomerCommandResult,
+} from "./idempotency";
 export { CustomerOrderRepository } from "./order-repository";
 export type {
   AddCustomerCartItemInput,
