@@ -56,14 +56,14 @@ select throws_ok(
 select lives_ok(
   $$ insert into foodflow.carts (id, tenant_id, branch_id, table_id, status)
      values ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000a5', 'DRAFT');
-     insert into foodflow.cart_items (tenant_id, cart_id, menu_item_id, quantity)
-     values ('00000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000aa', 1); $$,
+     insert into foodflow.cart_items (tenant_id, cart_id, menu_item_id, quantity, unit_price_minor, currency)
+     values ('00000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000aa', 1, 10000, 'THB'); $$,
   'draft cart can exist without required modifier completion'
 );
 
 select throws_ok(
-  $$ insert into foodflow.cart_items (tenant_id, cart_id, menu_item_id, quantity)
-     values ('00000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000aa', 0) $$,
+  $$ insert into foodflow.cart_items (tenant_id, cart_id, menu_item_id, quantity, unit_price_minor, currency)
+     values ('00000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000aa', 0, 10000, 'THB') $$,
   '23514',
   null,
   'zero cart quantity rejected'
