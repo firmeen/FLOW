@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { FlowLogo } from "@/components/shared/flow-logo";
 import { Card } from "@/components/ui/card";
@@ -34,13 +35,13 @@ export default async function CustomerEntryErrorPage({
   return (
     <main className="grid min-h-screen place-items-center bg-muted/40 px-4 py-10">
       <div className="w-full max-w-lg">
-        <a
+        <Link
           href="/"
           className="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           aria-label="FLOW home"
         >
           <FlowLogo variant="primary" preload className="w-48 sm:w-56" />
-        </a>
+        </Link>
 
         <Card className="mt-6 p-6 sm:p-8">
           <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -57,19 +58,19 @@ export default async function CustomerEntryErrorPage({
 
           <div className="mt-6 flex flex-wrap gap-3">
             {selector && (
-              <a
+              <Link
                 href={buildCustomerEntryPath(selector)}
                 className="inline-flex h-9 items-center justify-center bg-primary px-4 text-sm font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               >
                 Try again
-              </a>
+              </Link>
             )}
-            <a
+            <Link
               href="/"
               className="inline-flex h-9 items-center justify-center border border-border px-4 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               Return home
-            </a>
+            </Link>
           </div>
         </Card>
       </div>
