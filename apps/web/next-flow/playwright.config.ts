@@ -22,9 +22,9 @@ export default defineConfig({
     command: "npm run build:next && npm run start:next -- --port 3100",
     url: "http://localhost:3100",
     env: {
-      FOODFLOW_INTERNAL_EMAIL: E2E_AUTH.email,
-      FOODFLOW_INTERNAL_PASSWORD: E2E_AUTH.password,
-      FOODFLOW_SESSION_SECRET: E2E_AUTH.secret,
+      AUTH_SECRET: E2E_AUTH.authSecret,
+      AUTH_TRUST_HOST: "true",
+      DATABASE_URL: process.env.DATABASE_URL ?? "",
     },
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",
     timeout: 120_000,
