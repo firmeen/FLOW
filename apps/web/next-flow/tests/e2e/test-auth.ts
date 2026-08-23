@@ -1,5 +1,7 @@
+import { identityFixtures } from "../fixtures/identity";
+
 export const E2E_AUTH = {
-  email: "browser-check@foodflow.test",
-  password: "foodflow-browser-check",
-  secret: "foodflow-browser-check-session-secret-change-me",
+  email: identityFixtures.emails.ownerA,
+  password: identityFixtures.passwords.ownerA,
+  authSecret: "flow-browser-check-auth-secret-change-before-production",
 } as const;
