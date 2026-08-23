@@ -108,14 +108,14 @@ insert into foodflow.carts (
   'DRAFT'
 );
 
-select is(
+select extensions.is(
   (select count(*)::bigint from foodflow.carts where id = '71000000-0000-4000-8000-000000000001'),
   1::bigint,
   'own capability can read its cart'
 );
 
 select set_config('app.customer_capability_id', '70000000-0000-4000-8000-000000000042', true);
-select is(
+select extensions.is(
   (select count(*)::bigint from foodflow.carts where id = '71000000-0000-4000-8000-000000000001'),
   0::bigint,
   'same table but another capability cannot read the cart'
@@ -144,7 +144,7 @@ insert into foodflow.orders (
   null
 );
 
-select is(
+select extensions.is(
   (select count(*)::bigint from foodflow.orders where id = '72000000-0000-4000-8000-000000000001'),
   1::bigint,
   'own capability can persist and read a DRAFT order'
