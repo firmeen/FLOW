@@ -1601,3 +1601,414 @@ FLOW_P03_R01_IMPLEMENTATION_SPEC.md
 - The future R06 implementation must remove duplicate legacy authority rather than preserve it indefinitely.
 - The future R06 implementation must preserve the modern R03/R04/R05 authority chain.
 - The future R06 implementation remains owner-controlled for merge.
+
+# 179. Exact Legacy Removal Inventory — Runtime
+- inspect `src/lib/auth/config.ts` for any non-legacy constant before deletion.
+- inspect `src/lib/auth/token.ts` for any non-legacy consumer before deletion.
+- inspect `src/lib/auth/session.ts` for rollback-only exports.
+- inspect login/logout routes for legacy cookie cleanup references.
+- inspect proxy for stale legacy imports.
+- inspect test helpers for custom token minting.
+- inspect any middleware-like helper for fallback credential logic.
+- classify every remaining legacy symbol before removal.
+
+# 180. Exact Legacy Removal Inventory — Environment
+- `FOODFLOW_INTERNAL_EMAIL` should have zero runtime consumers after R06.
+- `FOODFLOW_INTERNAL_PASSWORD` should have zero runtime consumers after R06.
+- `FOODFLOW_SESSION_SECRET` should have zero runtime consumers after R06 when legacy signer is gone.
+- test-only references must not become product configuration.
+- deployment docs must not present these as required.
+- current Auth.js env remains authoritative.
+
+# 181. Exact Legacy Removal Inventory — Tests
+- old shared-credential success tests should be deleted or inverted.
+- old token issue/verify happy-path tests should be deleted or inverted.
+- stale-cookie denial tests should remain.
+- historical literal strings may remain only as negative fixtures.
+- test helpers must not provide reusable legacy-auth minting capability.
+
+# 182. Exact Legacy Removal Inventory — Dependencies
+- determine whether `jose` is a direct runtime dependency only for deleted code.
+- inspect source imports, test imports, scripts, and tooling.
+- remove direct dependency only if no supported direct consumer remains.
+- package-lock must reflect only intentional manifest change.
+- do not combine security cleanup with broad dependency modernization.
+
+# 183. Exact Legacy Removal Inventory — Documentation
+- preserve Phase 01/02 historical specs as records.
+- update active setup docs only.
+- update active environment docs only.
+- update active auth architecture/runbook only when present.
+- acceptance document may explicitly list removed legacy symbols.
+- do not rewrite history to pretend legacy path never existed.
+
+# 184. Atomic Removal Order
+- first confirm current Auth.js path is present on parent branch.
+- then identify all legacy consumers.
+- then convert/remove rollback-only call sites.
+- then delete legacy issuer/verifier modules.
+- then delete shared config module if fully obsolete.
+- then remove obsolete env documentation.
+- then remove dependency if unused.
+- then run source-level denylist searches.
+- then run full auth/authz regression.
+- this order minimizes accidental broken references and fallback resurrection.
+
+# 185. Current-vs-Legacy Classification Rule
+- database credential repository is CURRENT.
+- password verifier is CURRENT.
+- login throttle is CURRENT.
+- Auth.js Credentials provider is CURRENT.
+- Auth.js JWT/session callback is CURRENT.
+- AccessContext is CURRENT.
+- permission evaluator is CURRENT.
+- legacy shared environment credentials are LEGACY.
+- legacy custom HS256 issuer/verifier is LEGACY.
+- stale-cookie deletion logic is CLEANUP-ONLY, not authority.
+
+# 186. Source Removal Acceptance Matrix
+- deleted module import count must be zero.
+- deleted exported symbol references must be zero.
+- deprecated rollback helper references must be zero.
+- legacy env runtime references must be zero.
+- custom legacy token issue calls must be zero.
+- custom legacy token verify calls must be zero.
+- historical docs are excluded from runtime-zero counts.
+
+# 187. Old-Cookie Threat Matrix
+- unsigned random old cookie: deny.
+- malformed old JWT-looking cookie: deny.
+- expired historical valid legacy token: deny.
+- historically valid non-expired token under old secret: deny because verifier is gone.
+- old cookie plus workspace hint: deny without Auth.js session.
+- old cookie plus valid tenant/branch IDs: deny without Auth.js session.
+- old cookie plus forged role/permission data: deny.
+
+# 188. Old-Credential Threat Matrix
+- old shared email/password without DB user: deny.
+- old shared email/password with unrelated DB user: must not create authority unless actual DB credential matches.
+- old demo password cannot bypass scrypt verification.
+- legacy env variables cannot short-circuit DB credential lookup.
+- absence of DB connection must not trigger fallback shared credential.
+
+# 189. Session Ambiguity Elimination
+- there must be one supported way to establish authenticated internal session.
+- Auth.js provider/session callbacks define that path.
+- no helper may independently set a second internal auth cookie.
+- no route may select between Auth.js and legacy token verification.
+- no test helper should normalize dual-authority behavior.
+
+# 190. Authorization Ambiguity Elimination
+- authenticated session identifies actor only.
+- AccessContext identifies current workspace authority.
+- permission evaluator identifies current action authority.
+- RLS validates DB boundary.
+- no legacy “internal session means admin” semantics remain.
+- no static role inferred from old session type remains.
+
+# 191. Acceptance — Staff Family
+- authenticated staff with correct workspace and permission succeeds.
+- authenticated kitchen-only actor cannot use staff route unless permission explicitly grants it.
+- authenticated cashier-only actor cannot use staff route unless permission explicitly grants it.
+- legacy cookie cannot grant staff access.
+- old shared credential cannot grant staff access.
+
+# 192. Acceptance — Kitchen Family
+- authenticated kitchen actor with correct branch and permission succeeds.
+- wrong branch denies.
+- staff actor lacking kitchen access denies.
+- legacy cookie denies.
+- permission revocation is reflected without legacy fallback.
+
+# 193. Acceptance — Cashier Family
+- authenticated cashier actor with correct branch and permission succeeds.
+- unauthorized branch denies.
+- staff/kitchen actor lacking cashier permission denies.
+- legacy cookie denies.
+- financial commands remain separately permission-gated.
+
+# 194. Acceptance — Admin Family
+- authenticated manager/admin actor with management permission succeeds.
+- ordinary staff denies.
+- no-membership authenticated actor denies.
+- legacy cookie denies.
+- shared demo credential cannot become admin authority.
+- self-elevation protections remain active.
+
+# 195. Acceptance — No Membership
+- credential-bearing no-membership actor can remain a valid authentication negative/edge fixture.
+- authentication success does not imply workspace access.
+- workspace resolution returns no access.
+- permission evaluation cannot proceed as authorized.
+- legacy cookie cannot fill the missing membership gap.
+
+# 196. Acceptance — Revoked Membership
+- actor session may remain technically authenticated.
+- workspace resolution must fail for revoked membership.
+- protected route must not proceed through stale workspace hint.
+- command must not execute.
+- old cookie cannot restore previous access.
+
+# 197. Acceptance — Suspended User
+- pre-auth lookup should fail according to current credential contract.
+- existing stale session must not create current workspace authority.
+- authorization should fail closed.
+- no legacy fallback may bypass suspension.
+
+# 198. Acceptance — Disabled Credential
+- new login fails.
+- existing authorization semantics depend on session/user/membership state as currently designed.
+- R06 must not invent a new revocation model outside existing Phase 02 contract.
+- no shared fallback credential bypasses disabled credential.
+
+# 199. Acceptance — Wrong Tenant
+- authenticated actor with valid session but unauthorized tenant selection denies.
+- error must not expose sensitive tenant details.
+- old cookie cannot influence result.
+- command cannot override context with client-provided tenant.
+
+# 200. Acceptance — Wrong Branch
+- branch-bound actor requesting sibling branch denies.
+- tenant-wide actor behavior follows R04 semantics.
+- permission check receives authorized branch context only.
+- stale/legacy cookie cannot widen branch scope.
+
+# 201. Acceptance — Permission Revocation
+- remove permission mapping or alter role in controlled test.
+- next permission evaluation denies.
+- route/command cannot fall back to legacy internal-session semantics.
+- restoration of fixture state must be deterministic.
+
+# 202. Acceptance — Role Change
+- actor identity stays the same.
+- AccessContext re-resolves current role metadata as designed.
+- permission evaluator uses current DB relation.
+- legacy token does not carry an old privileged role snapshot.
+
+# 203. Acceptance — Session Expiry
+- expired Auth.js session no longer authenticates.
+- stale old legacy session cookie does not replace it.
+- workspace hint alone is insufficient.
+- protected routes return login flow.
+
+# 204. Acceptance — Secret Rotation
+- Auth.js secret rotation behavior remains framework/config controlled.
+- old legacy signing secret is irrelevant after removal.
+- no code path attempts to verify legacy token with obsolete secret.
+- no dual-secret fallback exists.
+
+# 205. Deployment Safety — Before Rollout
+- verify current environment has required Auth.js config.
+- verify database connectivity/config exists.
+- verify at least one supported internal account path exists for operational testing.
+- do not preserve shared credentials as a deployment safety net.
+- document rollback to previous deployment artifact if needed.
+
+# 206. Deployment Safety — After Rollout
+- supported login succeeds.
+- expected protected route succeeds.
+- unauthorized route denies.
+- logout succeeds.
+- stale legacy cookie is inert.
+- old shared env values are inert.
+- application startup does not reference removed modules/env.
+
+# 207. Rollback Safety
+- rollback should restore an earlier entire deployment, not cherry-pick legacy authority into current code.
+- do not maintain dual-path code for rollback.
+- database changes in R06 should be zero by default, simplifying rollback.
+- if a forward DB migration is unavoidable, document compatibility with previous application version.
+
+# 208. Dependency Removal Safety
+- package manifest change must be minimal.
+- lockfile must not contain unrelated bulk churn if avoidable.
+- build must prove Auth.js does not require direct project `jose` import.
+- tests must prove removed dependency does not break test helpers.
+- if dependency retained, PR must name current consumer.
+
+# 209. Test Helper Safety
+- no production module should import test helper.
+- no test helper should expose a generic legacy token mint function after R06.
+- fixture passwords remain test-only.
+- test automation should authenticate through supported path or controlled lower-level current primitives.
+
+# 210. Audit Trail Requirements
+- acceptance record must list actual R05 parent SHA.
+- acceptance record must list R06 head SHA.
+- acceptance record must list removed legacy files.
+- acceptance record must list retained current authority modules.
+- acceptance record must state actual validation results.
+- acceptance record must state whether implementation PR is merged or open.
+
+# 211. Acceptance Record — Legacy Removal Table
+- old shared credential config: REMOVED/INERT with evidence.
+- old custom session issuer: REMOVED.
+- old custom verifier: REMOVED.
+- old cookie authority: REMOVED.
+- old env dependency: REMOVED.
+- old demo fallback: REMOVED.
+- old direct dependency: REMOVED or retained with legitimate consumer.
+
+# 212. Acceptance Record — Current Authority Table
+- credential source: database credential boundary.
+- session source: Auth.js.
+- actor identity: real `app.users.id`.
+- workspace authority: current active membership via R04 resolver.
+- permission authority: current DB role/permission via R05 evaluator.
+- DB defense: tenant/branch/actor RLS/runtime context.
+
+# 213. Acceptance Record — Security Denial Table
+- unknown login: denied.
+- wrong password: denied.
+- suspended actor: denied.
+- no membership: workspace denied.
+- revoked membership: denied.
+- wrong tenant: denied.
+- wrong branch: denied.
+- missing permission: denied.
+- legacy cookie: denied.
+- old shared credential bypass: denied.
+
+# 214. Acceptance Record — Residual Risks
+- hosted obsolete secrets may remain stored until operator removal but must be inert.
+- historical docs retain legacy names by design.
+- synthetic fixture credentials remain test-only.
+- any deferred product-level session capability belongs to P03+.
+- record only real observed residual risks.
+
+# 215. R06 Change Budget
+- prioritize deletion and simplification.
+- avoid new abstractions unless needed to replace a current accidental legacy dependency.
+- no broad auth redesign.
+- no new auth provider.
+- no new persistence model.
+- no new infrastructure service.
+- high impact comes from eliminating duplicate authority and proving the final boundary.
+
+# 216. Review Focus — Deletions
+- reviewers should inspect every deleted module consumer.
+- ensure no hidden route still imports deleted code.
+- ensure no test silently stops covering protected paths.
+- ensure removal does not weaken deny behavior.
+
+# 217. Review Focus — Preserved Modern Path
+- Auth.js config remains canonical.
+- authentication orchestrator remains canonical.
+- session claims remain minimal.
+- current-access remains canonical.
+- permission evaluator remains canonical.
+- authorized transaction remains canonical.
+
+# 218. Review Focus — Configuration
+- env example reflects current runtime.
+- no demo password.
+- no old signing secret.
+- no unnecessary auth env aliases.
+- no secrets committed.
+
+# 219. Review Focus — Tests
+- legacy bypass denial is explicit.
+- modern happy paths are not deleted with legacy tests.
+- route permission E2E remains meaningful.
+- workspace tests remain meaningful.
+- DB security tests remain meaningful.
+
+# 220. Review Focus — Database
+- no accidental deletion of current credential tables/functions.
+- no grant broadening.
+- no RLS weakening.
+- no production mutation.
+- no historical migration rewrite.
+
+# 221. Exact Final Source State Target
+- `src/auth.ts`: supported Auth.js server auth.
+- `src/auth.config.ts`: supported proxy-compatible Auth.js config.
+- `src/lib/auth/session.ts`: Auth.js-oriented session convenience only.
+- legacy config/token modules: absent or reduced to non-authority cleanup-only code with strong justification.
+- identity modules: current DB auth/workspace/permission primitives.
+- proxy: Auth.js authentication gate, no legacy token verifier.
+
+# 222. Exact Final Environment State Target
+- current Auth.js environment contract documented.
+- database runtime environment contract documented.
+- legacy shared credentials absent from active setup.
+- legacy signing secret absent from active setup.
+- test fixtures not presented as production configuration.
+
+# 223. Exact Final Dependency State Target
+- next-auth/Auth.js dependencies retained.
+- current DB/Kysely dependencies retained.
+- `jose` direct dependency removed if no live direct consumer.
+- no replacement token library added.
+- no unrelated upgrade batch.
+
+# 224. Exact Final Test State Target
+- authentication current-path tests.
+- legacy bypass denial tests.
+- workspace access tests.
+- revocation tests.
+- permission route tests.
+- permission command tests.
+- RLS/database security tests.
+- Phase 02 acceptance evidence.
+
+# 225. Final P03 Handoff — Authentication
+- P03 must consume current server identity helpers rather than invent customer/internal identity confusion.
+- internal actor authorization remains separate from future customer capability.
+- P03 must not restore shared internal auth.
+- P03 can rely on one clean internal authority chain.
+
+# 226. Final P03 Handoff — Data Plane
+- P03 receives tenant/branch-safe server transaction primitives.
+- P03 receives permission-aware internal command foundations.
+- P03 still owns customer data-plane capability/session semantics.
+- R06 does not preempt those decisions.
+
+# 227. Final P03 Handoff — Testing
+- P03 inherits deterministic tenant/branch/actor fixtures.
+- P03 inherits security denial regressions.
+- P03 should extend rather than replace them.
+- P03 customer capability tests must coexist with internal auth tests.
+
+# 228. Final P03 Handoff — Non-Authority
+- legacy cookie is not an authority.
+- old shared env credentials are not an authority.
+- client tenant/branch fields are not authority.
+- UI route visibility is not authority.
+- session permission snapshots are not authority.
+
+# 229. R06 Completion Blockers
+- current Auth.js path is not actually functional on R05 parent.
+- R05 permission enforcement is missing despite branch evidence.
+- deleting legacy source would remove the only functioning login path.
+- unidentified live consumer requires insecure legacy verifier.
+- cleanup requires production destructive DB action.
+- security regression cannot be resolved without widening privilege.
+- report blocker rather than preserve ambiguity silently.
+
+# 230. R06 Implementation PR Stop Point
+- finish code cleanup.
+- finish acceptance tests.
+- add acceptance record.
+- open/update one R06 implementation PR.
+- report actual outcomes.
+- do not merge implementation PR.
+- do not create P03 implementation branch.
+
+# 231. Final Document Quality Check
+- metadata sequence is canonical.
+- R05 evidence is grounded in actual branch diff.
+- scope is cleanup/acceptance, not redesign.
+- legacy removal is file-level actionable.
+- security tests cover bypass and revocation.
+- environment/dependency cleanup is explicit.
+- migration safety is explicit.
+- failure/recovery and rollback are explicit.
+- P03 handoff is explicit.
+- no filler-only sections are intended.
+
+# 232. Final Acceptance
+- P02/R06 is READY as an executable specification document.
+- R06 closes Phase 02 by eliminating obsolete authority and proving the modern identity/authz chain.
+- The implementation must preserve Auth.js, AccessContext, permission enforcement, and RLS while deleting legacy shared auth.
+- After R06 implementation reaches stable handoff, the documentation pipeline may evaluate whether `FLOW_P03_R01_IMPLEMENTATION_SPEC.md` is justified.
