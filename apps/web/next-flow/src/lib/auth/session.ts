@@ -1,13 +1,16 @@
+import type { Session } from "next-auth";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { SESSION_COOKIE_NAME, SESSION_DURATION_SECONDS } from "./config";
-import {
-  createSessionToken,
-  verifySession,
-  type InternalSession,
-} from "./token";
+import { auth, signOut } from "@/auth";
 
+import { SESSION_COOKIE_NAME, SESSION_DURATION_SECONDS } from "./config";
+import { createSessionToken, type InternalSession } from "./token";
+
+/**
+ * @deprecated Source-level rollback helper only. Live R03 authentication must
+ * not call this legacy session issuer. R06 owns physical removal.
+ */
 export async function createSession(): Promise<InternalSession> {
   const { token, session } = await createSessionToken();
   const cookieStore = await cookies();
@@ -23,17 +26,17 @@ export async function createSession(): Promise<InternalSession> {
   return session;
 }
 
-export async function getInternalSession(): Promise<InternalSession | null> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  return verifySession(token);
+export async function getInternalSession(): Promise<Session | null> {
+  return auth();
 }
 
 export async function deleteSession(): Promise<void> {
+  await signOut({ redirect: false });
   (await cookies()).delete(SESSION_COOKIE_NAME);
 }
 
-export async function requireInternalSession(): Promise<InternalSession> {
+export async function requireInternalSession(): Promise<Session> {
   const session = await getInternalSession();
-  if (!session) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
   return session;
 }
