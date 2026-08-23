@@ -1564,20 +1564,403 @@ NOT APPLICABLE
 - Order snapshots are historical data, not live menu references only.
 - R04 handoff is composable and atomic.
 
-# 186. Document-Only Validation Policy
+# 186. Existing Table Audit — carts
+- confirm current columns exactly.
+- confirm PK type.
+- confirm tenant_id nullability.
+- confirm branch_id nullability.
+- confirm table_session relationship.
+- confirm status type/check.
+- confirm timestamps.
+- confirm current RLS policy names.
+- confirm current grants to customer runtime, flow_runtime, anon, authenticated.
+- confirm existing indexes.
+- confirm current seed/test usage.
+
+# 187. Existing Table Audit — cart_items
+- confirm parent FK delete behavior.
+- confirm tenant duplication strategy.
+- confirm menu_item FK behavior.
+- confirm quantity constraint.
+- confirm price columns and units.
+- confirm snapshot fields.
+- confirm modifier child model.
+- confirm RLS inherited-via-parent or direct.
+- confirm indexes.
+
+# 188. Existing Table Audit — orders
+- confirm status values and initial state.
+- confirm source cart relation.
+- confirm table/table-session relation.
+- confirm total/subtotal fields.
+- confirm currency representation.
+- confirm customer ownership field availability.
+- confirm current RLS/grants.
+- confirm order number/display ID semantics.
+- confirm kitchen/payment downstream FKs.
+
+# 189. Existing Table Audit — order_items
+- confirm menu item reference delete behavior.
+- confirm snapshot name columns.
+- confirm quantity constraint.
+- confirm price snapshot columns.
+- confirm modifier relation/snapshot support.
+- confirm tenant duplication strategy.
+- confirm current RLS and indexes.
+
+# 190. Existing Table Audit — table_sessions
+- confirm active/closed lifecycle representation.
+- confirm branch/table ownership FKs.
+- confirm customer capability relation if any.
+- confirm whether historical closed session rows remain.
+- confirm mutation eligibility predicate available to R03.
+
+# 191. Ownership Migration Path A — Existing ownership already sufficient
+- no new ownership columns.
+- reuse current capability/session key.
+- tighten RLS if needed.
+- add missing indexes/constraints only.
+- update repositories/types.
+- prefer this path when actual schema supports it.
+
+# 192. Ownership Migration Path B — Ownership column missing but safe additive migration
+- add nullable ownership column.
+- backfill deterministic test/local rows only where evidence exists.
+- update insert path to always write ownership.
+- validate no new null rows.
+- set NOT NULL only when all current legitimate data is safely attributable.
+- otherwise keep nullable with policy that denies null rows to customer runtime until later controlled migration.
+
+# 193. Ownership Migration Path C — Existing ownership conflicts with capability lifecycle
+- do not overwrite historical ownership blindly.
+- introduce stable non-secret owner key alongside legacy field if required.
+- document relationship and future cleanup.
+- preserve historical order readability.
+- stop if migration would invent false customer identity for real rows.
+
+# 194. Snapshot Rule — Mutable Cart
+- choose current-live vs persisted price behavior explicitly.
+- if persisted snapshot, define refresh behavior expectation for R04.
+- if live price, repository aggregate must fetch current authoritative price and identify stale menu rows.
+- never mix strategies silently per item.
+
+# 195. Snapshot Rule — Historical Order
+- order name snapshot immutable.
+- unit price snapshot immutable.
+- modifier label/price snapshot immutable when relevant.
+- mutable menu edits never rewrite existing order history.
+- FK deletion must not cascade historical rows.
+
+# 196. Locking Decision Matrix
+- cart creation conflict: uniqueness constraint preferred over application pre-check race.
+- cart item update: optimistic version or row lock only if needed.
+- conversion to order: row lock/unique source-cart constraint considered.
+- menu reads: no unnecessary FOR UPDATE.
+- order history reads: no locking.
+- choose minimum locking needed to preserve invariant.
+
+# 197. Row Locking Rules
+- acquire lock only within active customer transaction.
+- lock cart parent before terminal/conversion write when conversion invariant requires it.
+- use deterministic lock order if multiple rows must lock.
+- do not hold locks across network calls or external side effects.
+- R03 introduces no external side effects, enabling short transactions.
+
+# 198. Optimistic Version Contract
+- if version selected, start deterministic integer value.
+- update uses expected version predicate.
+- successful mutation increments exactly once.
+- zero-row update maps to typed conflict.
+- client cannot choose arbitrary resulting version.
+- R04 may ask client to refresh on conflict.
+
+# 199. One-Cart-One-Order Constraint
+- if hard invariant, unique index/constraint on `source_cart_id` where non-null.
+- duplicate conversion then fails deterministically in DB.
+- R04 maps conflict to already-submitted/reload semantics.
+- R05 later adds request-level result replay, not duplicate structural order creation.
+
+# 200. Customer Runtime Policy Helper Contract
+- helper must derive tenant from transaction-local trusted context.
+- helper must derive branch from transaction-local trusted context.
+- helper must derive customer owner key from transaction-local trusted context or explicit server-set value.
+- null/malformed settings fail closed.
+- helper must not read browser request fields.
+- helper should be SECURITY DEFINER only if necessary and fixed-search-path if so.
+
+# 201. Cart RLS Predicate Contract
+Conceptual read predicate:
+```text
+row.tenant_id = current_customer_tenant
+AND row.branch_id = current_customer_branch
+AND row.customer_owner_key = current_customer_owner
+```
+- exact helper/column names follow current implementation.
+- terminal rows may remain readable if confirmation UX requires.
+- write check must also enforce current active customer scope.
+
+# 202. Order RLS Predicate Contract
+Conceptual customer read predicate:
+```text
+row.tenant_id = current_customer_tenant
+AND row.branch_id = current_customer_branch
+AND row.customer_owner_key = current_customer_owner
+```
+- customer update should be far narrower than read.
+- direct arbitrary order update should normally be denied.
+- creation should happen through controlled repository/function path.
+
+# 203. Child RLS Contract
+- cart item visibility follows owned cart parent.
+- order item visibility follows owned order parent.
+- if child has tenant_id, it must also equal trusted tenant.
+- avoid relying on caller-provided child tenant IDs.
+- parent EXISTS predicates must be indexed efficiently.
+
+# 204. Write Function Alternative
+- if direct table grants make customer runtime too broad, use narrow functions.
+- function accepts domain selectors, not tenant authority.
+- function reads current transaction context.
+- function validates parent ownership.
+- function returns safe persisted row/result.
+- function fixed search_path and tightly granted.
+- repository remains caller abstraction.
+
+# 205. Price Snapshot Function Rule
+- server code may resolve price before repository insert.
+- database should still constrain numeric shape.
+- avoid duplicating full pricing engine inside SQL unless already canonical there.
+- R03 does not create split-brain pricing authorities.
+
+# 206. Cart Aggregate Query Contract
+- bounded query count target: constant relative to number of items where practical.
+- one cart metadata query plus batched item/modifier query acceptable.
+- avoid one modifier query per item.
+- deterministic item ordering for UI stability.
+- include only fields needed by customer flow.
+
+# 207. Order Aggregate Query Contract
+- stable order/item ordering.
+- historical snapshot values preferred.
+- no joins that substitute current mutable menu labels for snapshot fields.
+- exclude privileged operational relations.
+- bound relation load count.
+
+# 208. Failure Matrix — Cart create
+- invalid capability context → no transaction/write.
+- expired/revoked context → no write.
+- branch closed → no write.
+- active-cart uniqueness conflict → typed conflict/reuse decision deferred R04.
+- DB unavailable → safe unavailable error.
+- insert succeeds but follow-up fails in same operation → rollback.
+
+# 209. Failure Matrix — Cart item add
+- unknown item → invalid selection.
+- cross-tenant item → invalid selection/non-enumerating.
+- unavailable item → stale/invalid selection.
+- invalid modifier → invalid selection.
+- terminal cart → conflict.
+- ownership mismatch → not-found/denied.
+- DB constraint failure → typed domain/infrastructure mapping.
+
+# 210. Failure Matrix — Cart item update/remove
+- missing item → not-found.
+- ownership mismatch → not-found.
+- stale version → conflict if versioning selected.
+- terminal cart → conflict.
+- zero/negative quantity → validation error.
+- concurrent conversion → conflict/fail closed.
+
+# 211. Failure Matrix — Order persistence
+- empty cart/order where forbidden → validation/invariant failure.
+- invalid snapshot input → validation failure.
+- child insert failure → rollback all.
+- duplicate source-cart conversion → typed conflict.
+- context revoked before commit → fail closed through revalidation/RLS.
+- database unavailable → no partial order.
+
+# 212. Recovery Matrix
+- user can refresh cart after typed conflict.
+- stale menu data can be reloaded by R04.
+- expired capability requires re-entry/rescan via R01 flow.
+- DB unavailable returns retry-safe UI error without claiming success.
+- duplicate structural conversion can reload existing order when R04/R05 implement result semantics.
+
+# 213. Persistence Observability Evidence
+Implementation PR should record:
+- cart create operation logging behavior.
+- order create operation logging behavior.
+- no token logging proof/source inspection.
+- typed conflict logging class.
+- infrastructure error class.
+- correlation/request ID behavior if available.
+- no raw request body logging requirement.
+
+# 214. Schema Diff Evidence
+PR must list for each altered table:
+- added columns.
+- removed columns, expected none by default.
+- altered nullability.
+- altered defaults.
+- constraints added/changed.
+- indexes added/changed.
+- policies added/changed.
+- grants added/revoked.
+- backfill performed.
+
+# 215. Repository API Evidence
+PR must list exact methods added to CartRepository and OrderRepository.
+For each method record:
+- trusted context source.
+- input selectors.
+- output model.
+- transaction requirement.
+- expected typed errors.
+- whether row locking/version check occurs.
+
+# 216. R04 Command Contract — Add Cart Item
+R04 should be able to:
+1. validate current CustomerContext.
+2. open one customer transaction.
+3. load authoritative menu selection through R02 repository.
+4. load/create owned active cart through R03 repository.
+5. validate availability/pricing.
+6. persist item/modifiers through R03 repository.
+7. commit.
+8. return canonical cart aggregate.
+R03 must make this possible without direct SQL.
+
+# 217. R04 Command Contract — Update Cart Item
+R04 should be able to:
+1. validate context.
+2. open transaction.
+3. load owned cart/item.
+4. reject terminal/stale state.
+5. apply validated quantity/modifier change.
+6. persist atomically.
+7. return canonical aggregate.
+
+# 218. R04 Command Contract — Remove Cart Item
+R04 should be able to:
+1. validate context.
+2. open transaction.
+3. load owned cart/item.
+4. reject terminal cart.
+5. remove item.
+6. update/recompute stored totals if R03 strategy stores them.
+7. return canonical aggregate.
+
+# 219. R04 Command Contract — Submit Order
+R04 should be able to:
+1. validate context again at command time.
+2. open one transaction.
+3. lock/load owned active cart when needed.
+4. load authoritative menu/price/availability state.
+5. validate all cart lines.
+6. create order with immutable snapshots.
+7. create order items/modifier snapshots.
+8. mark source cart converted/terminal.
+9. commit atomically.
+10. perform only post-commit side-effect handoff later.
+R03 must provide all persistence primitives for steps 3, 6, 7, 8.
+
+# 220. R05 Future Compatibility
+- R03 source-cart unique constraint supports structural duplicate prevention.
+- R03 typed conflicts give R05 deterministic result classes.
+- R03 repository methods must not generate request-idempotency keys internally.
+- R03 must not persist arbitrary request IDs unless already required by current schema.
+- R05 can layer idempotency without replacing cart/order repositories.
+
+# 221. Phase 04 Future Compatibility
+- internal staff order repositories may later differ from customer repositories.
+- order schema must support staff/kitchen lifecycle extensions without customer authority broadening.
+- avoid customer-owner column being the only internal order authorization model.
+- tenant/branch remain common platform ownership.
+
+# 222. Database Acceptance — Clean Bootstrap
+- fresh database can apply all historical + new R03 migration.
+- seed succeeds.
+- R01/R02 DB functions/roles still exist.
+- R03 grants/policies install deterministically.
+- pgTAP/database tests pass when executed.
+- generated types match final schema.
+
+# 223. Database Acceptance — Least Privilege
+- entry role cannot mutate carts/orders.
+- customer runtime can only required cart/order/menu read/write surface.
+- customer runtime cannot read credentials.
+- customer runtime cannot mutate roles/memberships.
+- customer runtime cannot mutate payment/kitchen tables.
+- anon/authenticated broad direct writes remain denied.
+
+# 224. Database Acceptance — Ownership
+- own cart allow.
+- own order allow where customer read is required.
+- same branch other customer deny.
+- sibling branch deny.
+- cross tenant deny.
+- null owner context deny.
+- malformed/missing transaction context deny.
+
+# 225. Database Acceptance — Integrity
+- invalid quantity denied.
+- invalid status denied.
+- invalid FK relationships denied.
+- source-cart duplicate conversion denied when chosen.
+- orphan child rows impossible.
+- historical order items survive menu deactivation/deletion strategy.
+
+# 226. Server Acceptance — Architecture
+- no duplicate transaction helper.
+- repository factory extended.
+- no route-local Kysely writes.
+- server-only imports preserved.
+- typed models and errors.
+- no tenant/branch override parameters in repository methods.
+
+# 227. Server Acceptance — Persistence
+- create/load cart works.
+- item persistence works.
+- modifier persistence works.
+- order persistence works.
+- order snapshot mapping works.
+- aggregate reads deterministic.
+- rollback tests prove atomicity.
+
+# 228. Security Acceptance — Logging
+- bearer token absent from logs.
+- cookie contents absent from logs.
+- DB credentials absent from logs.
+- public error excludes SQL details.
+- ownership mismatch not exposed publicly.
+
+# 229. Performance Acceptance
+- cart aggregate query plan/index use inspected for primary lookup.
+- order lookup indexed by ownership/id.
+- no obvious N+1.
+- bulk item insert bounded by validated item count.
+- no unbounded customer history query added.
+
+# 230. Final Document Line-Quality Rule
+- Every section above must guide implementation, validation, security, migration safety, or handoff.
+- Do not add blank padding.
+- Do not duplicate generic theory.
+- If implementation evidence changes before work begins, follow current main + actual parent branch rather than stale authoring assumptions.
+
+# 231. Document-Only Validation Policy
 - Validate metadata, sequence, actual repository evidence, architecture, persistence invariants, security, failure behavior, tests, and handoff.
 - GitHub Actions are not document-validation authority.
 - Missing/failed/queued/skipped Actions do not semantically invalidate this document.
 - Hosted merge enforcement may technically block documentation merge.
 - Documentation task must not change runtime/CI merely to force docs merge.
 
-# 187. Implementation Validation Policy
+# 232. Implementation Validation Policy
 - Future R03 implementation must execute actual applicable checks.
 - Source audit here is not runtime proof.
 - Failed required implementation validation remains a blocker for implementation readiness.
 - Implementation PR remains owner-controlled.
 
-# 188. Final Development Gate
+# 233. Final Development Gate
 ```text
 NO SPEC ON MAIN = NO DEVELOPMENT
 FAILED REQUIRED CI = ROUND NOT READY
@@ -1590,7 +1973,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - Documentation branch is never implementation parent.
 - Owner controls implementation integration.
 
-# 189. Final Handoff to R04
+# 234. Final Handoff to R04
 - trusted input remains validated CustomerContext.
 - reusable customer transaction remains inherited from R02.
 - durable cart repository exists.
@@ -1600,7 +1983,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - cart/order writes are composable in one transaction.
 - R04 can implement command orchestration without direct SQL.
 
-# 190. Required Next Specification
+# 235. Required Next Specification
 ```text
 FLOW_P03_R04_IMPLEMENTATION_SPEC.md
 ```
@@ -1608,7 +1991,7 @@ FLOW_P03_R04_IMPLEMENTATION_SPEC.md
 - R03 does not infer final command API prematurely.
 - No R04 implementation starts until exact spec exists on `main`.
 
-# 191. Final Acceptance Statement
+# 236. Final Acceptance Statement
 - P03/R03 is READY as an executable specification document.
 - R03 establishes durable cart/order persistence between customer data access and customer command orchestration.
 - Customer ownership, tenant/branch scope, money snapshots, relational integrity, transaction safety, and rollback are explicit.
