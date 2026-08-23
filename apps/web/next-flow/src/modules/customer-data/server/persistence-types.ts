@@ -1,7 +1,7 @@
 import "server-only";
 
 export type CustomerCartStatus = "DRAFT" | "SUBMITTED" | "ABANDONED";
-export type CustomerOrderStatus = "DRAFT";
+export type CustomerOrderStatus = "DRAFT" | "PENDING_CONFIRMATION";
 
 export interface AddCustomerCartItemInput {
   readonly menuItemId: string;
@@ -95,11 +95,22 @@ export interface CustomerDraftOrderAggregate {
   readonly id: string;
   readonly sourceCartId: string | null;
   readonly orderNumber: string;
-  readonly status: CustomerOrderStatus;
+  readonly status: "DRAFT";
   readonly subtotalMinor: string;
   readonly currency: string;
   readonly customerNote: string | null;
   readonly tableId: string;
   readonly tableSessionId: string | null;
   readonly items: readonly CustomerOrderItemSnapshot[];
+}
+
+export interface CustomerSubmittedOrder {
+  readonly id: string;
+  readonly sourceCartId: string;
+  readonly orderNumber: string;
+  readonly status: "PENDING_CONFIRMATION";
+  readonly customerStatus: "SENT";
+  readonly submittedAt: Date;
+  readonly subtotalMinor: string;
+  readonly currency: string;
 }
