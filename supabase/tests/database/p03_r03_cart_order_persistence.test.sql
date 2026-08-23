@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(36);
 
 select ok(
   exists(select 1 from pg_roles where rolname = 'flow_customer_runtime'),
