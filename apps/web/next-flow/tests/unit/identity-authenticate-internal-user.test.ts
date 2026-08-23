@@ -126,6 +126,21 @@ describe("P02/R03 internal authentication orchestrator", () => {
     expect(dependencies.readThrottle).not.toHaveBeenCalled();
   });
 
+  it("fails closed when throttle subject derivation fails", async () => {
+    const dependencies = makeDependencies({
+      deriveThrottleSubject: vi.fn(() => {
+        throw new Error("digest unavailable");
+      }),
+    });
+    const authenticate = createInternalAuthenticator(dependencies);
+
+    await expect(authenticate(candidate.normalizedEmail, "password")).resolves.toEqual({
+      status: "unavailable",
+    });
+    expect(dependencies.readThrottle).not.toHaveBeenCalled();
+    expect(dependencies.findCandidate).not.toHaveBeenCalled();
+  });
+
   it("fails closed when authentication infrastructure fails", async () => {
     const dependencies = makeDependencies({
       readThrottle: vi.fn(async () => {
