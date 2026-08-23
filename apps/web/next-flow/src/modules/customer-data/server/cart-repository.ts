@@ -65,6 +65,19 @@ export class CustomerCartRepository {
     return this.requireById(row.id);
   }
 
+  async findActive(): Promise<CustomerCartAggregate | null> {
+    const row = await this.trx
+      .selectFrom("foodflow.carts as cart")
+      .select("cart.id")
+      .where("cart.tenant_id", "=", this.context.tenantId)
+      .where("cart.status", "=", "DRAFT")
+      .orderBy("cart.updated_at", "desc")
+      .orderBy("cart.id", "asc")
+      .executeTakeFirst();
+
+    return row ? this.requireById(row.id) : null;
+  }
+
   async findById(cartId: string): Promise<CustomerCartAggregate | null> {
     const id = validateUuid(cartId, "cartId");
     const cart = await this.trx
@@ -194,6 +207,24 @@ export class CustomerCartRepository {
     return cart;
   }
 
+  async lockDraft(cartId: string): Promise<CustomerCartAggregate> {
+    const id = validateUuid(cartId, "cartId");
+    const locked = await this.trx
+      .selectFrom("foodflow.carts as cart")
+      .select("cart.id")
+      .where("cart.tenant_id", "=", this.context.tenantId)
+      .where("cart.id", "=", id)
+      .where("cart.status", "=", "DRAFT")
+      .forUpdate()
+      .executeTakeFirst();
+
+    if (!locked) {
+      throw new CustomerDataError("CUSTOMER_RESOURCE_NOT_FOUND");
+    }
+
+    return this.requireById(locked.id);
+  }
+
   async addItem(
     cartId: string,
     input: AddCustomerCartItemInput,
@@ -201,7 +232,7 @@ export class CustomerCartRepository {
     const id = validateUuid(cartId, "cartId");
     const menuItemId = validateUuid(input.menuItemId, "menuItemId");
     const quantity = requirePositiveQuantity(input.quantity);
-    await this.requireDraftCart(id);
+    await this.lockDraft(id);
 
     const menuItem = await this.trx
       .selectFrom("foodflow.menu_items as menu_item")
@@ -313,7 +344,7 @@ export class CustomerCartRepository {
     const id = validateUuid(cartId, "cartId");
     const itemId = validateUuid(cartItemId, "cartItemId");
     const validatedQuantity = requirePositiveQuantity(quantity);
-    await this.requireDraftCart(id);
+    await this.lockDraft(id);
 
     const updated = await this.trx
       .updateTable("foodflow.cart_items")
@@ -333,7 +364,7 @@ export class CustomerCartRepository {
   async removeItem(cartId: string, cartItemId: string): Promise<CustomerCartAggregate> {
     const id = validateUuid(cartId, "cartId");
     const itemId = validateUuid(cartItemId, "cartItemId");
-    await this.requireDraftCart(id);
+    await this.lockDraft(id);
 
     const removed = await this.trx
       .deleteFrom("foodflow.cart_items")
@@ -355,20 +386,6 @@ export class CustomerCartRepository {
 
   async abandon(cartId: string): Promise<void> {
     await this.transitionDraftCart(cartId, "ABANDONED");
-  }
-
-  private async requireDraftCart(cartId: string): Promise<void> {
-    const cart = await this.trx
-      .selectFrom("foodflow.carts")
-      .select("id")
-      .where("tenant_id", "=", this.context.tenantId)
-      .where("id", "=", cartId)
-      .where("status", "=", "DRAFT")
-      .executeTakeFirst();
-
-    if (!cart) {
-      throw new CustomerDataError("CUSTOMER_RESOURCE_NOT_FOUND");
-    }
   }
 
   private async transitionDraftCart(
