@@ -80,17 +80,26 @@ select is(
   'sibling branch substitution is denied'
 );
 
-update foodflow.restaurant_tables
-set active = false
-where id = '00000000-0000-0000-0000-0000000000a5';
+insert into foodflow.restaurant_tables (
+  id, tenant_id, branch_id, code, label, seats, qr_code, display_order, active
+) values (
+  '70000000-0000-4000-8000-000000000000',
+  '00000000-0000-0000-0000-0000000000a1',
+  '00000000-0000-0000-0000-0000000000a3',
+  'P03-R01-SQL',
+  'Revocation Table',
+  1,
+  'test://p03-r01-sql',
+  98,
+  false
+);
 select is(
-  (select count(*)::bigint from private.resolve_customer_entry('restaurant-a', 'T-A1')),
+  (select count(*)::bigint from private.resolve_customer_entry('restaurant-a', 'P03-R01-SQL')),
   0::bigint,
   'inactive table revokes customer entry eligibility'
 );
-update foodflow.restaurant_tables
-set active = true
-where id = '00000000-0000-0000-0000-0000000000a5';
+delete from foodflow.restaurant_tables
+where id = '70000000-0000-4000-8000-000000000000';
 
 insert into foodflow.restaurant_tables (
   id, tenant_id, branch_id, code, label, seats, qr_code, display_order, active
