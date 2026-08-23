@@ -61,6 +61,13 @@ describe("P02/R06 final identity and authorization acceptance", () => {
     expect(env).not.toContain("FOODFLOW_SESSION_SECRET");
   });
 
+  it("removes the obsolete direct JOSE dependency while Auth.js owns JWT internals", () => {
+    const packageJson = JSON.parse(read("package.json")) as {
+      dependencies?: Record<string, string>;
+    };
+    expect(packageJson.dependencies).not.toHaveProperty("jose");
+  });
+
   it("keeps permission evaluation out of the authentication proxy", () => {
     const proxy = read("src/proxy.ts");
     expect(proxy).toContain("NextAuth(authConfig).auth");
