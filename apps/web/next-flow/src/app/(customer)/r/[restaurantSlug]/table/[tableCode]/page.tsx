@@ -8,6 +8,7 @@ import {
   buildCustomerExchangePath,
   parseCustomerEntrySelector,
 } from "@/modules/customer-capability/server/entry-selector";
+import { loadCustomerStorefrontSnapshot } from "@/modules/customer-data/server";
 
 export async function generateMetadata({
   params,
@@ -48,5 +49,23 @@ export default async function CustomerTablePage(props: {
     redirect(buildCustomerExchangePath(selector));
   }
 
-  return <CustomerExperience tableCode={resolution.context.tableCode} />;
+  const snapshot = await loadCustomerStorefrontSnapshot(resolution.context);
+  if (snapshot.status !== "ok") {
+    const params = new URLSearchParams({
+      state: snapshot.status === "unavailable" ? "unavailable" : "invalid",
+      restaurantSlug: selector.restaurantSlug,
+      tableCode: selector.tableCode,
+    });
+    redirect(`/customer-entry-error?${params.toString()}`);
+  }
+
+  return (
+    <div
+      data-flow-customer-data-source="database"
+      data-flow-restaurant={snapshot.data.storefront.restaurantId}
+      data-flow-branch={snapshot.data.storefront.branchId}
+    >
+      <CustomerExperience tableCode={resolution.context.tableCode} />
+    </div>
+  );
 }
