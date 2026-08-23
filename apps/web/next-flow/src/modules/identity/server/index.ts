@@ -13,6 +13,14 @@ export { clearLoginFailures, readLoginThrottle, recordLoginFailure } from "./log
 export { performDummyPasswordVerification, verifyPassword } from "./password-verifier";
 export { authenticateInternalUser, createInternalAuthenticator } from "./authenticate-internal-user";
 export { deriveLoginThrottleSubject } from "./throttle-subject";
+export { listActorWorkspaces } from "./workspace-repository";
+export { resolveAccessContext, createAccessContextResolver } from "./resolve-access-context";
+export {
+  getCurrentAccessContext,
+  getCurrentAccessResolution,
+  requireCurrentAccessContext,
+  withCurrentAccessTransaction,
+} from "./current-access";
 export {
   LOGIN_BLOCK_SECONDS,
   LOGIN_FAILURE_LIMIT,
@@ -25,4 +33,13 @@ export type {
   InternalAuthenticationDependencies,
   InternalAuthenticationResult,
 } from "./authenticate-internal-user";
+export type {
+  AccessContext,
+  AccessResolution,
+  AccessScope,
+  AccessSelector,
+  AuthorizedDatabaseRequestContext,
+  WorkspaceOption,
+} from "./access-context";
+export type { CurrentAccessOptions, CurrentAccessResolution } from "./current-access";
 export type { CredentialCandidate, LoginThrottleState } from "./types";
