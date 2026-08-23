@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { sql } from "kysely";
 
 import type { DatabaseTransaction } from "@/server/db/types";
 import { validateUuid } from "@/server/db/context";
@@ -11,6 +12,7 @@ import type {
   CustomerDraftOrderAggregate,
   CustomerOrderItemSnapshot,
   CustomerOrderModifierSnapshot,
+  CustomerSubmittedOrder,
   PersistDraftOrderInput,
   PersistDraftOrderItemInput,
 } from "./persistence-types";
@@ -193,6 +195,39 @@ export class CustomerOrderRepository {
     }
 
     return this.requireById(orderId);
+  }
+
+  async submitDraft(orderId: string): Promise<CustomerSubmittedOrder> {
+    const id = validateUuid(orderId, "orderId");
+    const result = await sql<{
+      id: string;
+      order_number: string;
+      status: string;
+      customer_status: string;
+      submitted_at: Date;
+      subtotal_minor: string;
+      currency: string;
+      source_cart_id: string;
+    }>`select * from private.submit_customer_order(${id}::uuid)`.execute(this.trx);
+    const row = result.rows[0];
+
+    if (!row) {
+      throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
+    }
+    if (row.status !== "PENDING_CONFIRMATION" || row.customer_status !== "SENT") {
+      throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
+    }
+
+    return Object.freeze({
+      id: row.id,
+      sourceCartId: row.source_cart_id,
+      orderNumber: row.order_number,
+      status: "PENDING_CONFIRMATION" as const,
+      customerStatus: "SENT" as const,
+      submittedAt: row.submitted_at,
+      subtotalMinor: row.subtotal_minor,
+      currency: row.currency,
+    });
   }
 
   async findById(orderId: string): Promise<CustomerDraftOrderAggregate | null> {
