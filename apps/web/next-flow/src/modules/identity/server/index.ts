@@ -21,6 +21,22 @@ export {
   requireCurrentAccessContext,
   withCurrentAccessTransaction,
 } from "./current-access";
+export { PERMISSIONS, isPermissionCode } from "./permissions";
+export {
+  AuthorizationDeniedError,
+  AuthorizationUnavailableError,
+  authorizePermission,
+  authorizePermissionInTransaction,
+} from "./authorize-permission";
+export {
+  withAuthorizedAccessTransaction,
+  withAuthorizedCurrentAccessTransaction,
+} from "./authorized-transaction";
+export {
+  INTERNAL_ROUTE_PERMISSION_REQUIREMENTS,
+  getRoutePermissionRequirement,
+  requireRoutePermission,
+} from "./route-permissions";
 export {
   LOGIN_BLOCK_SECONDS,
   LOGIN_FAILURE_LIMIT,
@@ -42,4 +58,10 @@ export type {
   WorkspaceOption,
 } from "./access-context";
 export type { CurrentAccessOptions, CurrentAccessResolution } from "./current-access";
+export type {
+  PermissionDecision,
+  PermissionScope,
+} from "./authorize-permission";
+export type { PermissionCode } from "./permissions";
+export type { RoutePermissionRequirement } from "./route-permissions";
 export type { CredentialCandidate, LoginThrottleState } from "./types";
