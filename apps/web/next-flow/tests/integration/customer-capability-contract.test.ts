@@ -56,7 +56,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
         tableCode: "T-A1",
       });
 
-      const issued = issueCustomerCapability(resolution.entry, 2_000_000_000);
+      const issued = issueCustomerCapability(resolution.entry);
       const validated = await validateCustomerCapability(issued.token);
       expect(validated.status).toBe("resolved");
       if (validated.status !== "resolved") return;
