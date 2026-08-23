@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +13,7 @@ import {
 import {
   buildCustomerEntryPath,
   buildCustomerExchangePath,
+  parseCustomerEntrySearchParams,
   parseCustomerEntrySelector,
 } from "@/modules/customer-capability/server/entry-selector";
 import type { ResolvedCustomerEntry } from "@/modules/customer-capability/server/types";
@@ -30,6 +32,34 @@ const entry: ResolvedCustomerEntry = {
   tableLabel: "Table A1",
   tableSessionId: null,
 };
+
+function resignCapability(
+  token: string,
+  options: {
+    header?: Record<string, unknown>;
+    payload?: Record<string, unknown>;
+  },
+): string {
+  const [encodedHeader, encodedPayload] = token.split(".");
+  const header = options.header
+    ? Buffer.from(JSON.stringify(options.header)).toString("base64url")
+    : encodedHeader;
+  const payload = options.payload
+    ? Buffer.from(JSON.stringify(options.payload)).toString("base64url")
+    : encodedPayload;
+  const unsigned = `${header}.${payload}`;
+  const signature = createHmac("sha256", TEST_SECRET)
+    .update(unsigned)
+    .digest("base64url");
+  return `${unsigned}.${signature}`;
+}
+
+function decodedPayload(token: string): Record<string, unknown> {
+  return JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8")) as Record<
+    string,
+    unknown
+  >;
+}
 
 beforeEach(() => {
   process.env.CUSTOMER_CAPABILITY_SECRET = TEST_SECRET;
@@ -89,13 +119,48 @@ describe("P03/R01 customer capability", () => {
     );
   });
 
-  it("keeps public selectors narrow and customer transport separate", () => {
+  it("rejects wrong algorithm, issuer, audience, and version even with a valid HMAC", () => {
+    const now = 2_000_000_000;
+    const issued = issueCustomerCapability(entry, now);
+    const payload = decodedPayload(issued.token);
+
+    const wrongAlgorithm = resignCapability(issued.token, {
+      header: { alg: "HS512", typ: "FLOW-CAP" },
+    });
+    expect(verifyCustomerCapability(wrongAlgorithm, now + 1)).toEqual({ status: "invalid" });
+
+    for (const patch of [
+      { iss: "not-flow" },
+      { aud: "not-foodflow-customer" },
+      { v: 2 },
+    ]) {
+      const forged = resignCapability(issued.token, {
+        payload: { ...payload, ...patch },
+      });
+      expect(verifyCustomerCapability(forged, now + 1)).toEqual({ status: "invalid" });
+    }
+  });
+
+  it("keeps public selectors narrow and rejects duplicate exchange inputs", () => {
     expect(parseCustomerEntrySelector(" Restaurant-A ", " T-A1 ")).toEqual({
       restaurantSlug: "restaurant-a",
       tableCode: "T-A1",
     });
     expect(parseCustomerEntrySelector("restaurant-a", "../admin")).toBeNull();
     expect(parseCustomerEntrySelector("https://example.com", "T-A1")).toBeNull();
+
+    expect(
+      parseCustomerEntrySearchParams(
+        new URLSearchParams("restaurantSlug=restaurant-a&tableCode=T-A1"),
+      ),
+    ).toEqual({ restaurantSlug: "restaurant-a", tableCode: "T-A1" });
+    expect(
+      parseCustomerEntrySearchParams(
+        new URLSearchParams(
+          "restaurantSlug=restaurant-a&restaurantSlug=restaurant-b&tableCode=T-A1",
+        ),
+      ),
+    ).toBeNull();
 
     const selector = { restaurantSlug: "restaurant-a", tableCode: "T-A1" };
     expect(buildCustomerEntryPath(selector)).toBe("/r/restaurant-a/table/T-A1");
