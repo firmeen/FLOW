@@ -13,7 +13,14 @@ select ok(
   'customer runtime may execute the exact submission primitive'
 );
 select ok(
-  not has_function_privilege('public', 'private.submit_customer_order(uuid)', 'EXECUTE'),
+  not exists (
+    select 1
+    from information_schema.routine_privileges privilege
+    where privilege.routine_schema = 'private'
+      and privilege.routine_name = 'submit_customer_order'
+      and privilege.grantee = 'PUBLIC'
+      and privilege.privilege_type = 'EXECUTE'
+  ),
   'public cannot execute customer submission'
 );
 select ok(
