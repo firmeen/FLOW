@@ -10,6 +10,9 @@ import {
 import type { CustomerCommandDependencies } from "@/modules/customer-data/server/commands/runtime";
 import { destroyDatabaseRuntimeForTests } from "@/server/db/client";
 
+const SEED_MENU_ITEM_ID = "00000000-0000-0000-0000-0000000000aa";
+const SEED_MODIFIER_CHOICE_ID = "00000000-0000-0000-0000-0000000000a9";
+
 const contextA: CustomerContext = Object.freeze({
   capabilityId: "70000000-0000-4000-8000-000000000071",
   tenantId: "00000000-0000-0000-0000-0000000000a1",
@@ -52,9 +55,9 @@ async function createPopulatedCart(context: CustomerContext) {
   return withCustomerDataTransaction(context, async ({ repositories }) => {
     const cart = await repositories.carts.createActive();
     return repositories.carts.addItem(cart.id, {
-      menuItemId: "00000000-0000-0000-0000-0000000000aa",
+      menuItemId: SEED_MENU_ITEM_ID,
       quantity: 1,
-      modifierChoiceIds: ["00000000-0000-0000-0000-0000000000a9"],
+      modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
       specialRequest: "less ice",
     });
   });
@@ -72,9 +75,9 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       const key = "10000000-0000-4000-8000-000000000011";
       const input = {
         cartId: cart.id,
-        menuItemId: "00000000-0000-0000-0000-0000000000aa",
+        menuItemId: SEED_MENU_ITEM_ID,
         quantity: 2,
-        modifierChoiceIds: ["00000000-0000-0000-0000-0000000000a9"],
+        modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
         specialRequest: "  no straw  ",
       };
 
@@ -102,8 +105,9 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       await addCustomerCartItemIdempotent(
         {
           cartId: cart.id,
-          menuItemId: "00000000-0000-0000-0000-0000000000aa",
+          menuItemId: SEED_MENU_ITEM_ID,
           quantity: 1,
+          modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
         },
         key,
         depsA,
@@ -113,8 +117,9 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
         addCustomerCartItemIdempotent(
           {
             cartId: cart.id,
-            menuItemId: "00000000-0000-0000-0000-0000000000aa",
+            menuItemId: SEED_MENU_ITEM_ID,
             quantity: 2,
+            modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
           },
           key,
           depsA,
@@ -190,8 +195,9 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       const key = "10000000-0000-4000-8000-000000000016";
       const input = {
         cartId: cart.id,
-        menuItemId: "00000000-0000-0000-0000-0000000000aa",
+        menuItemId: SEED_MENU_ITEM_ID,
         quantity: 1,
+        modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
       };
 
       const results = await Promise.all([
@@ -221,8 +227,9 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
         addCustomerCartItemIdempotent(
           {
             cartId: cartA.id,
-            menuItemId: "00000000-0000-0000-0000-0000000000aa",
+            menuItemId: SEED_MENU_ITEM_ID,
             quantity: 1,
+            modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
           },
           key,
           depsA,
@@ -230,8 +237,9 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
         addCustomerCartItemIdempotent(
           {
             cartId: cartB.id,
-            menuItemId: "00000000-0000-0000-0000-0000000000aa",
+            menuItemId: SEED_MENU_ITEM_ID,
             quantity: 1,
+            modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
           },
           key,
           depsOther,
