@@ -1773,7 +1773,23 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - R03 write privileges remain absent and proven.
 - no cart/order persistence migration is included.
 
-# 220. Required Next Specification
+# 220. Final R02 Security Evidence Required
+- customer role cannot read identity credential tables.
+- customer role cannot read staff membership/permission authority.
+- customer role cannot write cart/order state in this round.
+- forged tenant/branch/table selectors cannot alter repository scope.
+- pooled request reuse cannot leak staff/customer role context.
+- error responses do not expose raw database details.
+
+# 221. Final R02 Data-Layer Evidence Required
+- storefront repository uses trusted scope only.
+- menu repository uses trusted scope only.
+- transaction-bound repository composition is demonstrated.
+- customer-visible read model excludes internal-only fields.
+- empty menu is distinguishable from unavailable database.
+- query strategy is bounded and deterministic.
+
+# 222. Required Next Specification
 ```text
 FLOW_P03_R03_IMPLEMENTATION_SPEC.md
 ```
@@ -1781,7 +1797,7 @@ FLOW_P03_R03_IMPLEMENTATION_SPEC.md
 - R02 does not infer R03 schema prematurely.
 - No R03 implementation starts until exact spec exists on `main`.
 
-# 221. Final Acceptance Statement
+# 223. Final Acceptance Statement
 - P03/R02 is READY as an executable specification document.
 - R02 establishes the customer server data-access substrate between capability trust and durable persistence.
 - Customer repositories consume validated context rather than raw client selectors.
