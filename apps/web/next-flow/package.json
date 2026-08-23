@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run tests/integration",
-    "test:db-runtime": "vitest run tests/integration/database-runtime.test.ts tests/integration/identity-authorization-contract.test.ts tests/integration/internal-authentication-contract.test.ts tests/integration/workspace-access-contract.test.ts tests/integration/permission-authorization-contract.test.ts tests/integration/permission-freshness-contract.test.ts tests/integration/customer-capability-contract.test.ts",
+    "test:db-runtime": "vitest run tests/integration/database-runtime.test.ts tests/integration/identity-authorization-contract.test.ts tests/integration/internal-authentication-contract.test.ts tests/integration/workspace-access-contract.test.ts tests/integration/permission-authorization-contract.test.ts tests/integration/permission-freshness-contract.test.ts tests/integration/customer-capability-contract.test.ts tests/integration/customer-data-access-contract.test.ts",
     "test:e2e": "playwright test",
     "db:generate": "node scripts/generate-database-types.mjs",
     "db:verify-types": "node scripts/verify-database-types.mjs"
