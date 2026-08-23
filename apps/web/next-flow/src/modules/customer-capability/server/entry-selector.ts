@@ -21,6 +21,15 @@ export function parseCustomerEntrySelector(
   return { restaurantSlug: slug, tableCode: code };
 }
 
+export function parseCustomerEntrySearchParams(
+  searchParams: URLSearchParams,
+): CustomerEntrySelector | null {
+  const restaurantSlugs = searchParams.getAll("restaurantSlug");
+  const tableCodes = searchParams.getAll("tableCode");
+  if (restaurantSlugs.length !== 1 || tableCodes.length !== 1) return null;
+  return parseCustomerEntrySelector(restaurantSlugs[0], tableCodes[0]);
+}
+
 export function buildCustomerEntryPath(selector: CustomerEntrySelector): string {
   return `/r/${encodeURIComponent(selector.restaurantSlug)}/table/${encodeURIComponent(selector.tableCode)}`;
 }
