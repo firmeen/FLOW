@@ -137,11 +137,22 @@ as $$
     and b.is_open = true
     and t.active = true
     and (
-      p_table_session_id is null
+      (
+        p_table_session_id is null
+        and not exists (
+          select 1
+          from foodflow.table_sessions active_session
+          where active_session.tenant_id = o.id
+            and active_session.branch_id = b.id
+            and active_session.table_id = t.id
+            and active_session.status in ('ACTIVE', 'BILL_REQUESTED', 'PAYMENT_PENDING')
+        )
+      )
       or exists (
         select 1
         from foodflow.table_sessions ts
-        where ts.id = p_table_session_id
+        where p_table_session_id is not null
+          and ts.id = p_table_session_id
           and ts.tenant_id = o.id
           and ts.branch_id = b.id
           and ts.table_id = t.id
