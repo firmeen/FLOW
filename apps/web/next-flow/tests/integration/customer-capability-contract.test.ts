@@ -19,7 +19,9 @@ const ids = {
   branchA2: "00000000-0000-0000-0000-0000000000ac",
   tableA1: "00000000-0000-0000-0000-0000000000a5",
   tenantB: "00000000-0000-0000-0000-0000000000b1",
-  tableSession: "70000000-0000-4000-8000-000000000002",
+  revocationTable: "70000000-0000-4000-8000-000000000010",
+  sessionTable: "70000000-0000-4000-8000-000000000011",
+  tableSession: "70000000-0000-4000-8000-000000000012",
 } as const;
 
 function withClaim(
@@ -82,29 +84,42 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       ).resolves.toBeNull();
     });
 
-    it("revokes effective capability use when the table becomes inactive", async () => {
-      const resolution = await resolveCustomerEntry("restaurant-a", "T-A1");
-      expect(resolution.status).toBe("resolved");
-      if (resolution.status !== "resolved") return;
-      const claims = issueCustomerCapability(resolution.entry, 2_000_000_000).claims;
+    it("revokes effective capability use when its table becomes inactive", async () => {
       const { db } = getDatabaseRuntime();
+      await db
+        .insertInto("foodflow.restaurant_tables")
+        .values({
+          id: ids.revocationTable,
+          tenant_id: ids.tenantA,
+          branch_id: ids.branchA1,
+          code: "P03-R01-REVOKE",
+          label: "P03 R01 Revocation Table",
+          seats: 1,
+          qr_code: "test://p03-r01-revoke",
+          active: true,
+        })
+        .execute();
 
       try {
+        const resolution = await resolveCustomerEntry("restaurant-a", "P03-R01-REVOKE");
+        expect(resolution.status).toBe("resolved");
+        if (resolution.status !== "resolved") return;
+        const claims = issueCustomerCapability(resolution.entry, 2_000_000_000).claims;
+
         await db
           .updateTable("foodflow.restaurant_tables")
           .set({ active: false })
-          .where("id", "=", ids.tableA1)
+          .where("id", "=", ids.revocationTable)
           .execute();
 
         await expect(validateCustomerCapabilityScope(claims)).resolves.toBeNull();
-        await expect(resolveCustomerEntry("restaurant-a", "T-A1")).resolves.toEqual({
-          status: "invalid",
-        });
+        await expect(
+          resolveCustomerEntry("restaurant-a", "P03-R01-REVOKE"),
+        ).resolves.toEqual({ status: "invalid" });
       } finally {
         await db
-          .updateTable("foodflow.restaurant_tables")
-          .set({ active: true })
-          .where("id", "=", ids.tableA1)
+          .deleteFrom("foodflow.restaurant_tables")
+          .where("id", "=", ids.revocationTable)
           .execute();
       }
     });
@@ -112,12 +127,25 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
     it("binds an active table session and revokes it immediately after closure", async () => {
       const { db } = getDatabaseRuntime();
       await db
+        .insertInto("foodflow.restaurant_tables")
+        .values({
+          id: ids.sessionTable,
+          tenant_id: ids.tenantA,
+          branch_id: ids.branchA1,
+          code: "P03-R01-SESSION",
+          label: "P03 R01 Session Table",
+          seats: 1,
+          qr_code: "test://p03-r01-session",
+          active: true,
+        })
+        .execute();
+      await db
         .insertInto("foodflow.table_sessions")
         .values({
           id: ids.tableSession,
           tenant_id: ids.tenantA,
           branch_id: ids.branchA1,
-          table_id: ids.tableA1,
+          table_id: ids.sessionTable,
           session_number: "P03-R01-TEST-SESSION",
           status: "ACTIVE",
           guest_count: 1,
@@ -125,7 +153,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
         .execute();
 
       try {
-        const resolution = await resolveCustomerEntry("restaurant-a", "T-A1");
+        const resolution = await resolveCustomerEntry("restaurant-a", "P03-R01-SESSION");
         expect(resolution.status).toBe("resolved");
         if (resolution.status !== "resolved") return;
         expect(resolution.entry.tableSessionId).toBe(ids.tableSession);
@@ -146,6 +174,10 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
         await db
           .deleteFrom("foodflow.table_sessions")
           .where("id", "=", ids.tableSession)
+          .execute();
+        await db
+          .deleteFrom("foodflow.restaurant_tables")
+          .where("id", "=", ids.sessionTable)
           .execute();
       }
     });
