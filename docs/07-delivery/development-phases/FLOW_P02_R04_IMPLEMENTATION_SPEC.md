@@ -345,8 +345,8 @@ interface AccessContext {
 - A branch-bound member must not clear `branchId` to escape branch isolation.
 - If a selector omits branch for a branch-bound membership, the server may auto-resolve the only allowed branch when deterministic.
 - Auto-resolution must not occur when multiple choices exist.
-- If tenant-wide membership and branch-specific membership coexist, the spec requires explicit deterministic precedence.
-- Prefer preserving the broader legitimate tenant-wide authority while retaining selected branch specificity.
+- If tenant-wide membership and branch-specific membership coexist, the implementation must define deterministic precedence.
+- Prefer preserving legitimate tenant-wide authority while retaining selected branch specificity.
 - Do not merge memberships into a broader scope than any active membership permits.
 
 # 17. Multiple Memberships
@@ -385,7 +385,7 @@ interface AccessContext {
 - Revocation must take effect at next server-side AccessContext resolution.
 - R04 does not require immediate Auth.js token invalidation for membership-only revocation.
 - Authentication identity may remain valid while authorization becomes denied.
-- This distinction is important.
+- This distinction is intentional.
 - A revoked actor may remain signed in but have zero workspaces.
 - A zero-workspace actor must not reach protected operational data.
 - A zero-workspace actor should receive a deterministic no-access state.
@@ -401,13 +401,13 @@ interface AccessContext {
 # 20. Membership Status Change Semantics
 - ACTIVE to REVOKED must remove authority.
 - ACTIVE to SUSPENDED must remove authority.
-- ACTIVE to INVITED is an invalid or unusual transition and must not preserve authority.
+- ACTIVE to INVITED must not preserve authority.
 - REVOKED to ACTIVE, if allowed by domain rules, restores authority only after current-state resolution sees ACTIVE.
 - INVITED membership is not executable authority.
 - SUSPENDED membership is not executable authority.
 - Missing membership is not executable authority.
 - Status comparisons must use canonical enum/value definitions from the database model.
-- Do not duplicate status strings in many unrelated modules.
+- Do not duplicate status strings across many unrelated modules.
 - R04 should centralize access-eligibility semantics in one resolver/repository boundary.
 
 # 21. User Status Change Semantics
@@ -429,12 +429,12 @@ interface AccessContext {
 - R04 must not precompute and persist the complete permission set in the session.
 - R05 will evaluate permissions using current context and current role/permission relations.
 - Role deletion or invalid role relation must fail closed.
-- Broken role references should surface as authorization/data-integrity errors, not privilege broadening.
+- Broken role references should surface as authorization/data-integrity errors, never privilege broadening.
 
 # 23. Branch Lifecycle Semantics
 - A selected branch must belong to selected tenant.
 - Branch ID alone is insufficient authority.
-- If branch has an `is_open` flag, distinguish operational open/closed state from membership authorization unless the product explicitly uses it as an access gate.
+- If branch has an `is_open` flag, distinguish operational open/closed state from membership authorization unless product rules explicitly use it as an access gate.
 - Do not confuse store operating hours with security authorization.
 - If branch is administratively deleted or otherwise unavailable, selection must fail safely.
 - R04 should use only existing lifecycle fields as authority.
@@ -446,14 +446,15 @@ interface AccessContext {
 - Authorization key remains the canonical tenant ID used by RLS/context.
 - Do not authorize by slug or display name.
 - Slugs may be routing identifiers only when resolved server-side to canonical UUIDs.
-- If tenant and organization identifiers differ in current schema, the spec requires explicit mapping rather than conflation.
+- If tenant and organization identifiers differ in current schema, implementation must map them explicitly rather than conflate them.
 - R04 implementation must inspect generated DB types before deciding display/query joins.
 
 # 25. Expected Server Module Layout
-- Reuse current module structure under `src/modules/identity/server` or create a clearly named adjacent authorization/access module.
+- Reuse current module structure under `src/modules/identity/server` or create a clearly named adjacent access module.
 - Do not create a second generic auth framework.
 - Prefer one canonical home for workspace access logic.
-- Suggested files are guidance and must be reconciled with current branch architecture.
+- Suggested file paths are guidance and must be reconciled with current branch architecture.
+- Equivalent current modules should be extended instead of duplicated.
 
 # 26. Files to CREATE — Core Types
 - Expected: `apps/web/next-flow/src/modules/identity/server/access-context.ts` or equivalent.
@@ -699,7 +700,7 @@ interface AccessContext {
 
 # 48. Error Taxonomy
 - Add `AccessContextError` hierarchy or equivalent only if it improves deterministic handling.
-- Distinguish malformed selector from unauthorized selector.
+- Distinguish malformed selector from unauthorized selector internally.
 - Browser-visible response may intentionally collapse those distinctions.
 - Server logs may retain safe structured reason codes.
 - Never log credential data.
@@ -1396,7 +1397,787 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - existing actor permission helpers remain present.
 - implementation must re-read actual latest branch before coding.
 
-# 117. Document Validation Checklist
+# 117. Current-Code Surface Audit Requirements
+- Inspect `src/auth.ts` before touching any access module.
+- Inspect `src/auth.config.ts` before changing redirect behavior.
+- Inspect `src/lib/auth/session.ts` before adding current-access helpers.
+- Inspect `src/proxy.ts` before making workspace route public-to-authenticated users.
+- Inspect `src/server/db/context.ts` before adding context types.
+- Inspect `src/server/db/identity-transaction.ts` before adding discovery queries.
+- Inspect `src/server/db/transaction.ts` before adding execution wrappers.
+- Inspect generated database types before writing Kysely joins.
+- Inspect membership table shape before assuming status column names.
+- Inspect roles table before returning role display metadata.
+- Inspect branches table before assuming lifecycle fields.
+- Inspect organizations/tenants relation before naming workspace labels.
+- Inspect current internal route layouts before adding context gates.
+- Inspect existing redirect sanitizer before adding selector redirects.
+- Inspect current cookie naming and auth cookie boundaries before adding selection persistence.
+- Inspect installed Next.js docs before route/server-action/cookie implementation.
+
+# 118. Exact Existing Files to Re-Audit
+```text
+apps/web/next-flow/src/auth.ts
+apps/web/next-flow/src/auth.config.ts
+apps/web/next-flow/src/proxy.ts
+apps/web/next-flow/src/lib/auth/session.ts
+apps/web/next-flow/src/lib/auth/redirect.ts
+apps/web/next-flow/src/modules/identity/server/index.ts
+apps/web/next-flow/src/modules/identity/server/session-claims.ts
+apps/web/next-flow/src/server/db/context.ts
+apps/web/next-flow/src/server/db/identity-transaction.ts
+apps/web/next-flow/src/server/db/transaction.ts
+apps/web/next-flow/src/server/db/generated/database.ts
+apps/web/next-flow/tests/fixtures/identity.ts
+apps/web/next-flow/tests/integration/identity-authorization-contract.test.ts
+supabase/migrations/20260816070000_phase4_auth_rbac_tenancy.sql
+supabase/migrations/20260819095500_p01_r04_actor_authorization_baseline.sql
+supabase/tests/database/p01_r04_actor_authorization_baseline.test.sql
+supabase/tests/database/p02_r02_identity_authorization_fixtures.test.sql
+```
+- If a listed path moved on the latest implementation branch, use the current equivalent.
+- Do not recreate historical paths merely to satisfy this authoring-time list.
+
+# 119. AccessContext Invariant Set
+- `actorId` must be a valid UUID.
+- `tenantId` must be a valid UUID.
+- `membershipId` must be a valid UUID when membership IDs are UUIDs in current schema.
+- `roleId` must be a valid UUID when role IDs are UUIDs in current schema.
+- `scope=BRANCH` requires non-null `branchId`.
+- `scope=TENANT` must not imply cross-tenant authority.
+- `branchId` must belong to `tenantId`.
+- `membershipId` must belong to `actorId`.
+- `membershipId` must belong to `tenantId`.
+- branch-bound membership must match resolved `branchId`.
+- tenant-wide membership may resolve a branch only within its tenant.
+- inactive membership cannot construct AccessContext.
+- inactive actor cannot construct AccessContext.
+- client input cannot override `actorId`.
+- client input cannot override `membershipId`.
+- client input cannot override `roleId`.
+
+# 120. AccessContext Construction Rules
+- Construct AccessContext only from validated repository data.
+- Never construct it by spreading request JSON.
+- Never construct it by spreading cookie JSON.
+- Never construct it by spreading URL search params.
+- Normalize nullable branch representation once.
+- Avoid mixing `undefined`, empty string, and null as equivalent branch authority states.
+- Prefer one canonical no-branch representation.
+- Ensure runtime transaction conversion is one-way from AccessContext to DB context.
+- Do not provide a helper that turns arbitrary DB context into authorized AccessContext without revalidation.
+
+# 121. Workspace Projection Contract
+- UI workspace projection should be separate from authoritative AccessContext when useful.
+- Projection may contain `tenantId`.
+- Projection may contain `tenantName`.
+- Projection may contain `branchId`.
+- Projection may contain `branchName`.
+- Projection may contain safe role display name.
+- Projection may contain scope label.
+- Projection must not contain password state.
+- Projection must not contain raw permissions by default.
+- Projection must not contain hidden unrelated memberships.
+- Projection must not contain database-internal audit fields.
+- Projection must not become a client-side authorization object.
+
+# 122. Selector State Machine — Unauthenticated
+- Input state: no valid Auth.js actor identity.
+- Workspace discovery must not run under caller-provided actor.
+- Protected route goes to `/login`.
+- Safe next path may be preserved.
+- Workspace selector must not become a substitute login page.
+- No workspace cookie should grant access in this state.
+
+# 123. Selector State Machine — Authenticated / Zero Workspaces
+- Actor identity exists.
+- Discovery returns no active executable memberships.
+- Resolver returns `no_access`.
+- Protected operational entry stops.
+- UI shows no-access state.
+- Logout remains available.
+- No selection cookie is created.
+- Existing stale selection cookie is cleared/ignored.
+
+# 124. Selector State Machine — Authenticated / One Exact Workspace
+- Actor identity exists.
+- Discovery returns one exact branch-bound workspace.
+- Resolver may auto-resolve without selector page.
+- AccessContext uses that membership.
+- Tenant and branch come from server data.
+- Any conflicting explicit selector must be rejected rather than silently ignored.
+- Safe destination proceeds after resolution.
+
+# 125. Selector State Machine — Authenticated / One Tenant-Wide Membership
+- Actor identity exists.
+- Exactly one tenant-wide membership exists.
+- If destination requires only tenant scope, resolver may construct tenant context.
+- If destination requires a branch and multiple branches exist, selector is still required.
+- If destination requires a branch and exactly one legitimate branch exists, auto-resolution may be used.
+- Do not infer branch from last database row.
+
+# 126. Selector State Machine — Multiple Tenants
+- Actor identity exists.
+- Discovery returns workspaces across multiple tenants.
+- Resolver must not guess tenant.
+- Selector displays only authorized tenants.
+- Explicit tenant choice is required unless valid revalidated selection already exists.
+- Branch options shown after tenant choice must be scoped to that tenant.
+- Switching tenant invalidates incompatible branch selection.
+
+# 127. Selector State Machine — Multiple Branches in One Tenant
+- Actor identity exists.
+- Tenant is known and authorized.
+- More than one branch is legitimately selectable.
+- Resolver requires branch choice for branch-required destination.
+- Selector displays only branches actor may use.
+- Tenant-wide authority may produce multiple branch options.
+- Multiple branch memberships may also produce multiple options.
+- Do not collapse them into first branch.
+
+# 128. Selector State Machine — Stale Tenant
+- Stored tenant selector no longer authorized.
+- Resolver rejects it.
+- If other workspaces exist, user returns to selector.
+- If none exist, user receives no-access state.
+- Stale tenant ID is not used for domain transaction.
+- Stale selection is cleared/ignored.
+- Do not reveal why access changed beyond safe UX messaging.
+
+# 129. Selector State Machine — Stale Branch
+- Tenant remains authorized.
+- Stored branch no longer authorized or no longer belongs to current scope.
+- Resolver rejects branch.
+- If another branch is deterministically forced, implementation may require explicit selection unless policy explicitly permits safe absent-input auto-resolution after clearing stale explicit input.
+- Malicious explicit wrong-branch input must not be silently rewritten.
+- Stale stored branch should be cleared before fresh selection.
+
+# 130. Selector State Machine — Infrastructure Failure
+- Auth.js identity may be valid.
+- Workspace DB resolution fails transiently.
+- Resolver returns `unavailable` or equivalent.
+- Do not reinterpret infrastructure failure as no membership.
+- Do not persist a new selection.
+- Do not execute tenant transaction.
+- UI should expose retryable generic failure.
+- Logs may record safe database failure classification.
+
+# 131. Route Redirect Graph
+```text
+UNAUTHENTICATED PROTECTED REQUEST
+→ /login?next=<safe-internal-path>
+
+AUTHENTICATED + NO WORKSPACE
+→ /workspace/no-access or equivalent safe state
+
+AUTHENTICATED + SELECTION REQUIRED
+→ /workspace?next=<safe-internal-path>
+
+AUTHENTICATED + RESOLVED CONTEXT
+→ original safe destination
+```
+- Exact route names may adapt to current app structure.
+- Preserve acyclic redirects.
+- Workspace route itself must not redirect back to itself indefinitely.
+- No-access state must not redirect back to selector without changed state.
+
+# 132. Workspace Selection Transport Contract
+- Mutation must require Auth.js actor identity.
+- Mutation must accept only selector fields needed.
+- Actor ID must not be accepted from client.
+- Membership ID must not be accepted from client as authority.
+- Role ID must not be accepted from client as authority.
+- Tenant selector must be validated.
+- Branch selector must be validated.
+- Resolver must run before persistence.
+- On valid selection, persist minimal hint if persistence is used.
+- On invalid selection, return safe failure/redirect.
+- On unavailable DB, do not mutate selection.
+- On success, redirect only to sanitized internal destination.
+
+# 133. Suggested Selection Payload
+```ts
+interface WorkspaceSelectionInput {
+  tenantId?: string;
+  branchId?: string;
+  next?: string;
+}
+```
+- This is a transport input, not an authority object.
+- Do not add actorId.
+- Do not add roleId.
+- Do not add permissions.
+- Do not add membership status.
+- Server derives all authority fields.
+
+# 134. Suggested Workspace Discovery Type
+```ts
+interface WorkspaceOption {
+  tenantId: string;
+  tenantName: string;
+  branchId: string | null;
+  branchName: string | null;
+  scope: "TENANT" | "BRANCH";
+}
+```
+- Exact display fields depend on current schema.
+- Internal membership/role IDs may remain server-private if UI does not need them.
+- Do not expose permission lists merely for selector rendering.
+
+# 135. Current Access Helper Contract
+- `getCurrentAccessContext()` returns null or typed unresolved result for absent authorization.
+- `requireCurrentAccessContext()` either returns a valid context or terminates with safe redirect/error.
+- The helper must not accept actor ID from caller when session is already available.
+- A lower-level resolver may accept explicit actor ID for tests and internal composition.
+- Keep testable pure and impure layers separated.
+- Avoid hidden global mutable state.
+
+# 136. withCurrentAccessTransaction Contract
+- Optional helper may compose current access resolution with tenant transaction.
+- It must not swallow authorization failures.
+- It must not convert no-access into anonymous execution.
+- It must map canonical actor/tenant/branch exactly once.
+- It must keep callback inside transaction lifetime.
+- It must not perform external HTTP calls by default inside transaction.
+- It must remain compatible with R05 adding permission checks before command execution.
+
+# 137. Branch-Required Operation Contract
+- Some operations require concrete branch scope.
+- R04 should define a narrow helper or type for branch-required context if current code benefits.
+- Example conceptual type: `BranchAccessContext`.
+- Branch-required helper rejects tenant-only context.
+- Do not let each command independently check `if (!branchId)` with divergent behavior.
+- R05 may compose permissions on top of branch-required context.
+
+# 138. Tenant-Only Operation Contract
+- Some management operations may legitimately be tenant-scoped.
+- Tenant-only context must still include actor.
+- Tenant-only context must still derive from active membership.
+- Tenant-only context must not be obtainable by branch-bound actor if that broadens authority beyond current membership semantics.
+- Management permission checks remain R05.
+
+# 139. Membership Precedence Rules
+- Exact rules must follow current schema/business semantics.
+- If one tenant-wide active membership exists, it is legitimate tenant authority.
+- If branch-specific memberships also exist, do not discard them if role distinction matters.
+- If current model allows only one role per membership, R04 should avoid inventing multi-role merge semantics.
+- If multiple active memberships overlap and yield different role IDs, resolver must not arbitrarily choose without deterministic rule.
+- Prefer returning selection/ambiguity error over privilege escalation.
+- A database invariant may be added only if overlap is truly invalid domain state.
+
+# 140. Authorization Freshness Rule
+- Authentication token may live up to current session max age.
+- Workspace authorization must not be considered fresh for that entire lifetime.
+- Resolve from current database state at request/command boundary.
+- Per-request memoization is acceptable where safe.
+- Cross-request cache without invalidation is prohibited by default.
+- This is the central revocation guarantee of R04.
+
+# 141. Revocation Timing Contract
+- Membership revoked before request starts: deny.
+- Membership revoked during workspace resolution: query result governs.
+- Membership revoked after resolution but before tenant query: RLS/helper should deny where current database checks membership live.
+- Membership revoked after protected mutation commits: mutation already committed under then-current authority; do not retroactively roll back without domain requirement.
+- Next request must deny.
+- Tests should distinguish these moments.
+
+# 142. Role Change Timing Contract
+- Role changed before access resolution: new role ID returned.
+- Role changed after access resolution but before R05 permission lookup inside same request may create freshness concern.
+- R05 should evaluate permissions from database within execution boundary rather than trusting cached role permission list.
+- R04 therefore must not materialize permission snapshot.
+- Role ID in AccessContext is identity of current membership role at resolution time, not final permission authority.
+
+# 143. Branch Reassignment Timing Contract
+- Membership branch changed before resolution: new branch scope applies.
+- Existing stale branch selection fails.
+- Current Auth.js identity remains unchanged.
+- No forced re-login required.
+- AccessContext reflects current membership assignment.
+- RLS remains fallback against stale context race.
+
+# 144. User Suspension Timing Contract
+- User suspended before resolution: zero access.
+- Existing Auth.js token may still parse.
+- Workspace discovery must check current user status.
+- Protected operational entry denied.
+- No tenant query should execute through current-access helper.
+- Future R06 may decide whether global session invalidation is required, but R04 authorization already fails closed.
+
+# 145. No-Membership Actor Contract
+- R02 proves credential-bearing no-membership user can authenticate.
+- R04 must preserve authentication/authorization separation.
+- This actor receives valid identity session if R03 permits authentication.
+- This actor receives zero workspaces.
+- This actor cannot enter tenant transaction through authorized helper.
+- This actor provides a required regression test against “authenticated = authorized”.
+
+# 146. Tenant A Owner Contract
+- Owner A authenticates as real actor UUID.
+- Owner A has tenant-wide Tenant A membership in fixtures.
+- Workspace discovery must not expose Tenant B.
+- Owner A may choose legitimate Tenant A branches.
+- Owner A branch selection must still validate branch tenant relation.
+- R04 does not yet grant admin route permission based on owner role; R05 owns that permission gate.
+
+# 147. Staff A1 Contract
+- Staff A1 authenticates as actor UUID.
+- Staff A1 active membership is Branch A1.
+- Discovery returns Branch A1 scope.
+- Resolver denies Branch A2.
+- Resolver denies Tenant B.
+- Clearing branch selector must not broaden Staff A1 to tenant-wide authority.
+- R05 later checks `operations.staff.access` and other permissions.
+
+# 148. Staff A2 Contract
+- Staff A2 active membership is Branch A2.
+- Discovery returns Branch A2 scope.
+- Resolver denies Branch A1.
+- Resolver denies Tenant B.
+- Branch omission may auto-resolve A2 if it is the only legitimate exact branch.
+- R05 later handles staff permissions.
+
+# 149. Kitchen A1 Contract
+- Kitchen A1 active membership is Branch A1.
+- Discovery returns A1 only.
+- Workspace resolution is identical in security model to other branch-bound actors.
+- R04 does not special-case kitchen route permission.
+- R05 later evaluates kitchen permissions.
+
+# 150. Cashier A2 Contract
+- Cashier A2 active membership is Branch A2.
+- Discovery returns A2 only.
+- R04 does not expose payment permission list in selector.
+- R04 does not grant cashier route solely from role label.
+- R05 later evaluates cashier/payment permissions.
+
+# 151. Staff B1 Contract
+- Staff B1 belongs to Tenant B / Branch B1.
+- Discovery must not expose Tenant A.
+- Resolver denies Tenant A selectors.
+- Resolver denies A1/A2 branches.
+- Existing tenant isolation tests remain regression evidence.
+
+# 152. Invited Membership Contract
+- Invitation is not active operational authority.
+- Discovery excludes invited membership.
+- Resolver cannot construct context from it.
+- Selector never shows it as executable workspace.
+- If future invitation acceptance UI is needed, it is separate scope.
+
+# 153. Suspended Membership Contract
+- Suspended membership is not operational authority.
+- Discovery excludes it.
+- Stale selection referencing it fails.
+- Auth.js identity may remain signed in.
+- Other active memberships, if any, remain available.
+
+# 154. Revoked Membership Contract
+- Revoked membership is not operational authority.
+- Discovery excludes it.
+- Resolver denies it.
+- Stale selection is invalidated.
+- No silent fallback into same tenant with broader scope unless another explicit active membership authorizes it.
+
+# 155. Branch Belongs-to-Tenant Validation
+- Resolver must not assume submitted branch belongs to selected tenant.
+- Validate relationship from trusted database data.
+- Prefer repository query that joins branch under tenant selector.
+- Random valid UUID in another tenant must fail identically to unauthorized existing branch where possible.
+- Do not rely on UI dropdown constraints as security.
+
+# 156. Repository Failure Handling
+- Database connectivity failure must surface as unavailable, not no-access.
+- Query syntax/schema drift failure must fail closed.
+- Unexpected duplicate authority rows must fail closed if they create ambiguity.
+- Do not pick first row from ambiguous query without explicit ordering/domain rule.
+- Wrap low-level DB error in safe domain error where current error architecture supports it.
+- Preserve cause server-side when useful.
+
+# 157. Selection Persistence Decision Rule
+- Persistence is optional implementation detail, not core authority requirement.
+- If no persistence is needed, route parameters/server navigation may carry non-authoritative selectors transiently.
+- If persistence improves UX, prefer minimal httpOnly cookie.
+- Do not persist full AccessContext.
+- Do not persist role/permission data.
+- Do not require database table solely for last-selected workspace in R04.
+- If an existing user-settings table already supports preference, using it requires explicit justification and should not widen scope.
+
+# 158. Cookie Naming Rules
+- Use a clear non-legacy name if a workspace-selection cookie is added.
+- Do not reuse `foodflow_session`.
+- Do not reuse Auth.js session cookie name.
+- Avoid names suggesting authority such as `admin_role` or `permissions`.
+- Document lifetime and invalidation behavior.
+- Selection cookie lifetime may be shorter or similar to session but authorization must still revalidate every use.
+
+# 159. Selection Cookie Failure Cases
+- malformed serialized value: ignore/clear.
+- missing tenant: unresolved/selection flow.
+- malformed tenant UUID: ignore/clear.
+- malformed branch UUID: ignore/clear.
+- unauthorized tenant: ignore/clear and selector/no-access.
+- unauthorized branch: ignore/clear and selector.
+- revoked membership: ignore/clear and selector/no-access.
+- signed-in actor changes in same browser: revalidate selection against new actor; never reuse as authority.
+
+# 160. Authentication Actor Change
+- Logout then login as different actor must not inherit authority from previous actor’s workspace hint.
+- Revalidation should prevent privilege leak even if cookie remains accidentally.
+- Prefer clearing workspace selection on logout when practical.
+- Prefer clearing/replacing invalid selection after login.
+- Add regression test if selection cookie is implemented.
+
+# 161. Multi-Tab Behavior
+- Two tabs may select different workspaces if persistence is shared.
+- Shared cookie means last selection affects subsequent navigation.
+- This is UX behavior, not security issue, because every request revalidates.
+- Do not attempt complex per-tab authorization storage in R04.
+- If route-embedded selector is used, tabs may naturally differ.
+- Document chosen behavior in implementation PR.
+
+# 162. Server Component Boundary
+- Server components may call current-access helper.
+- Client components receive only safe projection.
+- Do not import `server-only` modules into client components.
+- Do not serialize database transaction objects.
+- Do not serialize internal error causes.
+- Keep selector form client behavior thin where possible.
+
+# 163. Route Handler Boundary
+- Route handler may parse selection request.
+- Route handler gets actor from server session.
+- Route handler calls resolver.
+- Route handler persists only validated hint.
+- Route handler returns redirect or safe JSON based on current app convention.
+- Do not expose repository directly as general-purpose API.
+
+# 164. Server Action Boundary
+- If server action is chosen, it must follow current Next.js server-action conventions from installed docs.
+- Validate form input server-side.
+- Read actor identity server-side.
+- Resolve current authority server-side.
+- Persist validated selection server-side.
+- Sanitize redirect destination.
+- Do not rely on client-side hidden actor field.
+
+# 165. API Error Response Contract
+- Avoid different public responses for “tenant exists but unauthorized” versus “tenant missing”.
+- Invalid UUID may return generic invalid selection.
+- Infrastructure failure may return generic unavailable.
+- Authentication absence remains unauthorized/login redirect.
+- No-access state for authenticated actor is semantically distinct from bad credentials.
+- Exact HTTP status depends on chosen transport and existing route conventions.
+
+# 166. No-Access Page Contract
+- Must be reachable only after authentication or via internal safe flow.
+- Must not expose membership status reason if that creates unnecessary disclosure.
+- Must offer logout.
+- May offer refresh/retry if infrastructure may have recovered.
+- Must not offer arbitrary tenant ID entry.
+- Must not link directly into operational routes that will loop.
+
+# 167. Workspace Page Loading State
+- Server-rendered page may not need client loading skeleton.
+- If client transition is used, show bounded pending state.
+- Disable duplicate submissions while selection mutation is pending.
+- Do not optimistically treat selection as authorized before server response.
+- Do not render cached unauthorized options after actor changes.
+
+# 168. Workspace Page Error State
+- Transient DB error: show generic retry state.
+- No memberships: show no-access state.
+- Invalid stale selector: show choices if available.
+- Mutation rejected: remain on selector with generic message.
+- Avoid showing raw DB errors or UUID relationship details.
+
+# 169. Accessibility Requirements
+- Selector options must be keyboard operable.
+- Form labels must identify tenant/branch choice.
+- Error messaging must be announced appropriately.
+- Focus should move predictably after validation failure.
+- Do not encode workspace state by color alone.
+- Preserve semantic buttons/links.
+
+# 170. Responsive Requirements
+- Selector usable on mobile widths.
+- Long tenant/branch names wrap safely.
+- Cards/list items must not overflow.
+- Primary action remains reachable without horizontal scroll.
+- Do not add broad responsive redesign outside selector/no-access surfaces.
+
+# 171. Performance — Query Count Budget
+- Discovery target: one query where current grants/schema allow.
+- Exact selection resolution target: one query or reuse already loaded discovery state within same request.
+- Avoid query per permission because R05 owns permissions.
+- Avoid query per branch when a join can list authorized branches.
+- Any additional fixed query must have clear responsibility.
+
+# 172. Performance — Data Volume
+- Select only IDs, names, status/scope fields needed.
+- Do not select password/credential columns.
+- Do not select audit event payloads.
+- Do not select entire permission matrix for selector.
+- Avoid `select *` in new repository queries.
+- Deterministic ordering should use indexed/stable fields where practical.
+
+# 173. Performance — Index Audit
+- Inspect indexes on `app.memberships.user_id` or equivalent actor lookup key.
+- Inspect indexes on membership tenant/branch columns.
+- Inspect branch tenant relation index.
+- Add index only if actual access query lacks reasonable support.
+- If adding index, use forward-only migration and explain expected query improvement.
+- Do not add duplicate index.
+
+# 174. Database Migration Trigger Conditions
+- persistent invariant cannot be safely enforced in application alone.
+- missing index causes material query risk proven by schema/query shape.
+- existing grants prevent least-privilege discovery and a narrow function is required.
+- branch/tenant relation needs database enforcement and current schema lacks it.
+- Otherwise, no migration.
+
+# 175. SECURITY DEFINER Rule If New Function Is Required
+- Prefer no new function if existing grants support query.
+- If a private helper function is required, use fixed `search_path`.
+- Return narrow columns only.
+- Grant execute only to intended role.
+- Revoke public/default execute.
+- Do not grant direct underlying table reads broadly.
+- Add negative privilege tests.
+- Do not accept actor ID as untrusted authority if actor context can be derived transaction-locally.
+
+# 176. Role / Context Leakage Requirements
+- `flow_identity` role must end with transaction.
+- `flow_runtime` role must end with transaction.
+- `app.actor_id` must not persist after transaction.
+- `app.tenant_id` must not persist after transaction.
+- `app.branch_id` must not persist after transaction.
+- Run sequential different-actor tests on reused pool.
+- Run sequential different-tenant tests.
+- Run sequential different-branch tests.
+
+# 177. Rollback Semantics
+- Workspace discovery is read-only.
+- Invalid selection persistence must not partially write.
+- If cookie persistence occurs after successful resolution, failure to set cookie should not mutate database authority.
+- Tenant transaction callback failure must roll back domain mutation under existing transaction semantics.
+- Authorization state itself remains database membership state.
+- No separate rollback migration is required for R04 by default.
+
+# 178. Recovery Semantics
+- Transient DB outage: retry next request.
+- Stale cookie: clear and reselect.
+- Revoked membership: select another active workspace or no-access.
+- Role change: next resolution/permission check uses current state.
+- Branch reassignment: stale branch rejected, new legitimate branch selectable.
+- Broken schema/invariant: fail closed and surface implementation blocker.
+
+# 179. Test Data Mutation Discipline
+- Revocation tests that mutate shared fixtures must restore state.
+- Prefer test transaction rollback where supported.
+- Avoid ordering-dependent tests.
+- Avoid leaving revoked fixtures for later tests.
+- Avoid using production-like secrets.
+- Deterministic fixture IDs remain stable.
+
+# 180. Unit Test File Expectations
+- Candidate: `tests/unit/access-context.test.ts`.
+- Candidate: `tests/unit/workspace-selection.test.ts`.
+- Candidate: `tests/unit/current-access.test.ts` where pure boundaries exist.
+- Reuse existing test naming conventions.
+- Keep pure resolver rules separate from DB integration.
+- Avoid duplicate test cases across unit/integration unless they prove different layers.
+
+# 181. Integration Test File Expectations
+- Candidate: `tests/integration/workspace-access-context.test.ts`.
+- Candidate: extend `identity-authorization-contract.test.ts` only if scope remains coherent.
+- Prefer new file when R04 behavior is large enough to deserve independent suite.
+- Include real DB runtime when DATABASE_URL is available.
+- Cleanly destroy shared DB runtime after suite as existing tests do.
+
+# 182. Database Test File Expectations
+- Add `supabase/tests/database/p02_r04_access_context.test.sql` only when SQL-level behavior needs new proof.
+- If no DB object changes, existing RLS tests plus integration may be sufficient.
+- Do not add SQL tests that merely duplicate TypeScript resolver logic.
+- SQL tests should target grants, RLS, constraints, or database helper semantics.
+
+# 183. E2E Test Expectations
+- Add selector-flow E2E only if UI/route is introduced.
+- Test login → workspace → safe destination.
+- Test zero-workspace no-access.
+- Test stale selection recovery.
+- Test external next rejection.
+- Keep test authentication fixture compatible with R03 Auth.js flow.
+- Do not expose plaintext fixture credentials outside test fixture modules.
+
+# 184. Boundary Input Matrix
+- tenantId undefined.
+- tenantId empty string.
+- tenantId whitespace.
+- tenantId malformed UUID.
+- tenantId random valid UUID.
+- tenantId existing unauthorized UUID.
+- branchId undefined.
+- branchId empty string.
+- branchId whitespace.
+- branchId malformed UUID.
+- branchId random valid UUID.
+- branchId sibling valid UUID.
+- branchId other-tenant valid UUID.
+- next undefined.
+- next internal path.
+- next external URL.
+- next protocol-relative URL.
+
+# 185. Resolver Determinism Matrix
+- same actor + same DB state + same selectors => same context.
+- same actor + revoked membership => no context.
+- same actor + role changed => updated role metadata.
+- same actor + branch reassigned => updated branch scope.
+- different actor + same selectors => independently authorized/denied.
+- actor B cannot inherit actor A selection authority.
+
+# 186. Security Regression Matrix
+- legacy `foodflow_session` alone does not create AccessContext.
+- arbitrary workspace cookie alone does not create AccessContext.
+- authenticated session without membership does not create AccessContext.
+- client-forged actor ID does not affect context.
+- client-forged role ID does not affect context.
+- client-forged membership ID does not affect context.
+- unauthorized tenant ID does not leak tenant details.
+- unauthorized branch ID does not leak branch details.
+- flow_identity cannot read credentials.
+- flow_runtime remains RLS constrained.
+
+# 187. Auth.js Regression Requirements
+- Auth.js Credentials provider still authenticates real actor UUID.
+- JWT/session claims still expose actor ID.
+- workspace logic does not break login.
+- workspace logic does not move credential verification into client.
+- logout clears or invalidates workspace selection hint where practical.
+- proxy remains compatible with Auth.js authorized callback.
+- workspace selector is reachable for authenticated actor.
+
+# 188. R05 Compatibility Requirements
+- R04 AccessContext must expose enough stable server data for permission checks.
+- At minimum actorId/tenantId/scope must be available.
+- Branch ID must be available when branch-resolved.
+- Membership/role identity should be available if current permission model needs them.
+- R05 should not need browser selectors again.
+- R05 should not need to duplicate workspace discovery query.
+- R05 should not need to alter Auth.js session to add permissions.
+
+# 189. R05 Permission Helper Anticipation
+- R04 may shape context so R05 can call `private.actor_has_permission(code, tenantId, branchId)` safely.
+- R04 must not call permission helper for route-specific codes yet.
+- R04 should ensure branch null semantics are explicit enough for R05.
+- R04 should ensure tenant/branch IDs are current and authorized.
+- R05 then evaluates canonical permission code within same trusted context.
+
+# 190. R05 Route Matrix Deferred Examples
+- `/staff` → operations.staff.access.
+- `/kitchen` → operations.kitchen.access.
+- `/cashier` → operations.cashier.access.
+- `/admin` → management.admin.access.
+- These mappings are illustrative existing permission concepts but R04 must not implement them.
+- R05 owns exact final route matrix from current code/spec.
+
+# 191. R05 Command Matrix Deferred Examples
+- order view/manage.
+- kitchen view/manage.
+- service view/manage.
+- merchant payment view/collect/void.
+- menu view/manage.
+- settings view/manage.
+- member view/invite/manage.
+- role view/manage.
+- audit view.
+- R04 must not wire these command checks.
+
+# 192. Legacy Auth Boundary
+- Legacy custom token source remains rollback-only from R03.
+- R04 must not restore it as authority.
+- Workspace selection must not be attached to legacy session.
+- Do not add new legacy-cookie parsing.
+- R06 owns physical removal.
+- Any accidental dependency on legacy authority discovered during R04 is a defect, not a feature.
+
+# 193. Deployment / Infrastructure Scope
+- No new cloud service required.
+- No new database provider required.
+- No new Vercel integration required.
+- No new queue/cache required.
+- No branch-protection changes required.
+- No CI workflow change expected unless current test discovery genuinely requires narrow wiring.
+- Documentation task itself does not modify deployment configuration.
+
+# 194. CI Strategy for Future Implementation
+- Existing stable quality contexts remain inherited.
+- R04 implementation should trigger real app quality when app code changes.
+- DB quality should trigger if DB/test scope requires it.
+- Legitimate NOT APPLICABLE behavior remains acceptable where current workflow defines it.
+- Do not weaken or rename checks for R04.
+- This document does not use CI result as document-validation authority.
+
+# 195. Implementation PR Evidence — Architecture
+- exact AccessContext type path.
+- exact workspace repository path.
+- exact resolver path.
+- exact current-access helper path.
+- exact selector UI/transport paths.
+- explanation of tenant-wide versus branch-bound semantics.
+- explanation of selection persistence choice.
+
+# 196. Implementation PR Evidence — Security
+- proof client selector is non-authoritative.
+- proof no-membership authenticated actor is denied.
+- proof sibling branch is denied.
+- proof cross-tenant selection is denied.
+- proof revoked membership is denied.
+- proof no broad DB grant was added.
+- proof session remains identity authority only.
+
+# 197. Implementation PR Evidence — Database
+- schema changed YES/NO.
+- migration added YES/NO.
+- generated types changed YES/NO.
+- new DB function/grant added YES/NO.
+- context leakage test result.
+- RLS regression result.
+- if no schema change, explicitly state that no migration was needed.
+
+# 198. Implementation PR Evidence — UX
+- zero-workspace behavior.
+- one-workspace behavior.
+- multiple-workspace behavior.
+- stale-selection behavior.
+- redirect safety.
+- logout behavior from no-access.
+- responsive/accessibility evidence where UI changed.
+
+# 199. Implementation PR Evidence — Validation
+- lint result.
+- typecheck result.
+- unit test result.
+- integration test result.
+- build result.
+- E2E result if applicable.
+- DB test result if applicable.
+- inherited regression result.
+- use only approved validation vocabulary.
+
+# 200. Stop Conditions During R04 Implementation
+- R03 actor session contract is absent/broken on parent branch.
+- latest implementation parent cannot be identified.
+- membership schema differs materially from spec assumptions and cannot be reconciled safely.
+- current RLS semantics contradict expected branch scope.
+- implementation would require broad DB grants.
+- implementation would require permission-route cutover to function at all, indicating round-boundary problem.
+- production destructive data operation appears necessary.
+- required secret would need to be exposed client-side.
+- In these cases, implementation must stop/report rather than improvise insecurely.
+
+# 201. Document Validation Checklist
 - [x] canonical filename uses P02/R04.
 - [x] Phase metadata is 02.
 - [x] Round metadata is 04.
@@ -1417,8 +2198,11 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - [x] failure/recovery behavior is explicit.
 - [x] test matrices are explicit.
 - [x] handoff is explicit.
+- [x] file-level responsibilities are explicit.
+- [x] state machine behavior is explicit.
+- [x] concurrency/freshness semantics are explicit.
 
-# 118. Document-Only Validation Policy
+# 202. Document-Only Validation Policy
 - This specification is validated by content consistency and actual repository evidence.
 - GitHub Actions are not the authority for document correctness.
 - Missing, queued, skipped, failed, or cancelled Actions do not make the document semantically invalid.
@@ -1426,7 +2210,7 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - Documentation automation must not change implementation code to satisfy hosted checks.
 - Documentation automation must not change CI workflows merely to make a spec PR green.
 
-# 119. Implementation Validation Vocabulary
+# 203. Implementation Validation Vocabulary
 - Implementation PR must use only `PASS`.
 - Or `FAIL`.
 - Or `NOT RUN`.
@@ -1435,7 +2219,169 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - Do not fabricate PASS.
 - This vocabulary applies to future implementation evidence, not this document's own content validation.
 
-# 120. Final Round State Before Owner Integration
+# 204. Definition of Done — Architecture
+- one canonical AccessContext exists.
+- one canonical workspace discovery boundary exists.
+- one canonical access resolver exists.
+- Auth.js session remains identity-only authority.
+- client selectors remain non-authoritative.
+- tenant transaction consumes server-resolved context.
+- R05 can reuse R04 primitives without duplication.
+
+# 205. Definition of Done — Workspace Discovery
+- actor sees only current legitimate workspaces.
+- inactive memberships are excluded.
+- inactive actor is excluded.
+- tenant-wide scope is explicit.
+- branch-bound scope is explicit.
+- cross-tenant leakage is absent.
+- discovery ordering is deterministic.
+- query shape is bounded.
+
+# 206. Definition of Done — Resolution
+- malformed selector fails safely.
+- unauthorized tenant fails safely.
+- unauthorized branch fails safely.
+- cross-tenant branch fails safely.
+- single deterministic context resolves safely.
+- ambiguous multiple choices require selection.
+- no-workspace state is explicit.
+- role/membership authority is current server state.
+
+# 207. Definition of Done — Revocation
+- revoked membership loses access on next resolution.
+- suspended membership loses access on next resolution.
+- invited membership never grants executable context.
+- no-membership actor gets no context.
+- remaining active memberships continue to work.
+- stale workspace selection cannot bypass revocation.
+- no password reauthentication is required solely for membership revocation.
+
+# 208. Definition of Done — Database Boundary
+- workspace discovery uses actor-bound least privilege.
+- tenant execution uses existing flow_runtime transaction boundary.
+- actor ID is always present for internal privileged tenant execution.
+- context is transaction-local.
+- pooled context leakage tests pass.
+- RLS remains defense in depth.
+- no broad table grants are introduced.
+
+# 209. Definition of Done — Security
+- no client-controlled authority.
+- no permission snapshot in session.
+- no role authority trusted from client.
+- no unauthorized workspace enumeration.
+- no raw credentials/tokens logged.
+- stale selections fail closed.
+- safe redirect rules are preserved.
+- no cross-tenant or sibling-branch escalation.
+
+# 210. Definition of Done — UX
+- zero workspace handled.
+- one workspace handled.
+- multiple workspaces handled.
+- stale workspace handled.
+- selection loading/error states handled.
+- logout available from no-access state.
+- responsive behavior preserved.
+- UI remains narrow to workspace selection, not dashboard redesign.
+
+# 211. Definition of Done — Tests
+- resolver unit tests exist.
+- workspace discovery integration tests exist.
+- AccessContext/database mapping integration tests exist.
+- revocation tests exist.
+- negative authorization tests exist.
+- context leakage tests exist.
+- route/selector tests exist if UI is introduced.
+- inherited R01/R02/R03/RLS regressions remain covered.
+
+# 212. Explicit Prohibitions
+- do not implement R05 permission route matrix.
+- do not implement command-specific permission requirements.
+- do not physically remove legacy auth files.
+- do not reinstall Auth.js.
+- do not replace Auth.js session with custom workspace session.
+- do not put permissions into JWT authority.
+- do not trust localStorage for access.
+- do not trust query parameters for access.
+- do not trust workspace cookies without DB revalidation.
+- do not create a duplicate membership model.
+- do not create a duplicate tenant transaction helper.
+- do not grant broad database table access.
+- do not perform production destructive DB operations.
+- do not refactor unrelated product code.
+- do not merge the implementation PR.
+- do not enable implementation auto-merge.
+
+# 213. PR Requirements
+- PR must identify Phase 02 / Round 04.
+- PR must reference `FLOW_P02_R04_IMPLEMENTATION_SPEC.md` from `main`.
+- PR must record implementation parent branch.
+- PR must record implementation parent SHA.
+- PR must record implementation head SHA.
+- PR must summarize current R03 session contract inherited.
+- PR must list created access-context modules.
+- PR must list workspace selector changes.
+- PR must declare whether schema changed.
+- PR must declare whether migration was added.
+- PR must declare whether generated DB types changed.
+- PR must declare whether dependency files changed.
+- PR must declare whether environment variables changed.
+- PR must report actual validation results truthfully.
+- PR must include negative authorization evidence.
+- PR must include revocation evidence.
+- PR must include context leakage evidence.
+- PR must call out deferred R05 work.
+- PR must remain owner-controlled.
+
+# 214. Expected PR Scope Declaration
+```text
+PHASE: P02
+ROUND: R04
+AUTHJS_SESSION_AUTHORITY_CHANGED: NO BY DEFAULT
+WORKSPACE_DISCOVERY_IMPLEMENTED: YES
+ACCESS_CONTEXT_IMPLEMENTED: YES
+TENANT_SELECTION_IMPLEMENTED: YES
+BRANCH_SELECTION_IMPLEMENTED: YES
+MEMBERSHIP_REVOCATION_HANDLING_IMPLEMENTED: YES
+PERMISSION_ROUTE_ENFORCEMENT_IMPLEMENTED: NO
+COMMAND_PERMISSION_ENFORCEMENT_IMPLEMENTED: NO
+LEGACY_AUTH_REMOVED: NO
+PRODUCTION_DB_DESTRUCTIVE_CHANGE: NO
+IMPLEMENTATION_AGENT_MERGE: NO
+```
+
+# 215. R05 Handoff Contract
+- R05 must inherit a real authenticated actor UUID from R03.
+- R05 must inherit a canonical AccessContext from R04.
+- R05 must not rediscover workspace selection rules independently.
+- R05 must not trust route params as tenant/branch authority.
+- R05 must evaluate permission codes against current AccessContext.
+- R05 must preserve revocation semantics.
+- R05 must preserve actor/tenant/branch DB context.
+- R05 must build permission-specific route and command authorization on top of R04 primitives.
+- R05 should become thinner because R04 centralizes membership and workspace authority.
+
+# 216. Exact R05 Ownership
+- route-to-permission mapping.
+- command-to-permission mapping.
+- server authorization helper using canonical permission codes.
+- unauthorized route behavior by permission.
+- unauthorized command behavior by permission.
+- staff/kitchen/cashier/admin operational permission separation.
+- role/permission relation evaluation.
+- permission-denial audit behavior where required.
+- R04 must not implement those prematurely.
+
+# 217. R06 Handoff Boundary
+- R06 still owns physical legacy-auth source deletion.
+- R06 still owns obsolete env cleanup.
+- R06 still owns obsolete JOSE/session cleanup where no longer needed.
+- R06 still owns final Phase 02 security acceptance.
+- R04 must not delete rollback surfaces that R03 intentionally preserved unless current main policy/spec later changes.
+
+# 218. Final Round State Before Owner Integration
 ```text
 P02/R04 = IMPLEMENTED ON ROUND BRANCH / PR OPEN
 ```
@@ -1443,7 +2389,7 @@ P02/R04 = IMPLEMENTED ON ROUND BRANCH / PR OPEN
 - Implementation branch progression remains governed by current repository policy.
 - Documentation authority remains `main`.
 
-# 121. Handoff to Next Round
+# 219. Handoff to Next Round
 ## Completed state expected from R04
 - authenticated actor identity from R03 remains intact.
 - current workspaces can be discovered server-side.
@@ -1471,7 +2417,7 @@ latest completed P02/R04 implementation branch
 FLOW_P02_R05_IMPLEMENTATION_SPEC.md
 ```
 
-# 122. Development Gate
+# 220. Development Gate
 ```text
 NO SPEC ON MAIN = NO DEVELOPMENT
 FAILED REQUIRED CI = ROUND NOT READY
@@ -1485,7 +2431,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - This documentation task does not create that implementation branch.
 - This documentation task does not perform implementation work.
 
-# 123. Acceptance Summary
+# 221. Acceptance Summary
 - R04 solves workspace authority, not authentication.
 - R04 solves AccessContext, not route permissions.
 - R04 solves membership revocation semantics, not physical session cleanup.
