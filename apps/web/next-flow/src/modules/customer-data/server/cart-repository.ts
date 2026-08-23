@@ -146,16 +146,16 @@ export class CustomerCartRepository {
       throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
     }
 
-    let subtotalMinor = 0n;
+    let subtotalMinor = BigInt(0);
     const items: CustomerCartItemSnapshot[] = itemRows.map((item) => {
       const modifiers = modifiersByItem.get(item.id) ?? [];
       const modifierTotal = modifiers.reduce(
         (sum, modifier) => sum + asMinor(modifier.priceDeltaMinor),
-        0n,
+        BigInt(0),
       );
       const lineTotal =
         (asMinor(item.unitPriceMinor) + modifierTotal) * BigInt(item.quantity);
-      if (lineTotal < 0n) {
+      if (lineTotal < BigInt(0)) {
         throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
       }
       subtotalMinor += lineTotal;
@@ -222,7 +222,11 @@ export class CustomerCartRepository {
     }
 
     const modifierChoiceIds = Array.from(
-      new Set((input.modifierChoiceIds ?? []).map((choiceId) => validateUuid(choiceId, "modifierChoiceId"))),
+      new Set(
+        (input.modifierChoiceIds ?? []).map((choiceId) =>
+          validateUuid(choiceId, "modifierChoiceId"),
+        ),
+      ),
     );
     if (modifierChoiceIds.length > MAX_CART_MODIFIER_CHOICES) {
       throw new CustomerDataError("CUSTOMER_DATA_INVARIANT_VIOLATION");
