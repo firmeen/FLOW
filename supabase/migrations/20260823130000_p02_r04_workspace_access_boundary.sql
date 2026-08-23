@@ -40,9 +40,9 @@ as $$
   join app.organizations organization
     on organization.id = m.tenant_id
    and organization.status = 'ACTIVE'
-  join app.roles role
-    on role.id = m.role_id
-   and role.tenant_id = m.tenant_id
+  join app.roles membership_role
+    on membership_role.id = m.role_id
+   and membership_role.tenant_id = m.tenant_id
   left join app.branches exact_branch
     on m.branch_id is not null
    and exact_branch.id = m.branch_id
