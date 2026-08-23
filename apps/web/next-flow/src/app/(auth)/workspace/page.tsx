@@ -52,17 +52,14 @@ export default async function WorkspacePage({
 
   const params = await searchParams;
   const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
-  const rawState = Array.isArray(params.state) ? params.state[0] : params.state;
   const nextPath = sanitizeInternalPath(rawNext);
 
   let choices: WorkspaceChoice[] = [];
-  let unavailable = rawState === "unavailable";
-  if (!unavailable) {
-    try {
-      choices = buildChoices(await listActorWorkspaces(actorId));
-    } catch {
-      unavailable = true;
-    }
+  let unavailable = false;
+  try {
+    choices = buildChoices(await listActorWorkspaces(actorId));
+  } catch {
+    unavailable = true;
   }
 
   return (
