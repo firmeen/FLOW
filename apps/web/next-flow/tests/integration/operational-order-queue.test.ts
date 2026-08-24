@@ -7,7 +7,6 @@ import {
 import type { AccessContext } from "@/modules/identity/server/access-context";
 import { PERMISSIONS } from "@/modules/identity/server/permissions";
 import { authorizeOperationalOrderRouteContext } from "@/modules/order-operations/server/http";
-import { OperationalOrderReadError } from "@/modules/order-operations/server/errors";
 import {
   getOperationalOrderDetail,
   listOperationalOrderQueue,
@@ -353,7 +352,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       for (const orderId of [orderIds.a2, orderIds.b1]) {
         await expect(
           getOperationalOrderDetail(contexts.staffA1, orderId),
-        ).rejects.toMatchObject<Partial<OperationalOrderReadError>>({
+        ).rejects.toMatchObject({
           code: "ORDER_QUEUE_NOT_FOUND",
         });
       }
@@ -382,7 +381,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       ).resolves.toEqual({ status: "allowed" });
       await expect(
         authorizeOperationalOrderRouteContext(contexts.kitchenA1),
-      ).rejects.toMatchObject<Partial<OperationalOrderReadError>>({
+      ).rejects.toMatchObject({
         code: "ORDER_QUEUE_FORBIDDEN",
       });
     });
