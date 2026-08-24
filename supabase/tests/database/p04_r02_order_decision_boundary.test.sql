@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(20);
+select plan(22);
 
 select has_column(
   'foodflow',
@@ -63,6 +63,27 @@ select has_column(
   'order_events',
   'occurred_at',
   'order event history records a server-side decision timestamp'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_constraint constraint_row
+    where constraint_row.conrelid = 'foodflow.orders'::regclass
+      and constraint_row.contype = 'c'
+      and pg_get_constraintdef(constraint_row.oid) like '%status%ACCEPTED%REJECTED%'
+  ),
+  'persisted order status constraint canonically allows ACCEPTED and REJECTED'
+);
+select ok(
+  exists (
+    select 1
+    from pg_constraint constraint_row
+    where constraint_row.conrelid = 'foodflow.orders'::regclass
+      and constraint_row.contype = 'c'
+      and pg_get_constraintdef(constraint_row.oid) like '%customer_status%CONFIRMED%REJECTED%'
+  ),
+  'persisted customer status constraint canonically allows CONFIRMED and REJECTED'
 );
 
 select ok(
