@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { sanitizeInternalPath } from "@/lib/auth/redirect";
 
 import type { AccessContext } from "./access-context";
-import { authorizePermission, type PermissionScope } from "./authorize-permission";
-import { requireCurrentAccessContext } from "./current-access";
+import type { PermissionScope } from "./authorize-permission";
 import { PERMISSIONS, type PermissionCode } from "./permissions";
 
 export interface RoutePermissionRequirement {
@@ -61,6 +60,10 @@ export async function requireRoutePermission(
   const requirement = getRoutePermissionRequirement(pathname);
   if (!requirement) return null;
 
+  const [{ requireCurrentAccessContext }, { authorizePermission }] = await Promise.all([
+    import("./current-access"),
+    import("./authorize-permission"),
+  ]);
   const context = await requireCurrentAccessContext({
     requireBranch: requirement.scope === "branch",
     nextPath: pathname,

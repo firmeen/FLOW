@@ -24,6 +24,7 @@ export default defineConfig({
     env: {
       AUTH_SECRET: E2E_AUTH.authSecret,
       AUTH_TRUST_HOST: "true",
+      CUSTOMER_CAPABILITY_SECRET: E2E_AUTH.customerCapabilitySecret,
       DATABASE_URL: process.env.DATABASE_URL ?? "",
     },
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",

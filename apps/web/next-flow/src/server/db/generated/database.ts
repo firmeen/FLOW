@@ -162,18 +162,29 @@ export interface FoodflowCartItemModifiers {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   modifier_choice_id: string;
+  modifier_choice_name: string;
   modifier_group_id: string;
+  modifier_group_name: string;
+  price_delta_minor: Int8;
   tenant_id: string;
 }
 
 export interface FoodflowCartItems {
   cart_id: string;
   created_at: Generated<Timestamp>;
+  /**
+   * Currency snapshot captured with the cart line price.
+   */
+  currency: string;
   id: Generated<string>;
   menu_item_id: string;
   quantity: number;
   special_request: string | null;
   tenant_id: string;
+  /**
+   * Menu unit-price snapshot captured by the server when a cart line is persisted.
+   */
+  unit_price_minor: Int8;
   updated_at: Generated<Timestamp>;
 }
 
@@ -181,6 +192,10 @@ export interface FoodflowCarts {
   branch_id: string;
   created_at: Generated<Timestamp>;
   customer_capability_digest: string | null;
+  /**
+   * Opaque signed-capability identifier used only for customer ownership. Bearer token material is never persisted.
+   */
+  customer_capability_id: string | null;
   id: Generated<string>;
   status: Generated<string>;
   table_id: string;
@@ -385,8 +400,12 @@ export interface FoodflowOrders {
   closed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   currency: string;
+  /**
+   * Opaque capability ownership identifier for customer-visible orders; not staff authority.
+   */
+  customer_capability_id: string | null;
   customer_note: string | null;
-  customer_status: string;
+  customer_status: string | null;
   id: Generated<string>;
   modified_by_staff: string | null;
   order_number: string;
@@ -397,12 +416,16 @@ export interface FoodflowOrders {
   rejection_reason: string | null;
   restaurant_id: string;
   served_at: Timestamp | null;
+  /**
+   * Optional originating cart. Unique when present so one cart cannot persist multiple orders.
+   */
+  source_cart_id: string | null;
   status: string;
-  submission_key: string;
-  submitted_at: Timestamp;
+  submission_key: string | null;
+  submitted_at: Timestamp | null;
   subtotal_minor: Int8;
   table_id: string;
-  table_session_id: string;
+  table_session_id: string | null;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
 }

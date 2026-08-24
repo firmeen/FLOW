@@ -1,17 +1,14 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { FLOW_BRAND_ASSETS } from "@/config/brand-assets";
 import { CustomerExperience } from "@/features/customer/customer-experience";
-
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return Array.from({ length: 12 }, (_, index) => ({
-    restaurantSlug: "demo",
-    tableCode: `T${String(index + 1).padStart(2, "0")}`,
-  }));
-}
+import { getCurrentCustomerContext } from "@/modules/customer-capability/server/current-context";
+import {
+  buildCustomerExchangePath,
+  parseCustomerEntrySelector,
+} from "@/modules/customer-capability/server/entry-selector";
+import { loadCustomerStorefrontSnapshot } from "@/modules/customer-data/server";
 
 export async function generateMetadata({
   params,
@@ -19,14 +16,11 @@ export async function generateMetadata({
   params: Promise<{ restaurantSlug: string; tableCode: string }>;
 }): Promise<Metadata> {
   const { restaurantSlug, tableCode } = await params;
+  const selector = parseCustomerEntrySelector(restaurantSlug, tableCode);
+  if (!selector) return {};
 
-  if (restaurantSlug !== "demo" || !/^T(0[1-9]|1[0-2])$/.test(tableCode)) {
-    return {};
-  }
-
-  const title = `Melbourne House · ${tableCode}`;
-  const description =
-    "Browse the Melbourne House dine-in menu and follow your table order with FoodFlow.";
+  const title = `FoodFlow · ${selector.tableCode}`;
+  const description = "Open the verified customer table experience with FoodFlow.";
 
   return {
     title,
@@ -43,10 +37,35 @@ export default async function CustomerTablePage(props: {
   params: Promise<{ restaurantSlug: string; tableCode: string }>;
 }) {
   const { restaurantSlug, tableCode } = await props.params;
+  const selector = parseCustomerEntrySelector(restaurantSlug, tableCode);
+  if (!selector) notFound();
 
-  if (restaurantSlug !== "demo" || !/^T(0[1-9]|1[0-2])$/.test(tableCode)) {
-    notFound();
+  const resolution = await getCurrentCustomerContext();
+  if (
+    resolution.status !== "resolved" ||
+    resolution.context.restaurantSlug !== selector.restaurantSlug ||
+    resolution.context.tableCode !== selector.tableCode
+  ) {
+    redirect(buildCustomerExchangePath(selector));
   }
 
-  return <CustomerExperience tableCode={tableCode} />;
+  const snapshot = await loadCustomerStorefrontSnapshot(resolution.context);
+  if (snapshot.status !== "ok") {
+    const params = new URLSearchParams({
+      state: snapshot.status === "unavailable" ? "unavailable" : "invalid",
+      restaurantSlug: selector.restaurantSlug,
+      tableCode: selector.tableCode,
+    });
+    redirect(`/customer-entry-error?${params.toString()}`);
+  }
+
+  return (
+    <div
+      data-flow-customer-data-source="database"
+      data-flow-restaurant={snapshot.data.storefront.restaurantId}
+      data-flow-branch={snapshot.data.storefront.branchId}
+    >
+      <CustomerExperience tableCode={resolution.context.tableCode} />
+    </div>
+  );
 }

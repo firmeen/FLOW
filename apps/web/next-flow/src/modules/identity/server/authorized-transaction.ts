@@ -13,7 +13,7 @@ import {
   authorizePermissionInTransaction,
   type PermissionScope,
 } from "./authorize-permission";
-import { requireCurrentAccessContext, type CurrentAccessOptions } from "./current-access";
+import type { CurrentAccessOptions } from "./current-access";
 import type { PermissionCode } from "./permissions";
 
 export type AuthorizedTransactionCallback<T> = (
@@ -55,6 +55,7 @@ export async function withAuthorizedCurrentAccessTransaction<T>(
   callback: AuthorizedTransactionCallback<T>,
   options: CurrentAccessOptions = {},
 ): Promise<T> {
+  const { requireCurrentAccessContext } = await import("./current-access");
   const context = await requireCurrentAccessContext({
     ...options,
     requireBranch: scope === "branch",
