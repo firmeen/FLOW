@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/modules/identity/server/current-access", () => ({
+  getCurrentAccessResolution: vi.fn(),
+}));
 
 import { OperationalOrderDecisionError } from "@/modules/order-operations/server/errors";
 import {
