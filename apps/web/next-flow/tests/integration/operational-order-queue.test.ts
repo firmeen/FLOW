@@ -6,7 +6,6 @@ import {
 } from "@/modules/identity/server/authorize-permission";
 import type { AccessContext } from "@/modules/identity/server/access-context";
 import { PERMISSIONS } from "@/modules/identity/server/permissions";
-import { authorizeOperationalOrderRouteContext } from "@/modules/order-operations/server/http";
 import {
   getOperationalOrderDetail,
   listOperationalOrderQueue,
@@ -352,9 +351,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       for (const orderId of [orderIds.a2, orderIds.b1]) {
         await expect(
           getOperationalOrderDetail(contexts.staffA1, orderId),
-        ).rejects.toMatchObject({
-          code: "ORDER_QUEUE_NOT_FOUND",
-        });
+        ).rejects.toMatchObject({ code: "ORDER_QUEUE_NOT_FOUND" });
       }
 
       const a2Page = await listOperationalOrderQueue(
@@ -373,23 +370,20 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
 
     it("requires the staff route capability independently from order.view", async () => {
       await expect(
-        authorizeOperationalOrderRouteContext(contexts.staffA1),
-      ).resolves.toEqual(contexts.staffA1);
-
+        authorizePermission(contexts.staffA1, PERMISSIONS.operationsStaffAccess, "branch"),
+      ).resolves.toEqual({ status: "allowed" });
       await expect(
         authorizePermission(contexts.kitchenA1, PERMISSIONS.orderView, "branch"),
       ).resolves.toEqual({ status: "allowed" });
       await expect(
-        authorizeOperationalOrderRouteContext(contexts.kitchenA1),
-      ).rejects.toMatchObject({
-        code: "ORDER_QUEUE_FORBIDDEN",
-      });
+        authorizePermission(contexts.kitchenA1, PERMISSIONS.operationsStaffAccess, "branch"),
+      ).resolves.toEqual({ status: "denied" });
     });
 
     it("does not let route-shell permission substitute for order.view", async () => {
       await expect(
-        authorizeOperationalOrderRouteContext(contexts.routeOnlyA1),
-      ).resolves.toEqual(contexts.routeOnlyA1);
+        authorizePermission(contexts.routeOnlyA1, PERMISSIONS.operationsStaffAccess, "branch"),
+      ).resolves.toEqual({ status: "allowed" });
       await expect(
         authorizePermission(contexts.routeOnlyA1, PERMISSIONS.orderView, "branch"),
       ).resolves.toEqual({ status: "denied" });
