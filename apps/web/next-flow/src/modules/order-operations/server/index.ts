@@ -10,19 +10,36 @@ export {
   parseOperationalOrderQueueSearchParams,
 } from "./order-queue-service";
 export {
+  acceptOperationalOrder,
+  decideOperationalOrder,
+  normalizeOperationalOrderRejectionReason,
+  parseOperationalOrderDecisionRequest,
+  rejectOperationalOrder,
+} from "./order-decision-service";
+export {
+  MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES,
+  assertOperationalOrderDecisionSameOrigin,
   authorizeOperationalOrderRouteContext,
   operationalOrderApiFailure,
   operationalOrderApiSuccess,
+  readOperationalOrderDecisionJson,
   requireOperationalOrderRouteContext,
 } from "./http";
-export { OperationalOrderReadError } from "./errors";
+export {
+  OperationalOrderDecisionError,
+  OperationalOrderReadError,
+} from "./errors";
 export type {
+  OperationalOrderDecision,
+  OperationalOrderDecisionCommand,
+  OperationalOrderDecisionResult,
   OperationalOrderDetail,
   OperationalOrderItemDetail,
   OperationalOrderModifierDetail,
   OperationalOrderQueueFilter,
   OperationalOrderQueueItem,
   OperationalOrderQueuePage,
+  OperationalOrderRejectionReasonCode,
   OperationalOrderSource,
   OperationalOrderStatus,
   OperationalOrderingMode,
