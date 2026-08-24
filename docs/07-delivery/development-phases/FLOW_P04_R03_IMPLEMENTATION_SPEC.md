@@ -1575,7 +1575,376 @@ IMPLEMENTATION_AGENT_MERGE: NO
 - Required implementation failures remain blockers for implementation readiness.
 - Implementation PR remains owner-controlled.
 
-# 177. Final Development Gate
+# 177. Schema Audit Checklist — Order Status
+- Read the actual order-status constraint or generated type on the latest R02 parent before coding.
+- Confirm `ACCEPTED` is currently valid because R02 writes it.
+- Confirm whether `PREPARING` already exists.
+- Confirm whether `READY` already exists.
+- Confirm whether `SERVED` already exists.
+- Confirm whether `CANCELLED`, `REMAKING`, or other exception states already exist but remain out of R03 scope.
+- Record exact storage vocabulary in the implementation PR.
+- If expected R03 states are absent, add only the narrow forward migration required.
+
+# 178. Schema Audit Checklist — Customer Status
+- Read the actual customer-status domain/constraint.
+- Record current value written by R02 acceptance: `CONFIRMED`.
+- Determine exact supported preparation-visible value.
+- Determine exact supported ready-visible value.
+- Determine exact supported served/completed value.
+- Do not add synonyms when an existing canonical value is available.
+- If customer status intentionally remains `CONFIRMED` through multiple internal states, document that explicit coarse mapping.
+- The implementation PR must record the final mapping table.
+
+# 179. Schema Audit Checklist — Timestamps
+- Inspect whether `accepted_at`, `rejected_at`, `preparing_at`, `ready_at`, and `served_at` exist.
+- Verify timestamp types are timestamptz or repository-standard equivalent.
+- Verify R02 acceptance/rejection fields are not overwritten by later lifecycle writes.
+- Determine whether event timestamp alone is sufficient for any target state.
+- Add a column only when current operational read/acceptance requirements need direct timestamp evidence.
+- Keep additions nullable for rolling deployment safety.
+
+# 180. Schema Audit Checklist — order_events
+- Inspect event type storage and constraints.
+- Confirm existing R02 event rows use canonical naming.
+- Determine whether R03 events can use current constraint unchanged.
+- Verify event actor column references correct user identity table/type.
+- Verify branch and tenant columns are present.
+- Verify event insertion is allowed through current internal transaction role.
+- Do not widen event grants to customer/public roles.
+
+# 181. Lifecycle Mapping Decision Record
+- Implementation PR must include a compact mapping table.
+- For each action record `from`, `to`, `customer_status`, `event_type`, and timestamp evidence.
+- This mapping becomes handoff evidence for R04 and R06.
+- Any deviation from the conceptual matrix in this spec must explain the actual canonical schema reason.
+- Do not silently choose a different transition graph.
+
+# 182. Repository Contract — transition()
+```ts
+transition(
+  orderId: string,
+  spec: OperationalLifecycleTransitionSpec,
+): Promise<OperationalOrderLifecycleMutationRow | null>
+```
+- `spec` is server-internal and sourced from the exhaustive transition map.
+- The public route never constructs arbitrary specs.
+- The repository validates no client authority.
+- The repository owns exact scoped update and event append.
+- The repository does not commit independently.
+
+# 183. Repository Contract — findScopedState()
+- Reuse or generalize the R02 scoped-state helper if it avoids duplicate query logic.
+- It must remain tenant/branch scoped.
+- It may return current operational status needed to classify conflict.
+- It must not return foreign-resource existence.
+- It must not expose full order/customer payload for error classification.
+
+# 184. Repository Contract — Event Append
+- Prefer one private repository helper shared by normal transitions.
+- Inputs are typed event contract, not arbitrary strings from route.
+- The helper uses trusted context for tenant/branch/actor.
+- `from_status` and `to_status` come from transition spec.
+- `occurred_at` uses the same authoritative transition time.
+- Event failure throws and rolls back the update.
+
+# 185. Service Contract — executeLifecycleTransition()
+- One internal executor should compose authorization, mapping, transaction, repository call, conflict classification, and result validation.
+- Convenience exported commands may wrap it.
+- Suggested exports: `startPreparingOperationalOrder`, `markOperationalOrderReady`, `markOperationalOrderServed`.
+- Avoid three separately implemented authorization/transaction flows.
+- Avoid route handlers importing repository directly.
+
+# 186. Service Contract — Trusted Context
+- Reuse the R02 trusted operational context shape if it already contains actorId, tenantId, branchId.
+- Do not create a second equivalent trusted-context type under a new name.
+- BranchId remains non-null at this layer.
+- If R02 type is too decision-specific, rename/generalize only if the refactor is focused and non-breaking.
+
+# 187. Type Contract — Operational Status
+- Prefer a typed union derived from current domain values.
+- R03 does not need to expose every future exception state as a legal action target.
+- Read DTO may include broader status union.
+- Transition spec target union should remain only normal R03 targets.
+- Compile-time exhaustiveness is preferred over stringly typed switches.
+
+# 188. Type Contract — Customer Status
+- Use a typed union where generated/domain types already provide one.
+- Transition mapping must not cast arbitrary strings merely to satisfy TypeScript.
+- If generated DB types are too broad strings, add narrow domain validation at service boundary.
+- Invariant checks protect against schema/application drift.
+
+# 189. Transport Contract — Success
+```json
+{
+  "ok": true,
+  "data": {
+    "orderId": "uuid",
+    "orderNumber": "...",
+    "action": "START_PREPARING",
+    "fromStatus": "ACCEPTED",
+    "status": "PREPARING",
+    "customerStatus": "...",
+    "transitionedAt": "ISO-8601"
+  }
+}
+```
+- Match current internal envelope conventions exactly.
+- Do not include tenant/branch authority fields in response unless an existing DTO requires them.
+- Do not expose actor permission internals.
+
+# 190. Transport Contract — Conflict Classification
+- Conflict means current scoped state does not match the action's required source state.
+- The response code remains stable.
+- Safe current status may be included only if existing internal APIs already use it and it helps reconciliation.
+- Do not include foreign state on inaccessible resources.
+- UI must treat conflict as stale-data signal.
+
+# 191. Transport Contract — Body Size
+- Reuse current R02 bounded body helper if one exists.
+- Lifecycle payload is tiny and should have a strict maximum.
+- Oversized body fails before service mutation.
+- Malformed JSON fails safely.
+- Empty object fails validation.
+- Arrays/null are rejected.
+
+# 192. Customer-Status Mapping Acceptance Matrix
+- ACCEPTED retains the R02 customer state.
+- START_PREPARING produces the exact mapped preparation/customer state.
+- MARK_READY produces the exact mapped ready/customer state.
+- MARK_SERVED produces the exact mapped served/completed customer state.
+- Illegal actions leave customer status unchanged.
+- Rollback leaves customer status unchanged.
+- Concurrent loser leaves customer status equal to winner's committed result after refetch.
+
+# 193. Timestamp Acceptance Matrix
+- START_PREPARING writes exactly one authoritative preparation timestamp when direct column exists.
+- MARK_READY writes exactly one authoritative ready timestamp when direct column exists.
+- MARK_SERVED writes exactly one authoritative served timestamp when direct column exists.
+- Later transitions do not overwrite earlier timestamps.
+- Conflict does not rewrite timestamps.
+- Duplicate stale request does not rewrite timestamp.
+- Rollback removes attempted timestamp update.
+
+# 194. Event Acceptance Matrix
+- START_PREPARING produces exactly one preparing event.
+- MARK_READY produces exactly one ready event.
+- MARK_SERVED produces exactly one served event.
+- Invalid request produces zero events.
+- Forbidden request produces zero events.
+- Cross-scope request produces zero events.
+- Wrong-source conflict produces zero events.
+- Event insert failure produces zero committed state transition and zero committed event.
+
+# 195. Concurrency Matrix — Same Action
+| Initial | Request A | Request B | Expected |
+|---|---|---|---|
+| ACCEPTED | START_PREPARING | START_PREPARING | one PREPARING success, one conflict |
+| PREPARING | MARK_READY | MARK_READY | one READY success, one conflict |
+| READY | MARK_SERVED | MARK_SERVED | one SERVED success, one conflict |
+- Exactly one event for each successful state change.
+- Exactly one authoritative transition timestamp.
+
+# 196. Concurrency Matrix — Sequential Stale Actions
+| Initial view | Other actor commits | Stale action | Expected |
+|---|---|---|---|
+| ACCEPTED | PREPARING | START_PREPARING | conflict + refetch |
+| PREPARING | READY | MARK_READY | conflict + refetch |
+| READY | SERVED | MARK_SERVED | conflict + refetch |
+| ACCEPTED | PREPARING | MARK_READY using stale UI that had not seen change | allowed only if server source is PREPARING at execution and action is MARK_READY; UI freshness is not authority |
+- This last case demonstrates that legal current database state, not stale display origin, controls validity.
+
+# 197. Cross-Branch Security Matrix
+- Same order UUID with wrong branch context cannot mutate.
+- A guessed foreign UUID cannot reveal its lifecycle status.
+- A manager in A1 cannot use A2 branch selector in body because branch selector is not accepted.
+- Switching workspace to A2 must re-resolve current authorization before mutation.
+- Revocation between reads and mutation must deny on fresh permission/context evaluation.
+
+# 198. Direct Repository Test Boundary
+- Repository tests may validate exact SQL/state behavior under trusted test transaction.
+- They are not substitutes for service authorization tests.
+- Service tests prove `order.manage` enforcement.
+- Route tests prove transport cannot bypass service.
+- DB tests prove RLS/grants defense.
+- Keep each test layer responsible for its own boundary.
+
+# 199. R01 Read Model Compatibility
+- Queue DTO must represent PREPARING, READY, and SERVED without unknown-state crash.
+- Detail DTO must represent new states.
+- Status labels must not fall back to misleading values.
+- Queue ordering remains deterministic.
+- Existing pending/accepted/rejected rows still render.
+- No local-demo order authority returns.
+
+# 200. R02 Decision Compatibility
+- Decision repository remains source-limited to PENDING_CONFIRMATION.
+- Lifecycle repository remains source-limited to post-accept normal states.
+- No route ambiguity between decision and lifecycle.
+- R02 accepted_at evidence remains intact after full lifecycle.
+- R02 rejection reason remains intact for rejected rows and never appears on normal accepted lifecycle.
+
+# 201. Historical Event Ordering
+- `ORDER_ACCEPTED` event precedes preparing event for normal accepted orders.
+- preparing event precedes ready event.
+- ready event precedes served event.
+- Use occurred_at + stable tie-breaker if events can share close timestamps.
+- R03 does not need to rewrite existing history ordering infrastructure.
+
+# 202. Database Check — Timestamp/State Compatibility
+- If practical, ensure served_at cannot be set on a row that never reached SERVED through application path.
+- Avoid overly complex cross-column CHECK constraints that block future exceptions.
+- Application/domain transition engine is primary state graph authority.
+- Database status constraint is minimum structural authority.
+- Event tests provide historical integrity evidence.
+
+# 203. Database Check — Rejection Compatibility
+- REJECTED rows retain rejected_at/rejection_reason semantics from R02.
+- Normal lifecycle transition predicates cannot target REJECTED.
+- R03 migration must not make rejection fields invalid on historical rejected rows.
+- Normal accepted-path rows should not acquire rejection reasons.
+
+# 204. Database Check — Actor Identity
+- `modified_by_staff` must receive current actor when updated by lifecycle transition if retained as latest modifier evidence.
+- `order_events.actor_id` records exact transition actor.
+- If `modified_by_staff` is nullable historical field, do not destructive-backfill.
+- R03 must not create fake actor UUIDs.
+
+# 205. Transaction Failure Injection Plan
+- Identify a safe test seam before implementation.
+- Preferred integration proof uses an actual transaction with a forced event write failure.
+- Alternative may use a temporary constraint/invalid actor fixture if test harness supports it.
+- The failure must occur after attempted order update but before transaction commit.
+- Assert rollback at database state level.
+
+# 206. DB Unavailability / Authorization Unavailability
+- Treat both as fail-closed but preserve distinct typed errors where existing infrastructure distinguishes them.
+- No callback side effect on authorization-unavailable path.
+- UI can show retryable service unavailable.
+- Do not map unavailable to forbidden if that would mislead operators.
+
+# 207. Response-Loss Recovery
+- If server commits transition and network response is lost, client may retry.
+- Retry sees current target state and returns conflict under default R03 semantics.
+- Client refetch then sees successful committed state.
+- This is acceptable because lifecycle transitions are staff interactions, not financial request-idempotency operations.
+- No duplicate event is created.
+
+# 208. No Batch Mutation
+- Do not add `POST /orders/lifecycle/batch`.
+- Bulk kitchen operations may need different concurrency/error semantics later.
+- Single-order command keeps evidence and stale-state handling precise.
+- R03 performance target does not require batching.
+
+# 209. Query Budget
+- Happy-path mutation should not load item/modifier detail.
+- Authorization transaction cost is inherited.
+- Order update = one bounded statement.
+- Event insert = one bounded statement.
+- Result returns from UPDATE RETURNING where practical.
+- Scoped-state lookup occurs only on no-row conflict/not-found path.
+
+# 210. UI Error Copy Contract
+- Invalid request should not normally be reachable from valid UI.
+- Conflict copy should indicate order changed and has been refreshed.
+- Forbidden copy should indicate access is no longer available, without technical permission names.
+- Unavailable copy should allow retry.
+- Invariant/server error copy should be generic and safe.
+
+# 211. UI Multi-Device Reconciliation
+- Do not rely on realtime for R03.
+- Manual action response and refetch provide correctness.
+- If the page already has polling/revalidation, reuse it.
+- Realtime integration can later improve latency without changing state authority.
+- State graph correctness must not depend on websocket delivery.
+
+# 212. Future Kitchen Consumer Contract
+- Kitchen may read operational status from the same server-backed order authority.
+- Kitchen cannot introduce alternate PREPARING/READY mutation semantics later without respecting lifecycle service.
+- R03 should expose domain primitives reusable by authorized kitchen commands in a future phase if needed.
+- Do not pre-authorize kitchen role unless current permission product model requires it now.
+
+# 213. Future Realtime Consumer Contract
+- A future realtime publisher should react to committed transition evidence/state.
+- It must not publish before transaction commit.
+- R03 does not implement outbox/event publication.
+- Durable order/event data is enough handoff evidence for later realtime design.
+
+# 214. Future Notification Consumer Contract
+- Notification delivery may use committed customer status changes later.
+- R03 does not send notifications.
+- Avoid embedding notification-specific payload into lifecycle service result.
+- Keep result DTO domain-focused.
+
+# 215. Future Analytics Contract
+- Stable event types enable transition-duration analysis later.
+- Stable timestamps enable accepted→preparing→ready→served timing metrics.
+- Do not add analytics aggregation tables in R03.
+- Preserve event naming consistency.
+
+# 216. R04 Exception Extension Design Constraint
+- R04 should be able to reuse trusted context, error classification, event append pattern, and conditional state predicate.
+- R04 may define exception-specific transition maps separately.
+- Do not expose a generic public `transitionTo(status)` merely for R04 reuse.
+- Internal typed helper can be shared while public commands remain explicit.
+
+# 217. R04 Cancellation Handoff Evidence
+- R04 will need exact normal state at cancellation attempt.
+- R03 must leave current status query/repository behavior deterministic.
+- R04 can determine whether cancellation is legal from PENDING_CONFIRMATION/ACCEPTED/PREPARING based on its own spec.
+- Existing lifecycle event history remains available for cancellation audit.
+
+# 218. R04 Edit Handoff Evidence
+- R04 may need edited-order audit while preserving immutable submitted snapshots/history.
+- R03 does not mutate order item content.
+- R03 lifecycle engine should not couple state transitions to item mutation code.
+- This separation prevents cancellation/edit work from contaminating normal progression.
+
+# 219. Acceptance Evidence Required in R03 PR
+- exact implementation parent SHA.
+- exact lifecycle branch head SHA.
+- final changed-file list.
+- final transition matrix.
+- final customer-status matrix.
+- final event/timestamp matrix.
+- authorization negative evidence.
+- concurrency evidence.
+- rollback evidence.
+- schema/migration evidence.
+- inherited R01/R02 regression evidence.
+
+# 220. Required Test Names / Coverage Discoverability
+- Tests should be named so reviewers can identify lifecycle coverage directly.
+- Avoid hiding lifecycle assertions in unrelated giant test files only.
+- Unit test name should mention operational order lifecycle.
+- Integration test name should mention operational order lifecycle.
+- DB test filename should follow P04/R03 naming convention.
+- Existing test files may be extended only when responsibilities remain clear.
+
+# 221. Definition of Done — Handoff Quality
+- R04 can import/reuse typed lifecycle definitions where appropriate.
+- R04 does not need route-local SQL.
+- R04 does not need to recreate branch authorization.
+- R04 does not need to invent event append semantics.
+- R04 receives stable conflict/error behavior.
+- R04 receives accurate current normal lifecycle state.
+
+# 222. Document Final Validation Checklist
+- [x] metadata is canonical.
+- [x] Previous/Next sequence is canonical.
+- [x] actual R02 head is recorded.
+- [x] actual R02 code evidence was inspected.
+- [x] normal lifecycle graph is explicit.
+- [x] customer status mapping decision is required.
+- [x] schema audit is explicit.
+- [x] transaction/event atomicity is explicit.
+- [x] permission/RLS boundaries are explicit.
+- [x] concurrency and stale behavior are explicit.
+- [x] UI reconciliation is explicit.
+- [x] migration/deployment safety is explicit.
+- [x] R04 exception handoff is explicit.
+- [x] R05/R06 scope remains deferred.
+
+# 223. Final Development Gate
 ```text
 NO SPEC ON MAIN = NO DEVELOPMENT
 FAILED REQUIRED CI = ROUND NOT READY
@@ -1588,7 +1957,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - Documentation branch is never implementation parent.
 - Owner controls implementation integration.
 
-# 178. Final Handoff to R04
+# 224. Final Handoff to R04
 - R01 durable queue/detail read plane remains intact.
 - R02 explicit accept/reject decision plane remains intact.
 - R03 supplies canonical normal lifecycle transition types/map.
@@ -1598,7 +1967,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - R03 supplies server-backed staff lifecycle UI integration.
 - R04 can implement controlled edit/cancel exceptions without arbitrary status writes.
 
-# 179. R04 Required Input Contract
+# 225. R04 Required Input Contract
 - current server-backed order read model.
 - current decision evidence.
 - current lifecycle status.
@@ -1608,7 +1977,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - conflict/error mapping.
 - exact lifecycle timestamps where present.
 
-# 180. R04 Must Not Need to Rebuild
+# 226. R04 Must Not Need to Rebuild
 - authentication.
 - AccessContext.
 - permission evaluation.
@@ -1618,7 +1987,7 @@ NO NEXT PHASE SPEC ON MAIN = STOP
 - branch isolation.
 - stale-state conflict classification.
 
-# 181. Required Next Specification
+# 227. Required Next Specification
 ```text
 FLOW_P04_R04_IMPLEMENTATION_SPEC.md
 ```
@@ -1626,7 +1995,7 @@ FLOW_P04_R04_IMPLEMENTATION_SPEC.md
 - R03 does not infer final cancellation/edit policy prematurely.
 - No R04 implementation starts until exact R04 spec exists on current main.
 
-# 182. Final Acceptance Statement
+# 228. Final Acceptance Statement
 - P04/R03 is READY as an executable specification document.
 - The round establishes the canonical legal normal operational lifecycle after staff acceptance.
 - Lifecycle authority remains server-side and branch-scoped.
