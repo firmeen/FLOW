@@ -85,9 +85,20 @@ export async function readOperationalOrderDecisionJson(
     }
   }
 
+  let text: string;
+  try {
+    text = await request.text();
+  } catch (error) {
+    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", error);
+  }
+
+  if (new TextEncoder().encode(text).byteLength > MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES) {
+    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
+  }
+
   let value: unknown;
   try {
-    value = await request.json();
+    value = JSON.parse(text) as unknown;
   } catch (error) {
     throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", error);
   }
