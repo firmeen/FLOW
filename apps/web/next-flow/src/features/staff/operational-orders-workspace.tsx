@@ -32,13 +32,36 @@ import {
 type StaffTab = "orders" | "tables" | "service" | "ready" | "menu";
 type QueueStatusFilter = "INCOMING" | "PENDING_CONFIRMATION" | "CHANGED";
 type QueueSourceFilter = "ALL" | "CUSTOMER_WEB" | "UNKNOWN";
+type DecisionAction = "ACCEPT" | "REJECT";
+type RejectionReasonCode =
+  | "ITEM_UNAVAILABLE"
+  | "STORE_CLOSING"
+  | "CAPACITY_LIMIT"
+  | "INVALID_ORDER"
+  | "OTHER";
 type ApiSuccess<T> = { readonly ok: true; readonly data: T };
 type ApiFailure = {
   readonly ok: false;
   readonly error: { readonly code: string; readonly message: string };
 };
+type OperationalOrderDecisionResult = {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly decision: DecisionAction;
+  readonly status: "ACCEPTED" | "REJECTED";
+  readonly customerStatus: "CONFIRMED" | "REJECTED";
+  readonly decidedAt: string;
+  readonly reasonCode: RejectionReasonCode | null;
+};
 
 const STAFF_TABS: readonly StaffTab[] = ["orders", "tables", "service", "ready", "menu"];
+const REJECTION_REASON_OPTIONS: readonly (readonly [RejectionReasonCode, string])[] = [
+  ["ITEM_UNAVAILABLE", "Item unavailable"],
+  ["STORE_CLOSING", "Store closing"],
+  ["CAPACITY_LIMIT", "Capacity limit"],
+  ["INVALID_ORDER", "Invalid order"],
+  ["OTHER", "Other"],
+];
 
 function currentStaffTab(): StaffTab {
   if (typeof window === "undefined") return "orders";
@@ -90,10 +113,16 @@ function OperationalOrdersWorkspace() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detail, setDetail] = useState<OperationalOrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [decisionPending, setDecisionPending] = useState<DecisionAction | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionForbidden, setDecisionForbidden] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState<RejectionReasonCode | "">("");
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -186,6 +215,9 @@ function OperationalOrdersWorkspace() {
     setSelectedOrderId(orderId);
     setDetail(null);
     setDetailError(null);
+    setDecisionError(null);
+    setRejectOpen(false);
+    setRejectReason("");
     setDetailLoading(true);
     try {
       const response = await fetch(`/api/internal/orders/${encodeURIComponent(orderId)}`, {
@@ -211,11 +243,98 @@ function OperationalOrdersWorkspace() {
   }
 
   function closeDetail() {
+    if (decisionPending) return;
     detailRequestVersion.current += 1;
     setSelectedOrderId(null);
     setDetail(null);
     setDetailError(null);
     setDetailLoading(false);
+    setDecisionError(null);
+    setRejectOpen(false);
+    setRejectReason("");
+  }
+
+  async function submitDecision(action: DecisionAction) {
+    if (!detail || decisionPending) return;
+    if (detail.status !== "PENDING_CONFIRMATION") {
+      setDecisionError("This order is no longer eligible for an initial decision.");
+      return;
+    }
+    if (action === "REJECT" && !rejectReason) {
+      setDecisionError("Choose a rejection reason before rejecting the order.");
+      return;
+    }
+
+    const orderId = detail.id;
+    const orderNumber = detail.orderNumber;
+    setDecisionPending(action);
+    setDecisionError(null);
+    setNotice(null);
+
+    try {
+      const payload =
+        action === "ACCEPT"
+          ? { action: "ACCEPT" }
+          : { action: "REJECT", reasonCode: rejectReason };
+      const response = await fetch(
+        `/api/internal/orders/${encodeURIComponent(orderId)}/decision`,
+        {
+          method: "POST",
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+      const body = (await response.json()) as
+        | ApiSuccess<OperationalOrderDecisionResult>
+        | ApiFailure;
+
+      if (!response.ok || !body.ok) {
+        const message = body.ok ? "Order decision is temporarily unavailable." : body.error.message;
+        if (response.status === 401) {
+          handleAuthFailure(response.status);
+          return;
+        }
+        if (response.status === 403) {
+          setDecisionForbidden(true);
+          setRejectOpen(false);
+          setDecisionError("You can view this order, but order.manage permission is required to decide it.");
+          return;
+        }
+        if (response.status === 409) {
+          setDecisionError("Another decision already won. The durable order state has been refreshed.");
+          await Promise.all([
+            loadQueue({ background: true }),
+            openDetail(orderId),
+          ]);
+          return;
+        }
+        if (response.status === 404) {
+          setDecisionError("This order is no longer available in the active branch.");
+          await loadQueue({ background: true });
+          return;
+        }
+        setDecisionError(message);
+        return;
+      }
+
+      setNotice(
+        body.data.decision === "ACCEPT"
+          ? `Order ${orderNumber} accepted.`
+          : `Order ${orderNumber} rejected.`,
+      );
+      setDecisionPending(null);
+      closeDetail();
+      await loadQueue({ background: true });
+    } catch {
+      setDecisionError("Order decision is temporarily unavailable. Refresh the order before retrying.");
+    } finally {
+      setDecisionPending(null);
+    }
   }
 
   const navItems = [
@@ -231,6 +350,8 @@ function OperationalOrdersWorkspace() {
     { label: "Ready", href: "/staff#ready", icon: HandPlatter },
     { label: "Menu", href: "/staff#menu", icon: Utensils },
   ];
+
+  const decisionEligible = detail?.status === "PENDING_CONFIRMATION";
 
   return (
     <OperationalShell
@@ -249,7 +370,7 @@ function OperationalOrdersWorkspace() {
         <SectionHeading
           eyebrow="Operational orders"
           title="Server-backed order queue"
-          description="Submitted orders are read from durable branch-scoped records. This queue is intentionally read-only."
+          description="Submitted orders are durable branch-scoped records. Eligible pending orders can be accepted or rejected through the authorized decision boundary."
         />
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -262,10 +383,16 @@ function OperationalOrdersWorkspace() {
           <QueueMetric
             label="Authority"
             value="Branch"
-            helper="staff session + order.view"
+            helper="order.view reads / order.manage decisions"
             icon={<ShieldCheck className="size-5" />}
           />
         </div>
+
+        {notice ? (
+          <div role="status" className="mt-4 border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
+            {notice}
+          </div>
+        ) : null}
 
         <section className="mt-6" aria-labelledby="operational-order-queue-title">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -274,7 +401,7 @@ function OperationalOrdersWorkspace() {
                 Incoming orders
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Oldest submissions first. Refresh manually for new durable orders.
+                Oldest submissions first. Decisions are persisted before the queue refreshes.
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-2">
@@ -378,7 +505,11 @@ function OperationalOrdersWorkspace() {
             ? `${detail.tableLabel ?? "Unknown table"} - Submitted ${formatBangkokTime(detail.submittedAt)}`
             : undefined
         }
-        footer={<Button variant="outline" onClick={closeDetail}>Close</Button>}
+        footer={
+          <Button variant="outline" disabled={Boolean(decisionPending)} onClick={closeDetail}>
+            Close
+          </Button>
+        }
         size="lg"
       >
         {detailLoading ? (
@@ -386,7 +517,110 @@ function OperationalOrdersWorkspace() {
         ) : detailError ? (
           <EmptyState compact icon={<RefreshCcw className="size-5" />} title="Order detail unavailable" description={detailError} />
         ) : detail ? (
-          <OperationalOrderDetailView detail={detail} now={now} />
+          <div className="space-y-4">
+            <OperationalOrderDetailView detail={detail} now={now} />
+
+            {decisionError ? (
+              <div role="alert" className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {decisionError}
+              </div>
+            ) : null}
+
+            {decisionEligible && !decisionForbidden ? (
+              <section className="border border-border bg-card p-4" aria-labelledby="order-decision-heading">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 id="order-decision-heading" className="text-sm font-semibold text-foreground">
+                      Initial staff decision
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Accept confirms the order. Reject requires one bounded operational reason. Later lifecycle actions are not part of this round.
+                    </p>
+                  </div>
+                  <Badge tone="neutral">order.manage</Badge>
+                </div>
+
+                {rejectOpen ? (
+                  <div className="mt-4 space-y-3 border-t border-border pt-4">
+                    <label className="block text-xs font-semibold text-foreground">
+                      Rejection reason
+                      <select
+                        className="mt-1.5 block h-10 w-full rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground"
+                        value={rejectReason}
+                        disabled={Boolean(decisionPending)}
+                        onChange={(event) =>
+                          setRejectReason(event.target.value as RejectionReasonCode | "")
+                        }
+                      >
+                        <option value="">Choose a reason</option>
+                        {REJECTION_REASON_OPTIONS.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        disabled={Boolean(decisionPending)}
+                        onClick={() => {
+                          setRejectOpen(false);
+                          setRejectReason("");
+                          setDecisionError(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        disabled={!rejectReason || Boolean(decisionPending)}
+                        leftIcon={
+                          decisionPending === "REJECT" ? (
+                            <LoaderCircle className="size-4 animate-spin" />
+                          ) : undefined
+                        }
+                        onClick={() => void submitDecision("REJECT")}
+                      >
+                        Reject order
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                    <Button
+                      variant="outline"
+                      disabled={Boolean(decisionPending)}
+                      onClick={() => {
+                        setRejectOpen(true);
+                        setDecisionError(null);
+                      }}
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      disabled={Boolean(decisionPending)}
+                      leftIcon={
+                        decisionPending === "ACCEPT" ? (
+                          <LoaderCircle className="size-4 animate-spin" />
+                        ) : undefined
+                      }
+                      onClick={() => void submitDecision("ACCEPT")}
+                    >
+                      Accept order
+                    </Button>
+                  </div>
+                )}
+              </section>
+            ) : detail.status === "CHANGED" ? (
+              <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
+                Changed orders remain review-only in R02. No authoritative re-decision semantics are defined for CHANGED yet.
+              </p>
+            ) : !decisionEligible ? (
+              <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
+                This order already left the initial decision state. Refresh the queue for its durable status.
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </Modal>
     </OperationalShell>
