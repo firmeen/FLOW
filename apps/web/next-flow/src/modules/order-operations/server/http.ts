@@ -10,6 +10,7 @@ import { getCurrentAccessResolution } from "@/modules/identity/server/current-ac
 import { PERMISSIONS } from "@/modules/identity/server/permissions";
 
 import {
+  OperationalOrderDecisionError,
   OperationalOrderReadError,
   isOperationalOrderDecisionError,
   isOperationalOrderReadError,
@@ -56,19 +57,12 @@ export function assertOperationalOrderDecisionSameOrigin(request: Request): void
   try {
     requestOrigin = new URL(request.url).origin;
   } catch (error) {
-    throw new OperationalOrderReadError("ORDER_QUEUE_INVALID_QUERY", error);
+    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", error);
   }
 
   if (origin !== requestOrigin) {
-    const { OperationalOrderDecisionError } = requireDecisionErrorClass();
     throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
   }
-}
-
-function requireDecisionErrorClass(): typeof import("./errors") {
-  // Kept as a tiny indirection so read-only route initialization remains unchanged.
-  // This module is server-only and the import is resolved synchronously by the bundler.
-  return require("./errors") as typeof import("./errors");
 }
 
 export async function readOperationalOrderDecisionJson(
@@ -76,7 +70,6 @@ export async function readOperationalOrderDecisionJson(
 ): Promise<Record<string, unknown>> {
   const contentType = request.headers.get("content-type");
   if (contentType && !contentType.toLowerCase().startsWith("application/json")) {
-    const { OperationalOrderDecisionError } = requireDecisionErrorClass();
     throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
   }
 
@@ -88,7 +81,6 @@ export async function readOperationalOrderDecisionJson(
       bytes < 0 ||
       bytes > MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES
     ) {
-      const { OperationalOrderDecisionError } = requireDecisionErrorClass();
       throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
     }
   }
@@ -97,12 +89,10 @@ export async function readOperationalOrderDecisionJson(
   try {
     value = await request.json();
   } catch (error) {
-    const { OperationalOrderDecisionError } = requireDecisionErrorClass();
     throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", error);
   }
 
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    const { OperationalOrderDecisionError } = requireDecisionErrorClass();
     throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
   }
 
