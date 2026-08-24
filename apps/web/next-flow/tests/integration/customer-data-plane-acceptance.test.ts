@@ -40,6 +40,16 @@ const contextAOtherCapability: CustomerContext = Object.freeze({
   capabilityId: "70000000-0000-4000-8000-000000000082",
 });
 
+const contextASiblingBranch: CustomerContext = Object.freeze({
+  ...contextA,
+  capabilityId: "70000000-0000-4000-8000-000000000084",
+  branchId: "00000000-0000-0000-0000-0000000000ac",
+  branchName: "Branch A2",
+  tableId: "00000000-0000-0000-0000-0000000000ad",
+  tableCode: "T-A2",
+  tableLabel: "Table A2",
+});
+
 const contextB: CustomerContext = Object.freeze({
   capabilityId: "70000000-0000-4000-8000-000000000083",
   tenantId: "00000000-0000-0000-0000-0000000000b1",
@@ -121,7 +131,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       expect(JSON.stringify(snapshot.data)).not.toContain("Seed Item B");
     });
 
-    it("proves server-authoritative cart snapshots, exact replay, mismatch denial and scope isolation", async () => {
+    it("proves server-authoritative cart snapshots, exact replay, mismatch denial and tenant/branch/capability isolation", async () => {
       const depsA = dependenciesFor(contextA);
       const cart = await withCustomerDataTransaction(contextA, ({ repositories }) =>
         repositories.carts.createActive(),
@@ -156,38 +166,38 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
       });
 
       await expect(
-        addCustomerCartItemIdempotent(
-          { ...input, quantity: 3 },
-          key,
-          depsA,
-        ),
+        addCustomerCartItemIdempotent({ ...input, quantity: 3 }, key, depsA),
       ).rejects.toMatchObject({ code: "CUSTOMER_COMMAND_IDEMPOTENCY_MISMATCH" });
 
-      await expect(
-        addCustomerCartItemIdempotent(
-          {
-            cartId: cart.id,
-            menuItemId: SEED_MENU_ITEM_ID,
-            quantity: 1,
-            modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
-          },
-          "10000000-0000-4000-8000-000000000082",
-          dependenciesFor(contextAOtherCapability),
-        ),
-      ).rejects.toMatchObject({ code: "CUSTOMER_COMMAND_NOT_FOUND" });
+      const foreignAttempts = [
+        {
+          context: contextAOtherCapability,
+          key: "10000000-0000-4000-8000-000000000082",
+        },
+        {
+          context: contextASiblingBranch,
+          key: "10000000-0000-4000-8000-000000000083",
+        },
+        {
+          context: contextB,
+          key: "10000000-0000-4000-8000-000000000087",
+        },
+      ];
 
-      await expect(
-        addCustomerCartItemIdempotent(
-          {
-            cartId: cart.id,
-            menuItemId: SEED_MENU_ITEM_ID,
-            quantity: 1,
-            modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
-          },
-          "10000000-0000-4000-8000-000000000083",
-          dependenciesFor(contextB),
-        ),
-      ).rejects.toMatchObject({ code: "CUSTOMER_COMMAND_NOT_FOUND" });
+      for (const attempt of foreignAttempts) {
+        await expect(
+          addCustomerCartItemIdempotent(
+            {
+              cartId: cart.id,
+              menuItemId: SEED_MENU_ITEM_ID,
+              quantity: 1,
+              modifierChoiceIds: [SEED_MODIFIER_CHOICE_ID],
+            },
+            attempt.key,
+            dependenciesFor(attempt.context),
+          ),
+        ).rejects.toMatchObject({ code: "CUSTOMER_COMMAND_NOT_FOUND" });
+      }
 
       const rowCount = await withCustomerDataTransaction(contextA, ({ trx }) =>
         trx
