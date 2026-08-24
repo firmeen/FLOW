@@ -226,7 +226,7 @@ export function OperationalOrderDetailView({
       ) : null}
 
       <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-        This queue is read-only. Accept, reject, edit, and lifecycle controls are not enabled on durable server orders yet.
+        Item and modifier snapshots remain read-only. Initial accept/reject decisions are handled separately and never rewrite these submitted facts.
       </p>
     </div>
   );
