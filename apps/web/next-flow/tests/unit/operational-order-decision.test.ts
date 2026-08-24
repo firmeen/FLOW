@@ -6,8 +6,10 @@ import {
   parseOperationalOrderDecisionRequest,
 } from "@/modules/order-operations/server/order-decision-service";
 import {
+  MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES,
   assertOperationalOrderDecisionSameOrigin,
   operationalOrderApiFailure,
+  readOperationalOrderDecisionJson,
 } from "@/modules/order-operations/server/http";
 
 const orderId = "91000000-0000-4000-8000-000000000001";
@@ -22,6 +24,12 @@ function expectInvalidRequest(callback: () => unknown) {
       "ORDER_DECISION_INVALID_REQUEST",
     );
   }
+}
+
+async function expectInvalidRequestAsync(callback: () => Promise<unknown>) {
+  await expect(callback()).rejects.toMatchObject({
+    code: "ORDER_DECISION_INVALID_REQUEST",
+  });
 }
 
 describe("P04/R02 operational order decision contracts", () => {
@@ -103,6 +111,42 @@ describe("P04/R02 operational order decision contracts", () => {
         }),
       ),
     ).not.toThrow();
+  });
+
+  it("parses same-origin bounded JSON and rejects unsupported content types", async () => {
+    const request = new Request("https://flow.test/api/internal/orders/1/decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ACCEPT" }),
+    });
+    await expect(readOperationalOrderDecisionJson(request)).resolves.toEqual({
+      action: "ACCEPT",
+    });
+
+    await expectInvalidRequestAsync(() =>
+      readOperationalOrderDecisionJson(
+        new Request("https://flow.test/api/internal/orders/1/decision", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "ACCEPT" }),
+        }),
+      ),
+    );
+  });
+
+  it("enforces the actual request body byte bound even without Content-Length", async () => {
+    const oversized = JSON.stringify({
+      action: "REJECT",
+      reasonCode: "OTHER",
+      padding: "x".repeat(MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES),
+    });
+    const request = new Request("https://flow.test/api/internal/orders/1/decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: oversized,
+    });
+
+    await expectInvalidRequestAsync(() => readOperationalOrderDecisionJson(request));
   });
 
   it("maps stale decisions to stable HTTP 409 without internal details", async () => {
