@@ -210,12 +210,15 @@ function OperationalOrdersWorkspace() {
     };
   }, []);
 
-  async function openDetail(orderId: string) {
+  async function openDetail(
+    orderId: string,
+    options: { readonly preserveDecisionError?: boolean } = {},
+  ) {
     const version = ++detailRequestVersion.current;
     setSelectedOrderId(orderId);
     setDetail(null);
     setDetailError(null);
-    setDecisionError(null);
+    if (!options.preserveDecisionError) setDecisionError(null);
     setRejectOpen(false);
     setRejectReason("");
     setDetailLoading(true);
@@ -242,8 +245,8 @@ function OperationalOrdersWorkspace() {
     }
   }
 
-  function closeDetail() {
-    if (decisionPending) return;
+  function closeDetail(force = false) {
+    if (decisionPending && !force) return;
     detailRequestVersion.current += 1;
     setSelectedOrderId(null);
     setDetail(null);
@@ -306,11 +309,11 @@ function OperationalOrdersWorkspace() {
           return;
         }
         if (response.status === 409) {
-          setDecisionError("Another decision already won. The durable order state has been refreshed.");
           await Promise.all([
             loadQueue({ background: true }),
-            openDetail(orderId),
+            openDetail(orderId, { preserveDecisionError: true }),
           ]);
+          setDecisionError("Another decision already won. The durable order state has been refreshed.");
           return;
         }
         if (response.status === 404) {
@@ -328,7 +331,7 @@ function OperationalOrdersWorkspace() {
           : `Order ${orderNumber} rejected.`,
       );
       setDecisionPending(null);
-      closeDetail();
+      closeDetail(true);
       await loadQueue({ background: true });
     } catch {
       setDecisionError("Order decision is temporarily unavailable. Refresh the order before retrying.");
@@ -506,7 +509,7 @@ function OperationalOrdersWorkspace() {
             : undefined
         }
         footer={
-          <Button variant="outline" disabled={Boolean(decisionPending)} onClick={closeDetail}>
+          <Button variant="outline" disabled={Boolean(decisionPending)} onClick={() => closeDetail()}>
             Close
           </Button>
         }
