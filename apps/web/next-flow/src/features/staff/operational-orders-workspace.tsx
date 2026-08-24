@@ -1,14 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BellRing,
   CheckCircle2,
-  ChevronRight,
   ClipboardList,
-  Clock3,
   HandPlatter,
   LayoutGrid,
   LoaderCircle,
@@ -18,80 +15,23 @@ import {
 } from "lucide-react";
 
 import { OperationalShell } from "@/components/layout";
-import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Modal,
-  SectionHeading,
-} from "@/components/foodflow-ui";
+import { Badge, Button, EmptyState, Modal, SectionHeading } from "@/components/foodflow-ui";
 import { StaffOperations } from "@/features/staff/staff-operations";
 import { useNow } from "@/hooks/use-now";
-import { formatBangkokTime, formatElapsed } from "@/lib/date";
+import { formatBangkokTime } from "@/lib/date";
+import {
+  OperationalOrderCard,
+  OperationalOrderDetailView,
+  QueueMetric,
+  dedupeOperationalOrders,
+  type OperationalOrderDetail,
+  type OperationalOrderQueuePage,
+  type OperationalOrderQueueItem,
+} from "./operational-orders-ui";
 
 type StaffTab = "orders" | "tables" | "service" | "ready" | "menu";
 type QueueStatusFilter = "INCOMING" | "PENDING_CONFIRMATION" | "CHANGED";
 type QueueSourceFilter = "ALL" | "CUSTOMER_WEB" | "UNKNOWN";
-type OperationalOrderStatus =
-  | "PENDING_CONFIRMATION"
-  | "ACCEPTED"
-  | "PREPARING"
-  | "READY"
-  | "SERVED"
-  | "PAYMENT_PENDING"
-  | "PAID"
-  | "CLOSED"
-  | "REJECTED"
-  | "CANCELLED"
-  | "CHANGED"
-  | "REMAKE"
-  | "VOIDED";
-
-interface OperationalOrderQueueItem {
-  readonly id: string;
-  readonly orderNumber: string;
-  readonly status: OperationalOrderStatus;
-  readonly customerStatus: string | null;
-  readonly source: "CUSTOMER_WEB" | "UNKNOWN";
-  readonly orderingMode: "DINE_IN";
-  readonly tableId: string;
-  readonly tableLabel: string | null;
-  readonly submittedAt: string;
-  readonly subtotalMinor: string;
-  readonly currency: string;
-  readonly lineCount: number;
-  readonly unitCount: number;
-  readonly hasCustomerNote: boolean;
-}
-
-interface OperationalOrderModifierDetail {
-  readonly id: string;
-  readonly modifierGroupName: string;
-  readonly modifierChoiceName: string;
-  readonly priceDeltaMinor: string;
-}
-
-interface OperationalOrderItemDetail {
-  readonly id: string;
-  readonly menuItemName: string;
-  readonly quantity: number;
-  readonly lineTotalMinor: string;
-  readonly specialRequest: string | null;
-  readonly modifiers: readonly OperationalOrderModifierDetail[];
-}
-
-interface OperationalOrderDetail extends OperationalOrderQueueItem {
-  readonly customerNote: string | null;
-  readonly items: readonly OperationalOrderItemDetail[];
-}
-
-interface OperationalOrderQueuePage {
-  readonly orders: readonly OperationalOrderQueueItem[];
-  readonly nextCursor: string | null;
-  readonly incomingCount: number;
-}
-
 type ApiSuccess<T> = { readonly ok: true; readonly data: T };
 type ApiFailure = {
   readonly ok: false;
@@ -185,11 +125,8 @@ function OperationalOrdersWorkspace() {
       background?: boolean;
     } = {}) => {
       const version = ++requestVersion.current;
-      if (append || background) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      if (append || background) setRefreshing(true);
+      else setLoading(true);
       setError(null);
 
       try {
@@ -210,7 +147,9 @@ function OperationalOrdersWorkspace() {
         }
 
         setOrders((current) =>
-          append ? dedupeOrders([...current, ...body.data.orders]) : body.data.orders,
+          append
+            ? dedupeOperationalOrders([...current, ...body.data.orders])
+            : body.data.orders,
         );
         setNextCursor(body.data.nextCursor);
         setIncomingCount(body.data.incomingCount);
@@ -229,7 +168,10 @@ function OperationalOrdersWorkspace() {
   );
 
   useEffect(() => {
-    void loadQueue();
+    const timer = window.setTimeout(() => {
+      void loadQueue();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadQueue]);
 
   useEffect(() => {
@@ -328,10 +270,7 @@ function OperationalOrdersWorkspace() {
         <section className="mt-6" aria-labelledby="operational-order-queue-title">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2
-                id="operational-order-queue-title"
-                className="text-lg font-semibold tracking-[-0.02em] text-foreground"
-              >
+              <h2 id="operational-order-queue-title" className="text-lg font-semibold tracking-[-0.02em] text-foreground">
                 Incoming orders
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -339,30 +278,26 @@ function OperationalOrdersWorkspace() {
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-2">
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                Status
-                <select
-                  className="mt-1 block h-9 rounded-md border border-border bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground"
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as QueueStatusFilter)}
-                >
-                  <option value="INCOMING">Incoming</option>
-                  <option value="PENDING_CONFIRMATION">Pending confirmation</option>
-                  <option value="CHANGED">Changed</option>
-                </select>
-              </label>
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                Source
-                <select
-                  className="mt-1 block h-9 rounded-md border border-border bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground"
-                  value={sourceFilter}
-                  onChange={(event) => setSourceFilter(event.target.value as QueueSourceFilter)}
-                >
-                  <option value="ALL">All</option>
-                  <option value="CUSTOMER_WEB">Customer web</option>
-                  <option value="UNKNOWN">Other / unknown</option>
-                </select>
-              </label>
+              <QueueSelect
+                label="Status"
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value as QueueStatusFilter)}
+                options={[
+                  ["INCOMING", "Incoming"],
+                  ["PENDING_CONFIRMATION", "Pending confirmation"],
+                  ["CHANGED", "Changed"],
+                ]}
+              />
+              <QueueSelect
+                label="Source"
+                value={sourceFilter}
+                onChange={(value) => setSourceFilter(value as QueueSourceFilter)}
+                options={[
+                  ["ALL", "All"],
+                  ["CUSTOMER_WEB", "Customer web"],
+                  ["UNKNOWN", "Other / unknown"],
+                ]}
+              />
               <Button
                 variant="outline"
                 disabled={refreshing || loading}
@@ -375,10 +310,7 @@ function OperationalOrdersWorkspace() {
           </div>
 
           {error && orders.length > 0 ? (
-            <div
-              role="alert"
-              className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-            >
+            <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               <span>{error}</span>
               <Button variant="outline" onClick={() => void loadQueue({ background: true })}>
                 Try again
@@ -399,11 +331,7 @@ function OperationalOrdersWorkspace() {
               icon={<RefreshCcw className="size-5" />}
               title="Order queue unavailable"
               description={error}
-              action={
-                <Button variant="outline" onClick={() => void loadQueue()}>
-                  Try again
-                </Button>
-              }
+              action={<Button variant="outline" onClick={() => void loadQueue()}>Try again</Button>}
             />
           ) : orders.length === 0 ? (
             <EmptyState
@@ -429,12 +357,8 @@ function OperationalOrdersWorkspace() {
                   <Button
                     variant="outline"
                     disabled={refreshing}
-                    leftIcon={
-                      refreshing ? <LoaderCircle className="size-4 animate-spin" /> : undefined
-                    }
-                    onClick={() =>
-                      void loadQueue({ append: true, cursor: nextCursor, background: true })
-                    }
+                    leftIcon={refreshing ? <LoaderCircle className="size-4 animate-spin" /> : undefined}
+                    onClick={() => void loadQueue({ append: true, cursor: nextCursor, background: true })}
                   >
                     Load more
                   </Button>
@@ -454,26 +378,13 @@ function OperationalOrdersWorkspace() {
             ? `${detail.tableLabel ?? "Unknown table"} - Submitted ${formatBangkokTime(detail.submittedAt)}`
             : undefined
         }
-        footer={
-          <Button variant="outline" onClick={closeDetail}>
-            Close
-          </Button>
-        }
+        footer={<Button variant="outline" onClick={closeDetail}>Close</Button>}
         size="lg"
       >
         {detailLoading ? (
-          <EmptyState
-            compact
-            icon={<LoaderCircle className="size-5 animate-spin" />}
-            title="Loading order detail..."
-          />
+          <EmptyState compact icon={<LoaderCircle className="size-5 animate-spin" />} title="Loading order detail..." />
         ) : detailError ? (
-          <EmptyState
-            compact
-            icon={<RefreshCcw className="size-5" />}
-            title="Order detail unavailable"
-            description={detailError}
-          />
+          <EmptyState compact icon={<RefreshCcw className="size-5" />} title="Order detail unavailable" description={detailError} />
         ) : detail ? (
           <OperationalOrderDetailView detail={detail} now={now} />
         ) : null}
@@ -482,234 +393,31 @@ function OperationalOrdersWorkspace() {
   );
 }
 
-function QueueMetric({
+function QueueSelect({
   label,
   value,
-  helper,
-  icon,
+  onChange,
+  options,
 }: {
   label: string;
-  value: string | number;
-  helper: string;
-  icon: ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly (readonly [string, string])[];
 }) {
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <span
-        className="grid size-10 shrink-0 place-items-center rounded-md bg-muted text-foreground"
-        aria-hidden="true"
+    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+      {label}
+      <select
+        className="mt-1 block h-9 rounded-md border border-border bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
       >
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-[0.11em] text-muted-foreground">{label}</p>
-        <p className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] text-foreground">{value}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{helper}</p>
-      </div>
-    </Card>
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </select>
+    </label>
   );
-}
-
-function OperationalOrderCard({
-  order,
-  now,
-  onReview,
-}: {
-  order: OperationalOrderQueueItem;
-  now: number;
-  onReview: () => void;
-}) {
-  return (
-    <Card className="overflow-hidden border-t-4 border-t-amber-500">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-              {order.tableLabel ?? "Unknown table"}
-            </p>
-            <h3 className="mt-1 truncate text-xl font-semibold tracking-[-0.03em] text-foreground">
-              {order.orderNumber}
-            </h3>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <Badge tone="warning">{statusLabel(order.status)}</Badge>
-              <Badge tone="neutral">
-                {order.source === "CUSTOMER_WEB" ? "Customer web" : "Other source"}
-              </Badge>
-            </div>
-          </div>
-          <div className="rounded-md bg-muted px-3 py-2 text-right">
-            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Waiting
-            </p>
-            <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-foreground">
-              {formatElapsed(order.submittedAt, now)}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 border-y border-border py-3 text-xs">
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Items</p>
-            <p className="mt-1 font-semibold text-foreground">
-              {order.unitCount} units / {order.lineCount} lines
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-              Subtotal
-            </p>
-            <p className="mt-1 font-bold text-foreground">
-              {formatMinorMoney(order.subtotalMinor, order.currency)}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock3 className="size-3.5" aria-hidden="true" />
-          Submitted {formatBangkokTime(order.submittedAt)}
-          {order.hasCustomerNote ? " - Customer note" : ""}
-        </div>
-      </div>
-      <div className="border-t border-border bg-muted p-4">
-        <Button fullWidth onClick={onReview} rightIcon={<ChevronRight className="size-4" />}>
-          Review details
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function OperationalOrderDetailView({
-  detail,
-  now,
-}: {
-  detail: OperationalOrderDetail;
-  now: number;
-}) {
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <DetailMetric label="Table" value={detail.tableLabel ?? "Unknown"} />
-        <DetailMetric label="Status" value={statusLabel(detail.status)} />
-        <DetailMetric label="Waiting" value={formatElapsed(detail.submittedAt, now)} />
-        <DetailMetric
-          label="Subtotal"
-          value={formatMinorMoney(detail.subtotalMinor, detail.currency)}
-        />
-      </div>
-
-      <section>
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-xs font-bold uppercase tracking-[0.11em] text-muted-foreground">
-            Persisted item snapshots
-          </h3>
-          <Badge tone="neutral">Read only</Badge>
-        </div>
-        <div className="mt-2 overflow-hidden rounded-md border border-border bg-card">
-          {detail.items.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">
-              No persisted item rows are available for this order.
-            </p>
-          ) : (
-            detail.items.map((item, index) => (
-              <div
-                className={`px-4 py-3.5 ${index ? "border-t border-border" : ""}`}
-                key={item.id}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 min-w-7 rounded bg-muted px-1.5 py-1 text-center text-xs font-bold text-foreground">
-                    {item.quantity}x
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-4">
-                      <p className="font-semibold leading-5 text-foreground">{item.menuItemName}</p>
-                      <p className="shrink-0 text-sm font-semibold text-foreground">
-                        {formatMinorMoney(item.lineTotalMinor, detail.currency)}
-                      </p>
-                    </div>
-                    {item.modifiers.length > 0 ? (
-                      <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
-                        {item.modifiers.map((modifier) => (
-                          <li key={modifier.id}>
-                            {modifier.modifierGroupName}: {modifier.modifierChoiceName}
-                            {modifier.priceDeltaMinor !== "0"
-                              ? ` (${formatMinorMoney(modifier.priceDeltaMinor, detail.currency)})`
-                              : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {item.specialRequest ? (
-                      <p className="mt-2 rounded bg-amber-500/15 px-2.5 py-2 text-xs leading-5 text-amber-800 dark:text-amber-300">
-                        <strong>Request:</strong> {item.specialRequest}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-
-      {detail.customerNote ? (
-        <section className="rounded-md border border-amber-500/40 bg-amber-500/15 p-4">
-          <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-amber-800 dark:text-amber-300">
-            Customer note
-          </h3>
-          <p className="mt-1.5 text-sm leading-6 text-amber-800 dark:text-amber-300">
-            {detail.customerNote}
-          </p>
-        </section>
-      ) : null}
-
-      <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-        This queue is read-only. Accept, reject, edit, and lifecycle controls are not enabled on durable
-        server orders yet.
-      </p>
-    </div>
-  );
-}
-
-function DetailMetric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <Card muted className="p-3">
-      <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
-    </Card>
-  );
-}
-
-function dedupeOrders(
-  orders: readonly OperationalOrderQueueItem[],
-): readonly OperationalOrderQueueItem[] {
-  const seen = new Set<string>();
-  return orders.filter((order) => {
-    if (seen.has(order.id)) return false;
-    seen.add(order.id);
-    return true;
-  });
-}
-
-function formatMinorMoney(minor: string, currency: string): string {
-  const amount = Number(minor) / 100;
-  if (!Number.isFinite(amount)) return "—";
-  try {
-    return new Intl.NumberFormat("en-TH", {
-      style: "currency",
-      currency,
-      currencyDisplay: "narrowSymbol",
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`;
-  }
-}
-
-function statusLabel(status: OperationalOrderStatus): string {
-  return status
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
