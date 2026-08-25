@@ -19,6 +19,7 @@ import { Badge, Button, EmptyState, Modal, SectionHeading } from "@/components/f
 import { StaffOperations } from "@/features/staff/staff-operations";
 import { useNow } from "@/hooks/use-now";
 import { formatBangkokTime } from "@/lib/date";
+import { OperationalOrderExceptionControls } from "./operational-order-exception-controls";
 import {
   OperationalOrderCard,
   OperationalOrderDetailView,
@@ -38,6 +39,7 @@ type QueueStatusFilter =
   | "READY"
   | "SERVED"
   | "REJECTED"
+  | "CANCELLED"
   | "CHANGED";
 type QueueSourceFilter = "ALL" | "CUSTOMER_WEB" | "UNKNOWN";
 type DecisionAction = "ACCEPT" | "REJECT";
@@ -57,6 +59,7 @@ type OperationalOrderDecisionResult = {
   readonly orderId: string;
   readonly orderNumber: string;
   readonly decision: DecisionAction;
+  readonly fromStatus: "PENDING_CONFIRMATION" | "CHANGED";
   readonly status: "ACCEPTED" | "REJECTED";
   readonly customerStatus: "CONFIRMED" | "REJECTED";
   readonly decidedAt: string;
@@ -149,6 +152,8 @@ function OperationalOrdersWorkspace() {
   const [lifecyclePending, setLifecyclePending] = useState<LifecycleAction | null>(null);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [lifecycleForbidden, setLifecycleForbidden] = useState(false);
+  const [exceptionPending, setExceptionPending] = useState(false);
+  const [exceptionError, setExceptionError] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState<RejectionReasonCode | "">("");
 
@@ -243,6 +248,7 @@ function OperationalOrdersWorkspace() {
     options: {
       readonly preserveDecisionError?: boolean;
       readonly preserveLifecycleError?: boolean;
+      readonly preserveExceptionError?: boolean;
     } = {},
   ) {
     const version = ++detailRequestVersion.current;
@@ -251,6 +257,7 @@ function OperationalOrdersWorkspace() {
     setDetailError(null);
     if (!options.preserveDecisionError) setDecisionError(null);
     if (!options.preserveLifecycleError) setLifecycleError(null);
+    if (!options.preserveExceptionError) setExceptionError(null);
     setDecisionForbidden(false);
     setLifecycleForbidden(false);
     setRejectOpen(false);
@@ -280,7 +287,7 @@ function OperationalOrdersWorkspace() {
   }
 
   function closeDetail(force = false) {
-    if ((decisionPending || lifecyclePending) && !force) return;
+    if ((decisionPending || lifecyclePending || exceptionPending) && !force) return;
     detailRequestVersion.current += 1;
     setSelectedOrderId(null);
     setDetail(null);
@@ -288,14 +295,15 @@ function OperationalOrdersWorkspace() {
     setDetailLoading(false);
     setDecisionError(null);
     setLifecycleError(null);
+    setExceptionError(null);
     setRejectOpen(false);
     setRejectReason("");
   }
 
   async function submitDecision(action: DecisionAction) {
-    if (!detail || decisionPending || lifecyclePending) return;
-    if (detail.status !== "PENDING_CONFIRMATION") {
-      setDecisionError("This order is no longer eligible for an initial decision.");
+    if (!detail || decisionPending || lifecyclePending || exceptionPending) return;
+    if (detail.status !== "PENDING_CONFIRMATION" && detail.status !== "CHANGED") {
+      setDecisionError("This order is no longer eligible for staff review.");
       return;
     }
     if (action === "REJECT" && !rejectReason) {
@@ -308,6 +316,7 @@ function OperationalOrdersWorkspace() {
     setDecisionPending(action);
     setDecisionError(null);
     setLifecycleError(null);
+    setExceptionError(null);
     setNotice(null);
 
     try {
@@ -377,7 +386,7 @@ function OperationalOrdersWorkspace() {
   }
 
   async function submitLifecycle(action: LifecycleAction) {
-    if (!detail || decisionPending || lifecyclePending) return;
+    if (!detail || decisionPending || lifecyclePending || exceptionPending) return;
     const expected = LIFECYCLE_ACTIONS[detail.status as keyof typeof LIFECYCLE_ACTIONS];
     if (!expected || expected[0] !== action) {
       setLifecycleError("This order is no longer eligible for that lifecycle action.");
@@ -389,6 +398,7 @@ function OperationalOrdersWorkspace() {
     setLifecyclePending(action);
     setLifecycleError(null);
     setDecisionError(null);
+    setExceptionError(null);
     setNotice(null);
 
     try {
@@ -463,11 +473,12 @@ function OperationalOrdersWorkspace() {
     { label: "Menu", href: "/staff#menu", icon: Utensils },
   ];
 
-  const decisionEligible = detail?.status === "PENDING_CONFIRMATION";
+  const decisionEligible =
+    detail?.status === "PENDING_CONFIRMATION" || detail?.status === "CHANGED";
   const lifecycleAction = detail
     ? LIFECYCLE_ACTIONS[detail.status as keyof typeof LIFECYCLE_ACTIONS]
     : undefined;
-  const mutationPending = Boolean(decisionPending || lifecyclePending);
+  const mutationPending = Boolean(decisionPending || lifecyclePending || exceptionPending);
 
   return (
     <OperationalShell
@@ -486,7 +497,7 @@ function OperationalOrdersWorkspace() {
         <SectionHeading
           eyebrow="Operational orders"
           title="Server-backed order workflow"
-          description="Submitted orders remain durable branch-scoped records. Staff decisions and normal lifecycle progression are authorized and persisted by the server."
+          description="Submitted orders remain durable branch-scoped records. Staff decisions, normal progression, controlled amendments and cancellation are authorized and persisted by the server."
         />
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -533,7 +544,8 @@ function OperationalOrdersWorkspace() {
                   ["READY", "Ready"],
                   ["SERVED", "Served"],
                   ["REJECTED", "Rejected"],
-                  ["CHANGED", "Changed"],
+                  ["CANCELLED", "Cancelled"],
+                  ["CHANGED", "Changed - review required"],
                 ]}
               />
               <QueueSelect
@@ -651,16 +663,23 @@ function OperationalOrdersWorkspace() {
                 {lifecycleError}
               </div>
             ) : null}
+            {exceptionError ? (
+              <div role="alert" className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {exceptionError}
+              </div>
+            ) : null}
 
             {decisionEligible && !decisionForbidden ? (
               <section className="border border-border bg-card p-4" aria-labelledby="order-decision-heading">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 id="order-decision-heading" className="text-sm font-semibold text-foreground">
-                      Initial staff decision
+                      {detail.status === "CHANGED" ? "Changed order re-review" : "Initial staff decision"}
                     </h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Accept confirms the order. Reject requires one bounded operational reason. Normal lifecycle progression starts only after acceptance.
+                      {detail.status === "CHANGED"
+                        ? "This amendment is not accepted automatically. Review the durable changed snapshots, then explicitly accept or reject the order again."
+                        : "Accept confirms the order. Reject requires one bounded operational reason. Normal lifecycle progression starts only after acceptance."}
                     </p>
                   </div>
                   <Badge tone="neutral">order.manage</Badge>
@@ -696,7 +715,7 @@ function OperationalOrdersWorkspace() {
                           setDecisionError(null);
                         }}
                       >
-                        Cancel
+                        Keep reviewing
                       </Button>
                       <Button
                         disabled={!rejectReason || mutationPending}
@@ -732,7 +751,7 @@ function OperationalOrdersWorkspace() {
                       }
                       onClick={() => void submitDecision("ACCEPT")}
                     >
-                      Accept order
+                      {detail.status === "CHANGED" ? "Accept changed order" : "Accept order"}
                     </Button>
                   </div>
                 )}
@@ -764,23 +783,41 @@ function OperationalOrdersWorkspace() {
                   </Button>
                 </div>
               </section>
-            ) : detail.status === "CHANGED" ? (
-              <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-                Changed orders remain review-only. Edit/cancel exception semantics belong to the next round.
-              </p>
             ) : detail.status === "SERVED" ? (
               <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-                Served is terminal for the R03 normal lifecycle. Payment remains a separate lifecycle.
+                Served is terminal for the normal operational lifecycle. Payment remains a separate lifecycle.
               </p>
             ) : detail.status === "REJECTED" ? (
               <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-                Rejected orders cannot enter the normal lifecycle.
+                Rejected orders cannot enter the normal lifecycle or R04 amendment/cancellation workflow.
+              </p>
+            ) : detail.status === "CANCELLED" ? (
+              <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
+                Cancelled is terminal for the R04 operational exception workflow.
               </p>
             ) : !decisionEligible ? (
               <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-                No normal R03 lifecycle action is available for this order state.
+                No normal lifecycle action is available for this order state.
               </p>
             ) : null}
+
+            <OperationalOrderExceptionControls
+              detail={detail}
+              disabled={mutationPending}
+              onBusyChange={setExceptionPending}
+              onAuthFailure={handleAuthFailure}
+              onNotice={(message) => {
+                setNotice(message);
+                setExceptionError(null);
+              }}
+              onError={setExceptionError}
+              onReconcile={async (preserveError) => {
+                await Promise.all([
+                  loadQueue({ background: true }),
+                  openDetail(detail.id, { preserveExceptionError: preserveError }),
+                ]);
+              }}
+            />
           </div>
         ) : null}
       </Modal>
