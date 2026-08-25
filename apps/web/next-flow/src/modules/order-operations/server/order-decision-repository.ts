@@ -10,8 +10,6 @@ import type {
   TrustedOperationalOrderContext,
 } from "./types";
 
-const DECISION_SOURCE_STATUSES = new Set<string>(["PENDING_CONFIRMATION", "CHANGED"]);
-
 export interface OperationalOrderDecisionMutationRow {
   readonly id: string;
   readonly orderNumber: string;
@@ -32,8 +30,11 @@ export class OperationalOrderDecisionRepository {
     private readonly context: TrustedOperationalOrderContext,
   ) {}
 
-  async accept(orderId: string): Promise<OperationalOrderDecisionMutationRow | null> {
-    const sourceStatus = await this.readDecisionSource(orderId);
+  async accept(
+    orderId: string,
+    allowedSources: readonly OperationalOrderDecisionSourceStatus[],
+  ): Promise<OperationalOrderDecisionMutationRow | null> {
+    const sourceStatus = await this.readDecisionSource(orderId, allowedSources);
     if (!sourceStatus) return null;
 
     const row = await this.trx
@@ -79,8 +80,9 @@ export class OperationalOrderDecisionRepository {
   async reject(
     orderId: string,
     reasonCode: OperationalOrderRejectionReasonCode,
+    allowedSources: readonly OperationalOrderDecisionSourceStatus[],
   ): Promise<OperationalOrderDecisionMutationRow | null> {
-    const sourceStatus = await this.readDecisionSource(orderId);
+    const sourceStatus = await this.readDecisionSource(orderId, allowedSources);
     if (!sourceStatus) return null;
 
     const row = await this.trx
@@ -137,9 +139,12 @@ export class OperationalOrderDecisionRepository {
 
   private async readDecisionSource(
     orderId: string,
+    allowedSources: readonly OperationalOrderDecisionSourceStatus[],
   ): Promise<OperationalOrderDecisionSourceStatus | null> {
     const current = await this.findScopedState(orderId);
-    if (!current || !DECISION_SOURCE_STATUSES.has(current.status)) return null;
+    if (!current || !allowedSources.includes(current.status as OperationalOrderDecisionSourceStatus)) {
+      return null;
+    }
     return current.status as OperationalOrderDecisionSourceStatus;
   }
 
