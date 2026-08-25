@@ -27,6 +27,8 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REJECTION_REASON_SET = new Set<string>(OPERATIONAL_ORDER_REJECTION_REASONS);
 const DECISION_SOURCE_SET = new Set<string>(OPERATIONAL_ORDER_DECISION_SOURCE_STATUSES);
+const INITIAL_DECISION_SOURCES = ["PENDING_CONFIRMATION"] as const satisfies readonly OperationalOrderDecisionSourceStatus[];
+const REVIEW_DECISION_SOURCES = OPERATIONAL_ORDER_DECISION_SOURCE_STATUSES;
 
 function invalidRequest(cause?: unknown): never {
   throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", cause);
@@ -148,6 +150,7 @@ export function mapOperationalOrderDecisionResult(
 async function executeOperationalOrderDecision(
   context: AccessContext,
   command: OperationalOrderDecisionCommand,
+  allowedSources: readonly OperationalOrderDecisionSourceStatus[],
 ): Promise<OperationalOrderDecisionResult> {
   try {
     return await withAuthorizedAccessTransaction(
@@ -161,8 +164,8 @@ async function executeOperationalOrderDecision(
         );
         const row =
           command.decision === "ACCEPT"
-            ? await repository.accept(command.orderId)
-            : await repository.reject(command.orderId, command.reasonCode);
+            ? await repository.accept(command.orderId, allowedSources)
+            : await repository.reject(command.orderId, command.reasonCode, allowedSources);
 
         if (!row) {
           const current = await repository.findScopedState(command.orderId);
@@ -198,6 +201,7 @@ export async function acceptOperationalOrder(
       decision: "ACCEPT",
       reasonCode: null,
     }),
+    INITIAL_DECISION_SOURCES,
   );
 }
 
@@ -213,6 +217,7 @@ export async function rejectOperationalOrder(
       decision: "REJECT",
       reasonCode: normalizeOperationalOrderRejectionReason(reasonCode),
     }),
+    INITIAL_DECISION_SOURCES,
   );
 }
 
@@ -220,8 +225,17 @@ export async function decideOperationalOrder(
   context: AccessContext,
   command: OperationalOrderDecisionCommand,
 ): Promise<OperationalOrderDecisionResult> {
-  if (command.decision === "ACCEPT") {
-    return acceptOperationalOrder(context, command.orderId);
-  }
-  return rejectOperationalOrder(context, command.orderId, command.reasonCode);
+  const normalizedCommand: OperationalOrderDecisionCommand =
+    command.decision === "ACCEPT"
+      ? Object.freeze({
+          orderId: assertOrderId(command.orderId),
+          decision: "ACCEPT",
+          reasonCode: null,
+        })
+      : Object.freeze({
+          orderId: assertOrderId(command.orderId),
+          decision: "REJECT",
+          reasonCode: normalizeOperationalOrderRejectionReason(command.reasonCode),
+        });
+  return executeOperationalOrderDecision(context, normalizedCommand, REVIEW_DECISION_SOURCES);
 }
