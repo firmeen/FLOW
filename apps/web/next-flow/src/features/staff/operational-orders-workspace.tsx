@@ -30,9 +30,18 @@ import {
 } from "./operational-orders-ui";
 
 type StaffTab = "orders" | "tables" | "service" | "ready" | "menu";
-type QueueStatusFilter = "INCOMING" | "PENDING_CONFIRMATION" | "CHANGED";
+type QueueStatusFilter =
+  | "INCOMING"
+  | "PENDING_CONFIRMATION"
+  | "ACCEPTED"
+  | "PREPARING"
+  | "READY"
+  | "SERVED"
+  | "REJECTED"
+  | "CHANGED";
 type QueueSourceFilter = "ALL" | "CUSTOMER_WEB" | "UNKNOWN";
 type DecisionAction = "ACCEPT" | "REJECT";
+type LifecycleAction = "START_PREPARING" | "MARK_READY" | "MARK_SERVED";
 type RejectionReasonCode =
   | "ITEM_UNAVAILABLE"
   | "STORE_CLOSING"
@@ -53,6 +62,15 @@ type OperationalOrderDecisionResult = {
   readonly decidedAt: string;
   readonly reasonCode: RejectionReasonCode | null;
 };
+type OperationalOrderLifecycleResult = {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly action: LifecycleAction;
+  readonly fromStatus: "ACCEPTED" | "PREPARING" | "READY";
+  readonly status: "PREPARING" | "READY" | "SERVED";
+  readonly customerStatus: "PREPARING" | "COMING_TO_TABLE" | "SERVED";
+  readonly transitionedAt: string;
+};
 
 const STAFF_TABS: readonly StaffTab[] = ["orders", "tables", "service", "ready", "menu"];
 const REJECTION_REASON_OPTIONS: readonly (readonly [RejectionReasonCode, string])[] = [
@@ -62,6 +80,13 @@ const REJECTION_REASON_OPTIONS: readonly (readonly [RejectionReasonCode, string]
   ["INVALID_ORDER", "Invalid order"],
   ["OTHER", "Other"],
 ];
+const LIFECYCLE_ACTIONS = {
+  ACCEPTED: ["START_PREPARING", "Start preparing"],
+  PREPARING: ["MARK_READY", "Mark ready"],
+  READY: ["MARK_SERVED", "Mark served"],
+} as const satisfies Partial<
+  Record<OperationalOrderDetail["status"], readonly [LifecycleAction, string]>
+>;
 
 function currentStaffTab(): StaffTab {
   if (typeof window === "undefined") return "orders";
@@ -121,6 +146,9 @@ function OperationalOrdersWorkspace() {
   const [decisionPending, setDecisionPending] = useState<DecisionAction | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionForbidden, setDecisionForbidden] = useState(false);
+  const [lifecyclePending, setLifecyclePending] = useState<LifecycleAction | null>(null);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [lifecycleForbidden, setLifecycleForbidden] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState<RejectionReasonCode | "">("");
 
@@ -212,13 +240,19 @@ function OperationalOrdersWorkspace() {
 
   async function openDetail(
     orderId: string,
-    options: { readonly preserveDecisionError?: boolean } = {},
+    options: {
+      readonly preserveDecisionError?: boolean;
+      readonly preserveLifecycleError?: boolean;
+    } = {},
   ) {
     const version = ++detailRequestVersion.current;
     setSelectedOrderId(orderId);
     setDetail(null);
     setDetailError(null);
     if (!options.preserveDecisionError) setDecisionError(null);
+    if (!options.preserveLifecycleError) setLifecycleError(null);
+    setDecisionForbidden(false);
+    setLifecycleForbidden(false);
     setRejectOpen(false);
     setRejectReason("");
     setDetailLoading(true);
@@ -246,19 +280,20 @@ function OperationalOrdersWorkspace() {
   }
 
   function closeDetail(force = false) {
-    if (decisionPending && !force) return;
+    if ((decisionPending || lifecyclePending) && !force) return;
     detailRequestVersion.current += 1;
     setSelectedOrderId(null);
     setDetail(null);
     setDetailError(null);
     setDetailLoading(false);
     setDecisionError(null);
+    setLifecycleError(null);
     setRejectOpen(false);
     setRejectReason("");
   }
 
   async function submitDecision(action: DecisionAction) {
-    if (!detail || decisionPending) return;
+    if (!detail || decisionPending || lifecyclePending) return;
     if (detail.status !== "PENDING_CONFIRMATION") {
       setDecisionError("This order is no longer eligible for an initial decision.");
       return;
@@ -272,6 +307,7 @@ function OperationalOrdersWorkspace() {
     const orderNumber = detail.orderNumber;
     setDecisionPending(action);
     setDecisionError(null);
+    setLifecycleError(null);
     setNotice(null);
 
     try {
@@ -340,6 +376,79 @@ function OperationalOrdersWorkspace() {
     }
   }
 
+  async function submitLifecycle(action: LifecycleAction) {
+    if (!detail || decisionPending || lifecyclePending) return;
+    const expected = LIFECYCLE_ACTIONS[detail.status as keyof typeof LIFECYCLE_ACTIONS];
+    if (!expected || expected[0] !== action) {
+      setLifecycleError("This order is no longer eligible for that lifecycle action.");
+      return;
+    }
+
+    const orderId = detail.id;
+    const orderNumber = detail.orderNumber;
+    setLifecyclePending(action);
+    setLifecycleError(null);
+    setDecisionError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch(
+        `/api/internal/orders/${encodeURIComponent(orderId)}/lifecycle`,
+        {
+          method: "POST",
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const body = (await response.json()) as
+        | ApiSuccess<OperationalOrderLifecycleResult>
+        | ApiFailure;
+
+      if (!response.ok || !body.ok) {
+        const message = body.ok ? "Order lifecycle is temporarily unavailable." : body.error.message;
+        if (response.status === 401) {
+          handleAuthFailure(response.status);
+          return;
+        }
+        if (response.status === 403) {
+          setLifecycleForbidden(true);
+          setLifecycleError("You can view this order, but order.manage permission is required to progress it.");
+          return;
+        }
+        if (response.status === 409) {
+          await Promise.all([
+            loadQueue({ background: true }),
+            openDetail(orderId, { preserveLifecycleError: true }),
+          ]);
+          setLifecycleError("Another lifecycle transition already won. The durable order state has been refreshed.");
+          return;
+        }
+        if (response.status === 404) {
+          setLifecycleError("This order is no longer available in the active branch.");
+          await loadQueue({ background: true });
+          return;
+        }
+        setLifecycleError(message);
+        return;
+      }
+
+      setNotice(`Order ${orderNumber}: ${lifecycleSuccessLabel(body.data.action)}.`);
+      await Promise.all([
+        loadQueue({ background: true }),
+        openDetail(orderId, { preserveLifecycleError: true }),
+      ]);
+    } catch {
+      setLifecycleError("Order lifecycle is temporarily unavailable. Refresh the order before retrying.");
+    } finally {
+      setLifecyclePending(null);
+    }
+  }
+
   const navItems = [
     {
       label: "Orders",
@@ -355,6 +464,10 @@ function OperationalOrdersWorkspace() {
   ];
 
   const decisionEligible = detail?.status === "PENDING_CONFIRMATION";
+  const lifecycleAction = detail
+    ? LIFECYCLE_ACTIONS[detail.status as keyof typeof LIFECYCLE_ACTIONS]
+    : undefined;
+  const mutationPending = Boolean(decisionPending || lifecyclePending);
 
   return (
     <OperationalShell
@@ -372,8 +485,8 @@ function OperationalOrdersWorkspace() {
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           eyebrow="Operational orders"
-          title="Server-backed order queue"
-          description="Submitted orders are durable branch-scoped records. Eligible pending orders can be accepted or rejected through the authorized decision boundary."
+          title="Server-backed order workflow"
+          description="Submitted orders remain durable branch-scoped records. Staff decisions and normal lifecycle progression are authorized and persisted by the server."
         />
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -386,7 +499,7 @@ function OperationalOrdersWorkspace() {
           <QueueMetric
             label="Authority"
             value="Branch"
-            helper="order.view reads / order.manage decisions"
+            helper="order.view reads / order.manage mutations"
             icon={<ShieldCheck className="size-5" />}
           />
         </div>
@@ -401,10 +514,10 @@ function OperationalOrdersWorkspace() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 id="operational-order-queue-title" className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-                Incoming orders
+                Operational orders
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Oldest submissions first. Decisions are persisted before the queue refreshes.
+                Oldest submissions first. Every mutation reconciles against the durable server state.
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-2">
@@ -415,6 +528,11 @@ function OperationalOrdersWorkspace() {
                 options={[
                   ["INCOMING", "Incoming"],
                   ["PENDING_CONFIRMATION", "Pending confirmation"],
+                  ["ACCEPTED", "Accepted"],
+                  ["PREPARING", "Preparing"],
+                  ["READY", "Ready"],
+                  ["SERVED", "Served"],
+                  ["REJECTED", "Rejected"],
                   ["CHANGED", "Changed"],
                 ]}
               />
@@ -509,7 +627,7 @@ function OperationalOrdersWorkspace() {
             : undefined
         }
         footer={
-          <Button variant="outline" disabled={Boolean(decisionPending)} onClick={() => closeDetail()}>
+          <Button variant="outline" disabled={mutationPending} onClick={() => closeDetail()}>
             Close
           </Button>
         }
@@ -528,6 +646,11 @@ function OperationalOrdersWorkspace() {
                 {decisionError}
               </div>
             ) : null}
+            {lifecycleError ? (
+              <div role="alert" className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {lifecycleError}
+              </div>
+            ) : null}
 
             {decisionEligible && !decisionForbidden ? (
               <section className="border border-border bg-card p-4" aria-labelledby="order-decision-heading">
@@ -537,7 +660,7 @@ function OperationalOrdersWorkspace() {
                       Initial staff decision
                     </h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Accept confirms the order. Reject requires one bounded operational reason. Later lifecycle actions are not part of this round.
+                      Accept confirms the order. Reject requires one bounded operational reason. Normal lifecycle progression starts only after acceptance.
                     </p>
                   </div>
                   <Badge tone="neutral">order.manage</Badge>
@@ -550,7 +673,7 @@ function OperationalOrdersWorkspace() {
                       <select
                         className="mt-1.5 block h-10 w-full rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground"
                         value={rejectReason}
-                        disabled={Boolean(decisionPending)}
+                        disabled={mutationPending}
                         onChange={(event) =>
                           setRejectReason(event.target.value as RejectionReasonCode | "")
                         }
@@ -566,7 +689,7 @@ function OperationalOrdersWorkspace() {
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button
                         variant="outline"
-                        disabled={Boolean(decisionPending)}
+                        disabled={mutationPending}
                         onClick={() => {
                           setRejectOpen(false);
                           setRejectReason("");
@@ -576,7 +699,7 @@ function OperationalOrdersWorkspace() {
                         Cancel
                       </Button>
                       <Button
-                        disabled={!rejectReason || Boolean(decisionPending)}
+                        disabled={!rejectReason || mutationPending}
                         leftIcon={
                           decisionPending === "REJECT" ? (
                             <LoaderCircle className="size-4 animate-spin" />
@@ -592,7 +715,7 @@ function OperationalOrdersWorkspace() {
                   <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                     <Button
                       variant="outline"
-                      disabled={Boolean(decisionPending)}
+                      disabled={mutationPending}
                       onClick={() => {
                         setRejectOpen(true);
                         setDecisionError(null);
@@ -601,7 +724,7 @@ function OperationalOrdersWorkspace() {
                       Reject
                     </Button>
                     <Button
-                      disabled={Boolean(decisionPending)}
+                      disabled={mutationPending}
                       leftIcon={
                         decisionPending === "ACCEPT" ? (
                           <LoaderCircle className="size-4 animate-spin" />
@@ -614,13 +737,48 @@ function OperationalOrdersWorkspace() {
                   </div>
                 )}
               </section>
+            ) : lifecycleAction && !lifecycleForbidden ? (
+              <section className="border border-border bg-card p-4" aria-labelledby="order-lifecycle-heading">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 id="order-lifecycle-heading" className="text-sm font-semibold text-foreground">
+                      Normal order lifecycle
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Only the next legal transition is available. The server derives target state, customer status, actor and timestamp.
+                    </p>
+                  </div>
+                  <Badge tone="neutral">order.manage</Badge>
+                </div>
+                <div className="mt-4 flex justify-end border-t border-border pt-4">
+                  <Button
+                    disabled={mutationPending}
+                    leftIcon={
+                      lifecyclePending === lifecycleAction[0] ? (
+                        <LoaderCircle className="size-4 animate-spin" />
+                      ) : undefined
+                    }
+                    onClick={() => void submitLifecycle(lifecycleAction[0])}
+                  >
+                    {lifecycleAction[1]}
+                  </Button>
+                </div>
+              </section>
             ) : detail.status === "CHANGED" ? (
               <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-                Changed orders remain review-only in R02. No authoritative re-decision semantics are defined for CHANGED yet.
+                Changed orders remain review-only. Edit/cancel exception semantics belong to the next round.
+              </p>
+            ) : detail.status === "SERVED" ? (
+              <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
+                Served is terminal for the R03 normal lifecycle. Payment remains a separate lifecycle.
+              </p>
+            ) : detail.status === "REJECTED" ? (
+              <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
+                Rejected orders cannot enter the normal lifecycle.
               </p>
             ) : !decisionEligible ? (
               <p className="border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-                This order already left the initial decision state. Refresh the queue for its durable status.
+                No normal R03 lifecycle action is available for this order state.
               </p>
             ) : null}
           </div>
@@ -628,6 +786,17 @@ function OperationalOrdersWorkspace() {
       </Modal>
     </OperationalShell>
   );
+}
+
+function lifecycleSuccessLabel(action: LifecycleAction): string {
+  switch (action) {
+    case "START_PREPARING":
+      return "preparation started";
+    case "MARK_READY":
+      return "marked ready";
+    case "MARK_SERVED":
+      return "marked served";
+  }
 }
 
 function QueueSelect({
