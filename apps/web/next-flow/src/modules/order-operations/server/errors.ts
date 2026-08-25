@@ -46,3 +46,27 @@ export function isOperationalOrderDecisionError(
 ): value is OperationalOrderDecisionError {
   return value instanceof OperationalOrderDecisionError;
 }
+
+export type OperationalOrderLifecycleErrorCode =
+  | "ORDER_LIFECYCLE_INVALID_REQUEST"
+  | "ORDER_LIFECYCLE_FORBIDDEN"
+  | "ORDER_LIFECYCLE_NOT_FOUND"
+  | "ORDER_LIFECYCLE_CONFLICT"
+  | "ORDER_LIFECYCLE_INVARIANT_VIOLATION"
+  | "ORDER_LIFECYCLE_UNAVAILABLE";
+
+export class OperationalOrderLifecycleError extends Error {
+  readonly code: OperationalOrderLifecycleErrorCode;
+
+  constructor(code: OperationalOrderLifecycleErrorCode, cause?: unknown) {
+    super(code, { cause });
+    this.name = "OperationalOrderLifecycleError";
+    this.code = code;
+  }
+}
+
+export function isOperationalOrderLifecycleError(
+  value: unknown,
+): value is OperationalOrderLifecycleError {
+  return value instanceof OperationalOrderLifecycleError;
+}
