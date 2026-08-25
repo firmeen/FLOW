@@ -11,8 +11,10 @@ import { PERMISSIONS } from "@/modules/identity/server/permissions";
 
 import {
   OperationalOrderDecisionError,
+  OperationalOrderLifecycleError,
   OperationalOrderReadError,
   isOperationalOrderDecisionError,
+  isOperationalOrderLifecycleError,
   isOperationalOrderReadError,
 } from "./errors";
 
@@ -22,6 +24,7 @@ const NO_STORE_HEADERS = {
 } as const;
 
 export const MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES = 8 * 1024;
+export const MAX_OPERATIONAL_ORDER_LIFECYCLE_BODY_BYTES = 4 * 1024;
 
 export interface OperationalOrderApiErrorBody {
   readonly ok: false;
@@ -31,11 +34,7 @@ export interface OperationalOrderApiErrorBody {
   };
 }
 
-function apiError(
-  status: number,
-  code: string,
-  message: string,
-): Response {
+function apiError(status: number, code: string, message: string): Response {
   return Response.json(
     { ok: false, error: { code, message } } satisfies OperationalOrderApiErrorBody,
     { status, headers: NO_STORE_HEADERS },
@@ -43,13 +42,10 @@ function apiError(
 }
 
 export function operationalOrderApiSuccess<T>(data: T): Response {
-  return Response.json(
-    { ok: true, data },
-    { status: 200, headers: NO_STORE_HEADERS },
-  );
+  return Response.json({ ok: true, data }, { status: 200, headers: NO_STORE_HEADERS });
 }
 
-export function assertOperationalOrderDecisionSameOrigin(request: Request): void {
+function assertSameOrigin(request: Request, invalidRequest: (cause?: unknown) => never): void {
   const origin = request.headers.get("origin");
   if (!origin) return;
 
@@ -57,65 +53,88 @@ export function assertOperationalOrderDecisionSameOrigin(request: Request): void
   try {
     requestOrigin = new URL(request.url).origin;
   } catch (error) {
-    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", error);
+    invalidRequest(error);
   }
 
-  if (origin !== requestOrigin) {
-    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
-  }
+  if (origin !== requestOrigin) invalidRequest();
 }
 
-export async function readOperationalOrderDecisionJson(
+async function readBoundedJsonObject(
   request: Request,
+  maxBytes: number,
+  invalidRequest: (cause?: unknown) => never,
 ): Promise<Record<string, unknown>> {
   const contentType = request.headers.get("content-type");
   if (contentType && !contentType.toLowerCase().startsWith("application/json")) {
-    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
+    invalidRequest();
   }
 
   const contentLength = request.headers.get("content-length");
   if (contentLength) {
     const bytes = Number(contentLength);
-    if (
-      !Number.isFinite(bytes) ||
-      bytes < 0 ||
-      bytes > MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES
-    ) {
-      throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
-    }
+    if (!Number.isFinite(bytes) || bytes < 0 || bytes > maxBytes) invalidRequest();
   }
 
   let text: string;
   try {
     text = await request.text();
   } catch (error) {
-    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", error);
+    invalidRequest(error);
   }
 
-  if (new TextEncoder().encode(text).byteLength > MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES) {
-    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
-  }
+  if (new TextEncoder().encode(text).byteLength > maxBytes) invalidRequest();
 
   let value: unknown;
   try {
     value = JSON.parse(text) as unknown;
   } catch (error) {
-    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", error);
+    invalidRequest(error);
   }
 
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST");
-  }
-
+  if (!value || typeof value !== "object" || Array.isArray(value)) invalidRequest();
   return value as Record<string, unknown>;
+}
+
+export function assertOperationalOrderDecisionSameOrigin(request: Request): void {
+  assertSameOrigin(request, (cause?: unknown): never => {
+    throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", cause);
+  });
+}
+
+export async function readOperationalOrderDecisionJson(
+  request: Request,
+): Promise<Record<string, unknown>> {
+  return readBoundedJsonObject(
+    request,
+    MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES,
+    (cause?: unknown): never => {
+      throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", cause);
+    },
+  );
+}
+
+export function assertOperationalOrderLifecycleSameOrigin(request: Request): void {
+  assertSameOrigin(request, (cause?: unknown): never => {
+    throw new OperationalOrderLifecycleError("ORDER_LIFECYCLE_INVALID_REQUEST", cause);
+  });
+}
+
+export async function readOperationalOrderLifecycleJson(
+  request: Request,
+): Promise<Record<string, unknown>> {
+  return readBoundedJsonObject(
+    request,
+    MAX_OPERATIONAL_ORDER_LIFECYCLE_BODY_BYTES,
+    (cause?: unknown): never => {
+      throw new OperationalOrderLifecycleError("ORDER_LIFECYCLE_INVALID_REQUEST", cause);
+    },
+  );
 }
 
 export async function authorizeOperationalOrderRouteContext(
   context: AccessContext,
 ): Promise<AccessContext> {
-  if (!context.branchId) {
-    throw new OperationalOrderReadError("ORDER_QUEUE_FORBIDDEN");
-  }
+  if (!context.branchId) throw new OperationalOrderReadError("ORDER_QUEUE_FORBIDDEN");
 
   const decision = await authorizePermission(
     context,
@@ -146,6 +165,22 @@ export async function requireOperationalOrderRouteContext(): Promise<AccessConte
 }
 
 export function operationalOrderApiFailure(error: unknown): Response {
+  if (isOperationalOrderLifecycleError(error)) {
+    switch (error.code) {
+      case "ORDER_LIFECYCLE_INVALID_REQUEST":
+        return apiError(400, error.code, "The order lifecycle request is invalid.");
+      case "ORDER_LIFECYCLE_FORBIDDEN":
+        return apiError(403, error.code, "Order lifecycle access is not permitted.");
+      case "ORDER_LIFECYCLE_NOT_FOUND":
+        return apiError(404, error.code, "The order was not found.");
+      case "ORDER_LIFECYCLE_CONFLICT":
+        return apiError(409, error.code, "The order is no longer eligible for that lifecycle action.");
+      case "ORDER_LIFECYCLE_INVARIANT_VIOLATION":
+      case "ORDER_LIFECYCLE_UNAVAILABLE":
+        return apiError(503, "ORDER_LIFECYCLE_UNAVAILABLE", "Order lifecycle is temporarily unavailable.");
+    }
+  }
+
   if (isOperationalOrderDecisionError(error)) {
     switch (error.code) {
       case "ORDER_DECISION_INVALID_REQUEST":
@@ -161,6 +196,7 @@ export function operationalOrderApiFailure(error: unknown): Response {
         return apiError(503, "ORDER_DECISION_UNAVAILABLE", "Order decision is temporarily unavailable.");
     }
   }
+
   if (error instanceof AuthorizationDeniedError) {
     return apiError(403, "ORDER_QUEUE_FORBIDDEN", "Order access is not permitted.");
   }
