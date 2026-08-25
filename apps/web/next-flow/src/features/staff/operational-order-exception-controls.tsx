@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LoaderCircle, PencilLine, XCircle } from "lucide-react";
 
 import { Badge, Button } from "@/components/foodflow-ui";
@@ -96,15 +96,6 @@ export function OperationalOrderExceptionControls({
   const [reasonCode, setReasonCode] = useState<CancellationReasonCode | "">("");
   const [busy, setBusy] = useState<"AMEND" | "CANCEL" | null>(null);
 
-  useEffect(() => {
-    setAmendOpen(false);
-    setCancelOpen(false);
-    setCustomerNote(detail.customerNote ?? "");
-    setItems(initialItems(detail));
-    setReasonCode("");
-    setBusy(null);
-  }, [detail]);
-
   const amendmentPayload = useMemo(() => {
     if (!amendmentEligible) return null;
     const payload: {
@@ -144,6 +135,11 @@ export function OperationalOrderExceptionControls({
   }, [amendmentEligible, customerNote, detail, items]);
 
   const allItemsRemoved = items.length > 0 && items.every((item) => item.removed);
+  const invalidQuantity = items.some(
+    (item) =>
+      !item.removed &&
+      (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99),
+  );
 
   function patchItem(itemId: string, patch: Partial<Omit<ItemDraft, "id">>) {
     setItems((current) =>
@@ -278,7 +274,7 @@ export function OperationalOrderExceptionControls({
                         disabled={draft.removed || disabled || Boolean(busy)}
                         onChange={(event) => {
                           const value = Number(event.target.value);
-                          if (Number.isInteger(value)) patchItem(item.id, { quantity: value });
+                          patchItem(item.id, { quantity: value });
                         }}
                       />
                     </label>
@@ -303,6 +299,10 @@ export function OperationalOrderExceptionControls({
             <p role="alert" className="text-xs text-destructive">
               An amendment cannot remove every persisted item.
             </p>
+          ) : invalidQuantity ? (
+            <p role="alert" className="text-xs text-destructive">
+              Every retained item quantity must be a whole number from 1 through 99.
+            </p>
           ) : null}
 
           <div className="flex flex-wrap justify-end gap-2">
@@ -319,7 +319,13 @@ export function OperationalOrderExceptionControls({
               Discard amendment
             </Button>
             <Button
-              disabled={!amendmentPayload || allItemsRemoved || disabled || Boolean(busy)}
+              disabled={
+                !amendmentPayload ||
+                allItemsRemoved ||
+                invalidQuantity ||
+                disabled ||
+                Boolean(busy)
+              }
               leftIcon={busy === "AMEND" ? <LoaderCircle className="size-4 animate-spin" /> : undefined}
               onClick={() => amendmentPayload && void submitException(amendmentPayload, "AMEND")}
             >
