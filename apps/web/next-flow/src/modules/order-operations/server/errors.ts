@@ -70,3 +70,27 @@ export function isOperationalOrderLifecycleError(
 ): value is OperationalOrderLifecycleError {
   return value instanceof OperationalOrderLifecycleError;
 }
+
+export type OperationalOrderExceptionErrorCode =
+  | "ORDER_EXCEPTION_INVALID_REQUEST"
+  | "ORDER_EXCEPTION_FORBIDDEN"
+  | "ORDER_EXCEPTION_NOT_FOUND"
+  | "ORDER_EXCEPTION_CONFLICT"
+  | "ORDER_EXCEPTION_INVARIANT_VIOLATION"
+  | "ORDER_EXCEPTION_UNAVAILABLE";
+
+export class OperationalOrderExceptionError extends Error {
+  readonly code: OperationalOrderExceptionErrorCode;
+
+  constructor(code: OperationalOrderExceptionErrorCode, cause?: unknown) {
+    super(code, { cause });
+    this.name = "OperationalOrderExceptionError";
+    this.code = code;
+  }
+}
+
+export function isOperationalOrderExceptionError(
+  value: unknown,
+): value is OperationalOrderExceptionError {
+  return value instanceof OperationalOrderExceptionError;
+}
