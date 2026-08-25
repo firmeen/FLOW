@@ -1,4 +1,5 @@
 import {
+  OperationalOrderLifecycleError,
   assertOperationalOrderLifecycleSameOrigin,
   operationalOrderApiFailure,
   operationalOrderApiSuccess,
@@ -15,9 +16,7 @@ export async function POST(
   try {
     const url = new URL(request.url);
     if ([...url.searchParams.keys()].length > 0) {
-      return operationalOrderApiFailure(
-        new Error("ORDER_LIFECYCLE_INVALID_REQUEST"),
-      );
+      throw new OperationalOrderLifecycleError("ORDER_LIFECYCLE_INVALID_REQUEST");
     }
 
     assertOperationalOrderLifecycleSameOrigin(request);
