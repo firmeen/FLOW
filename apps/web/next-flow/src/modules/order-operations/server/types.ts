@@ -24,6 +24,10 @@ export const DEFAULT_OPERATIONAL_ORDER_STATUSES = [
 export const OPERATIONAL_ORDER_SOURCES = ["CUSTOMER_WEB", "UNKNOWN"] as const;
 export const OPERATIONAL_ORDERING_MODES = ["DINE_IN"] as const;
 export const OPERATIONAL_ORDER_DECISIONS = ["ACCEPT", "REJECT"] as const;
+export const OPERATIONAL_ORDER_DECISION_SOURCE_STATUSES = [
+  "PENDING_CONFIRMATION",
+  "CHANGED",
+] as const;
 export const OPERATIONAL_ORDER_LIFECYCLE_ACTIONS = [
   "START_PREPARING",
   "MARK_READY",
@@ -36,15 +40,50 @@ export const OPERATIONAL_ORDER_REJECTION_REASONS = [
   "INVALID_ORDER",
   "OTHER",
 ] as const;
+export const OPERATIONAL_ORDER_EXCEPTION_ACTIONS = ["AMEND", "CANCEL"] as const;
+export const OPERATIONAL_ORDER_CANCELLATION_REASONS = [
+  "STAFF_REQUEST",
+  "CUSTOMER_REQUEST",
+  "ITEM_UNAVAILABLE",
+  "CAPACITY_LIMIT",
+  "STORE_CLOSING",
+  "DUPLICATE_ORDER",
+  "OPERATIONAL_ERROR",
+  "OTHER",
+] as const;
+export const OPERATIONAL_ORDER_CANCELLABLE_STATUSES = [
+  "PENDING_CONFIRMATION",
+  "CHANGED",
+  "ACCEPTED",
+  "PREPARING",
+  "READY",
+] as const;
+export const OPERATIONAL_ORDER_AMENDMENT_CHANGE_CATEGORIES = [
+  "CUSTOMER_NOTE",
+  "ITEM_QUANTITY",
+  "ITEM_SPECIAL_REQUEST",
+  "ITEM_REMOVED",
+  "MULTIPLE_FIELDS",
+] as const;
 
 export type OperationalOrderStatus = (typeof OPERATIONAL_ORDER_STATUSES)[number];
 export type OperationalOrderSource = (typeof OPERATIONAL_ORDER_SOURCES)[number];
 export type OperationalOrderingMode = (typeof OPERATIONAL_ORDERING_MODES)[number];
 export type OperationalOrderDecision = (typeof OPERATIONAL_ORDER_DECISIONS)[number];
+export type OperationalOrderDecisionSourceStatus =
+  (typeof OPERATIONAL_ORDER_DECISION_SOURCE_STATUSES)[number];
 export type OperationalOrderLifecycleAction =
   (typeof OPERATIONAL_ORDER_LIFECYCLE_ACTIONS)[number];
 export type OperationalOrderRejectionReasonCode =
   (typeof OPERATIONAL_ORDER_REJECTION_REASONS)[number];
+export type OperationalOrderExceptionAction =
+  (typeof OPERATIONAL_ORDER_EXCEPTION_ACTIONS)[number];
+export type OperationalOrderCancellationReasonCode =
+  (typeof OPERATIONAL_ORDER_CANCELLATION_REASONS)[number];
+export type OperationalOrderCancellableStatus =
+  (typeof OPERATIONAL_ORDER_CANCELLABLE_STATUSES)[number];
+export type OperationalOrderAmendmentChangeCategory =
+  (typeof OPERATIONAL_ORDER_AMENDMENT_CHANGE_CATEGORIES)[number];
 
 export interface OperationalOrderQueueFilter {
   readonly statuses?: readonly OperationalOrderStatus[];
@@ -128,6 +167,7 @@ export interface OperationalOrderDecisionResult {
   readonly orderId: string;
   readonly orderNumber: string;
   readonly decision: OperationalOrderDecision;
+  readonly fromStatus: OperationalOrderDecisionSourceStatus;
   readonly status: "ACCEPTED" | "REJECTED";
   readonly customerStatus: "CONFIRMED" | "REJECTED";
   readonly decidedAt: string;
@@ -157,6 +197,54 @@ export interface OperationalOrderLifecycleResult {
   readonly customerStatus: "PREPARING" | "COMING_TO_TABLE" | "SERVED";
   readonly transitionedAt: string;
 }
+
+export interface OperationalOrderItemAmendment {
+  readonly itemId: string;
+  readonly quantity?: number;
+  readonly specialRequest?: string | null;
+  readonly remove?: true;
+}
+
+export type OperationalOrderExceptionCommand =
+  | {
+      readonly orderId: string;
+      readonly action: "AMEND";
+      readonly customerNote?: string | null;
+      readonly itemChanges: readonly OperationalOrderItemAmendment[];
+    }
+  | {
+      readonly orderId: string;
+      readonly action: "CANCEL";
+      readonly reasonCode: OperationalOrderCancellationReasonCode;
+    };
+
+export interface OperationalOrderAmendmentResult {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly action: "AMEND";
+  readonly fromStatus: "ACCEPTED";
+  readonly status: "CHANGED";
+  readonly customerStatus: "SENT";
+  readonly subtotalMinor: string;
+  readonly currency: string;
+  readonly changeCategory: OperationalOrderAmendmentChangeCategory;
+  readonly changedAt: string;
+}
+
+export interface OperationalOrderCancellationResult {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly action: "CANCEL";
+  readonly fromStatus: OperationalOrderCancellableStatus;
+  readonly status: "CANCELLED";
+  readonly customerStatus: "CANCELLED";
+  readonly reasonCode: OperationalOrderCancellationReasonCode;
+  readonly cancelledAt: string;
+}
+
+export type OperationalOrderExceptionResult =
+  | OperationalOrderAmendmentResult
+  | OperationalOrderCancellationResult;
 
 export interface TrustedOperationalOrderContext {
   readonly actorId: string;
