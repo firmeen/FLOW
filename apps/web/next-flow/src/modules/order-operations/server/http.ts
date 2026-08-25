@@ -11,9 +11,11 @@ import { PERMISSIONS } from "@/modules/identity/server/permissions";
 
 import {
   OperationalOrderDecisionError,
+  OperationalOrderExceptionError,
   OperationalOrderLifecycleError,
   OperationalOrderReadError,
   isOperationalOrderDecisionError,
+  isOperationalOrderExceptionError,
   isOperationalOrderLifecycleError,
   isOperationalOrderReadError,
 } from "./errors";
@@ -25,6 +27,7 @@ const NO_STORE_HEADERS = {
 
 export const MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES = 8 * 1024;
 export const MAX_OPERATIONAL_ORDER_LIFECYCLE_BODY_BYTES = 4 * 1024;
+export const MAX_OPERATIONAL_ORDER_EXCEPTION_BODY_BYTES = 8 * 1024;
 
 export interface OperationalOrderApiErrorBody {
   readonly ok: false;
@@ -131,6 +134,24 @@ export async function readOperationalOrderLifecycleJson(
   );
 }
 
+export function assertOperationalOrderExceptionSameOrigin(request: Request): void {
+  assertSameOrigin(request, (cause?: unknown): never => {
+    throw new OperationalOrderExceptionError("ORDER_EXCEPTION_INVALID_REQUEST", cause);
+  });
+}
+
+export async function readOperationalOrderExceptionJson(
+  request: Request,
+): Promise<Record<string, unknown>> {
+  return readBoundedJsonObject(
+    request,
+    MAX_OPERATIONAL_ORDER_EXCEPTION_BODY_BYTES,
+    (cause?: unknown): never => {
+      throw new OperationalOrderExceptionError("ORDER_EXCEPTION_INVALID_REQUEST", cause);
+    },
+  );
+}
+
 export async function authorizeOperationalOrderRouteContext(
   context: AccessContext,
 ): Promise<AccessContext> {
@@ -165,6 +186,23 @@ export async function requireOperationalOrderRouteContext(): Promise<AccessConte
 }
 
 export function operationalOrderApiFailure(error: unknown): Response {
+  if (isOperationalOrderExceptionError(error)) {
+    switch (error.code) {
+      case "ORDER_EXCEPTION_INVALID_REQUEST":
+        return apiError(400, error.code, "The order exception request is invalid.");
+      case "ORDER_EXCEPTION_FORBIDDEN":
+        return apiError(403, error.code, "Order exception access is not permitted.");
+      case "ORDER_EXCEPTION_NOT_FOUND":
+        return apiError(404, error.code, "The order or selected order item was not found.");
+      case "ORDER_EXCEPTION_CONFLICT":
+        return apiError(409, error.code, "The order is no longer eligible for that exception action.");
+      case "ORDER_EXCEPTION_INVARIANT_VIOLATION":
+        return apiError(500, error.code, "The order exception could not be applied safely.");
+      case "ORDER_EXCEPTION_UNAVAILABLE":
+        return apiError(503, error.code, "Order exception handling is temporarily unavailable.");
+    }
+  }
+
   if (isOperationalOrderLifecycleError(error)) {
     switch (error.code) {
       case "ORDER_LIFECYCLE_INVALID_REQUEST":
