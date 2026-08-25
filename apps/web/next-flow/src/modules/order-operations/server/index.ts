@@ -17,16 +17,29 @@ export {
   rejectOperationalOrder,
 } from "./order-decision-service";
 export {
+  LIFECYCLE_TRANSITIONS,
+  mapOperationalOrderLifecycleResult,
+  markOperationalOrderReady,
+  markOperationalOrderServed,
+  parseOperationalOrderLifecycleRequest,
+  startPreparingOperationalOrder,
+  transitionOperationalOrderLifecycle,
+} from "./order-lifecycle-service";
+export {
   MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES,
+  MAX_OPERATIONAL_ORDER_LIFECYCLE_BODY_BYTES,
   assertOperationalOrderDecisionSameOrigin,
+  assertOperationalOrderLifecycleSameOrigin,
   authorizeOperationalOrderRouteContext,
   operationalOrderApiFailure,
   operationalOrderApiSuccess,
   readOperationalOrderDecisionJson,
+  readOperationalOrderLifecycleJson,
   requireOperationalOrderRouteContext,
 } from "./http";
 export {
   OperationalOrderDecisionError,
+  OperationalOrderLifecycleError,
   OperationalOrderReadError,
 } from "./errors";
 export type {
@@ -35,6 +48,10 @@ export type {
   OperationalOrderDecisionResult,
   OperationalOrderDetail,
   OperationalOrderItemDetail,
+  OperationalOrderLifecycleAction,
+  OperationalOrderLifecycleCommand,
+  OperationalOrderLifecycleResult,
+  OperationalOrderLifecycleTransitionSpec,
   OperationalOrderModifierDetail,
   OperationalOrderQueueFilter,
   OperationalOrderQueueItem,
