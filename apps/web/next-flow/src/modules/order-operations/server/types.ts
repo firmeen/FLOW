@@ -24,6 +24,11 @@ export const DEFAULT_OPERATIONAL_ORDER_STATUSES = [
 export const OPERATIONAL_ORDER_SOURCES = ["CUSTOMER_WEB", "UNKNOWN"] as const;
 export const OPERATIONAL_ORDERING_MODES = ["DINE_IN"] as const;
 export const OPERATIONAL_ORDER_DECISIONS = ["ACCEPT", "REJECT"] as const;
+export const OPERATIONAL_ORDER_LIFECYCLE_ACTIONS = [
+  "START_PREPARING",
+  "MARK_READY",
+  "MARK_SERVED",
+] as const;
 export const OPERATIONAL_ORDER_REJECTION_REASONS = [
   "ITEM_UNAVAILABLE",
   "STORE_CLOSING",
@@ -36,6 +41,8 @@ export type OperationalOrderStatus = (typeof OPERATIONAL_ORDER_STATUSES)[number]
 export type OperationalOrderSource = (typeof OPERATIONAL_ORDER_SOURCES)[number];
 export type OperationalOrderingMode = (typeof OPERATIONAL_ORDERING_MODES)[number];
 export type OperationalOrderDecision = (typeof OPERATIONAL_ORDER_DECISIONS)[number];
+export type OperationalOrderLifecycleAction =
+  (typeof OPERATIONAL_ORDER_LIFECYCLE_ACTIONS)[number];
 export type OperationalOrderRejectionReasonCode =
   (typeof OPERATIONAL_ORDER_REJECTION_REASONS)[number];
 
@@ -125,6 +132,30 @@ export interface OperationalOrderDecisionResult {
   readonly customerStatus: "CONFIRMED" | "REJECTED";
   readonly decidedAt: string;
   readonly reasonCode: OperationalOrderRejectionReasonCode | null;
+}
+
+export interface OperationalOrderLifecycleCommand {
+  readonly orderId: string;
+  readonly action: OperationalOrderLifecycleAction;
+}
+
+export interface OperationalOrderLifecycleTransitionSpec {
+  readonly action: OperationalOrderLifecycleAction;
+  readonly from: "ACCEPTED" | "PREPARING" | "READY";
+  readonly to: "PREPARING" | "READY" | "SERVED";
+  readonly customerStatus: "PREPARING" | "COMING_TO_TABLE" | "SERVED";
+  readonly eventType: "ORDER_PREPARING" | "ORDER_READY" | "ORDER_SERVED";
+  readonly timestampColumn: "preparing_at" | "ready_at" | "served_at";
+}
+
+export interface OperationalOrderLifecycleResult {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly action: OperationalOrderLifecycleAction;
+  readonly fromStatus: "ACCEPTED" | "PREPARING" | "READY";
+  readonly status: "PREPARING" | "READY" | "SERVED";
+  readonly customerStatus: "PREPARING" | "COMING_TO_TABLE" | "SERVED";
+  readonly transitionedAt: string;
 }
 
 export interface TrustedOperationalOrderContext {
