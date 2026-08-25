@@ -14,9 +14,11 @@ import {
   type OperationalOrderDecisionMutationRow,
 } from "./order-decision-repository";
 import {
+  OPERATIONAL_ORDER_DECISION_SOURCE_STATUSES,
   OPERATIONAL_ORDER_REJECTION_REASONS,
   type OperationalOrderDecisionCommand,
   type OperationalOrderDecisionResult,
+  type OperationalOrderDecisionSourceStatus,
   type OperationalOrderRejectionReasonCode,
   type TrustedOperationalOrderContext,
 } from "./types";
@@ -24,6 +26,7 @@ import {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REJECTION_REASON_SET = new Set<string>(OPERATIONAL_ORDER_REJECTION_REASONS);
+const DECISION_SOURCE_SET = new Set<string>(OPERATIONAL_ORDER_DECISION_SOURCE_STATUSES);
 
 function invalidRequest(cause?: unknown): never {
   throw new OperationalOrderDecisionError("ORDER_DECISION_INVALID_REQUEST", cause);
@@ -85,13 +88,21 @@ function trustedContext(context: AccessContext): TrustedOperationalOrderContext 
   });
 }
 
-function mapDecisionResult(
+function assertDecisionSource(value: string): OperationalOrderDecisionSourceStatus {
+  if (!DECISION_SOURCE_SET.has(value)) {
+    throw new OperationalOrderDecisionError("ORDER_DECISION_INVARIANT_VIOLATION");
+  }
+  return value as OperationalOrderDecisionSourceStatus;
+}
+
+export function mapOperationalOrderDecisionResult(
   decision: "ACCEPT" | "REJECT",
   row: OperationalOrderDecisionMutationRow,
 ): OperationalOrderDecisionResult {
   if (!(row.decidedAt instanceof Date) || Number.isNaN(row.decidedAt.getTime())) {
     throw new OperationalOrderDecisionError("ORDER_DECISION_INVARIANT_VIOLATION");
   }
+  const fromStatus = assertDecisionSource(row.fromStatus);
 
   if (decision === "ACCEPT") {
     if (
@@ -105,6 +116,7 @@ function mapDecisionResult(
       orderId: row.id,
       orderNumber: row.orderNumber,
       decision,
+      fromStatus,
       status: "ACCEPTED",
       customerStatus: "CONFIRMED",
       decidedAt: row.decidedAt.toISOString(),
@@ -125,6 +137,7 @@ function mapDecisionResult(
     orderId: row.id,
     orderNumber: row.orderNumber,
     decision,
+    fromStatus,
     status: "REJECTED",
     customerStatus: "REJECTED",
     decidedAt: row.decidedAt.toISOString(),
@@ -159,7 +172,7 @@ async function executeOperationalOrderDecision(
           throw new OperationalOrderDecisionError("ORDER_DECISION_CONFLICT", current.status);
         }
 
-        return mapDecisionResult(command.decision, row);
+        return mapOperationalOrderDecisionResult(command.decision, row);
       },
     );
   } catch (error) {
