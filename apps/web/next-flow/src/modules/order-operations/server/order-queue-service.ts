@@ -17,15 +17,23 @@ import {
 } from "./order-queue-repository";
 import {
   DEFAULT_OPERATIONAL_ORDER_STATUSES,
+  OPERATIONAL_ORDER_DEFER_REASONS,
+  OPERATIONAL_ORDER_PRIORITY_CODES,
+  OPERATIONAL_ORDER_PRIORITY_REASONS,
+  OPERATIONAL_ORDER_REMAKE_REASONS,
   OPERATIONAL_ORDERING_MODES,
   OPERATIONAL_ORDER_SOURCES,
   OPERATIONAL_ORDER_STATUSES,
   type OperationalOrderCursor,
+  type OperationalOrderDeferReasonCode,
   type OperationalOrderDetail,
   type OperationalOrderItemDetail,
+  type OperationalOrderPriorityCode,
+  type OperationalOrderPriorityReasonCode,
   type OperationalOrderQueueFilter,
   type OperationalOrderQueueItem,
   type OperationalOrderQueuePage,
+  type OperationalOrderRemakeReasonCode,
   type OperationalOrderSource,
   type OperationalOrderStatus,
   type TrustedOperationalOrderContext,
@@ -41,6 +49,10 @@ const NONNEGATIVE_INTEGER_PATTERN = /^\d+$/;
 const STATUS_SET = new Set<string>(OPERATIONAL_ORDER_STATUSES);
 const SOURCE_SET = new Set<string>(OPERATIONAL_ORDER_SOURCES);
 const MODE_SET = new Set<string>(OPERATIONAL_ORDERING_MODES);
+const PRIORITY_SET = new Set<string>(OPERATIONAL_ORDER_PRIORITY_CODES);
+const PRIORITY_REASON_SET = new Set<string>(OPERATIONAL_ORDER_PRIORITY_REASONS);
+const DEFER_REASON_SET = new Set<string>(OPERATIONAL_ORDER_DEFER_REASONS);
+const REMAKE_REASON_SET = new Set<string>(OPERATIONAL_ORDER_REMAKE_REASONS);
 const ALLOWED_QUERY_KEYS = new Set([
   "status",
   "source",
@@ -53,6 +65,10 @@ const ALLOWED_QUERY_KEYS = new Set([
 
 function invalidQuery(cause?: unknown): never {
   throw new OperationalOrderReadError("ORDER_QUEUE_INVALID_QUERY", cause);
+}
+
+function invariantViolation(cause?: unknown): never {
+  throw new OperationalOrderReadError("ORDER_QUEUE_INVARIANT_VIOLATION", cause);
 }
 
 function scalarParam(params: URLSearchParams, key: string): string | null {
@@ -116,8 +132,19 @@ function parseTimestamp(value: string | null): string | null {
   return new Date(value).toISOString();
 }
 
+function assertRank(value: unknown): 0 | 1 {
+  if (value !== 0 && value !== 1) invalidQuery();
+  return value;
+}
+
 export function encodeOperationalOrderCursor(cursor: OperationalOrderCursor): string {
-  if (cursor.v !== 1 || !isIsoTimestamp(cursor.submittedAt) || !UUID_PATTERN.test(cursor.id)) {
+  if (
+    cursor.v !== 2 ||
+    (cursor.deferRank !== 0 && cursor.deferRank !== 1) ||
+    (cursor.priorityRank !== 0 && cursor.priorityRank !== 1) ||
+    !isIsoTimestamp(cursor.submittedAt) ||
+    !UUID_PATTERN.test(cursor.id)
+  ) {
     invalidQuery();
   }
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
@@ -134,9 +161,9 @@ export function decodeOperationalOrderCursor(
     if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) invalidQuery();
     const candidate = decoded as Record<string, unknown>;
     const keys = Object.keys(candidate).sort();
-    if (keys.join(",") !== "id,submittedAt,v") invalidQuery();
+    if (keys.join(",") !== "deferRank,id,priorityRank,submittedAt,v") invalidQuery();
     if (
-      candidate.v !== 1 ||
+      candidate.v !== 2 ||
       typeof candidate.submittedAt !== "string" ||
       !isIsoTimestamp(candidate.submittedAt) ||
       typeof candidate.id !== "string" ||
@@ -145,7 +172,9 @@ export function decodeOperationalOrderCursor(
       invalidQuery();
     }
     return Object.freeze({
-      v: 1,
+      v: 2,
+      deferRank: assertRank(candidate.deferRank),
+      priorityRank: assertRank(candidate.priorityRank),
       submittedAt: new Date(candidate.submittedAt).toISOString(),
       id: candidate.id,
     });
@@ -198,37 +227,68 @@ function trustedContext(context: AccessContext): TrustedOperationalOrderContext 
 }
 
 function assertStatus(value: string): OperationalOrderStatus {
-  if (!STATUS_SET.has(value)) {
-    throw new OperationalOrderReadError("ORDER_QUEUE_INVARIANT_VIOLATION");
-  }
+  if (!STATUS_SET.has(value)) invariantViolation();
   return value as OperationalOrderStatus;
 }
 
 function assertIsoDate(value: Date): string {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
-    throw new OperationalOrderReadError("ORDER_QUEUE_INVARIANT_VIOLATION");
-  }
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) invariantViolation();
   return value.toISOString();
+}
+
+function optionalIsoDate(value: Date | null): string | null {
+  if (value === null) return null;
+  return assertIsoDate(value);
 }
 
 function assertMinor(value: string): string {
   const normalized = String(value);
-  if (!NONNEGATIVE_INTEGER_PATTERN.test(normalized)) {
-    throw new OperationalOrderReadError("ORDER_QUEUE_INVARIANT_VIOLATION");
-  }
+  if (!NONNEGATIVE_INTEGER_PATTERN.test(normalized)) invariantViolation();
   return normalized;
 }
 
 function assertCurrency(value: string): string {
-  if (!CURRENCY_PATTERN.test(value)) {
-    throw new OperationalOrderReadError("ORDER_QUEUE_INVARIANT_VIOLATION");
-  }
+  if (!CURRENCY_PATTERN.test(value)) invariantViolation();
   return value;
+}
+
+function assertPriority(value: string): OperationalOrderPriorityCode {
+  if (!PRIORITY_SET.has(value)) invariantViolation();
+  return value as OperationalOrderPriorityCode;
+}
+
+function assertOptionalPriorityReason(value: string | null): OperationalOrderPriorityReasonCode | null {
+  if (value === null) return null;
+  if (!PRIORITY_REASON_SET.has(value)) invariantViolation();
+  return value as OperationalOrderPriorityReasonCode;
+}
+
+function assertOptionalDeferReason(value: string | null): OperationalOrderDeferReasonCode | null {
+  if (value === null) return null;
+  if (!DEFER_REASON_SET.has(value)) invariantViolation();
+  return value as OperationalOrderDeferReasonCode;
+}
+
+function assertOptionalRemakeReason(value: string | null): OperationalOrderRemakeReasonCode | null {
+  if (value === null) return null;
+  if (!REMAKE_REASON_SET.has(value)) invariantViolation();
+  return value as OperationalOrderRemakeReasonCode;
 }
 
 export function mapOperationalOrderQueueRow(
   row: OperationalOrderQueueRow,
 ): OperationalOrderQueueItem {
+  const priority = assertPriority(row.priorityCode);
+  const priorityReason = assertOptionalPriorityReason(row.priorityReason);
+  const deferReason = assertOptionalDeferReason(row.deferReason);
+  const lastRemakeReason = assertOptionalRemakeReason(row.lastRemakeReason);
+  if (priority === "URGENT" && (!priorityReason || !row.prioritizedAt)) invariantViolation();
+  if (priority === "NORMAL" && (priorityReason || row.prioritizedAt)) invariantViolation();
+  if (Boolean(deferReason) !== Boolean(row.deferredAt)) invariantViolation();
+  if (!Number.isInteger(row.remakeCount) || row.remakeCount < 0 || row.remakeCount > 3) {
+    invariantViolation();
+  }
+
   return Object.freeze({
     id: row.id,
     orderNumber: row.orderNumber,
@@ -244,6 +304,16 @@ export function mapOperationalOrderQueueRow(
     lineCount: row.lineCount,
     unitCount: row.unitCount,
     hasCustomerNote: Boolean(row.customerNote),
+    priority,
+    priorityReason,
+    prioritizedAt: optionalIsoDate(row.prioritizedAt),
+    deferred: deferReason !== null,
+    deferReason,
+    deferredAt: optionalIsoDate(row.deferredAt),
+    deferredUntil: optionalIsoDate(row.deferredUntil),
+    remakeCount: row.remakeCount,
+    lastRemakeReason,
+    remakeRequestedAt: optionalIsoDate(row.remakeRequestedAt),
   });
 }
 
@@ -311,7 +381,9 @@ export async function listOperationalOrderQueue(
           nextCursor:
             hasNextPage && last
               ? encodeOperationalOrderCursor({
-                  v: 1,
+                  v: 2,
+                  deferRank: assertRank(last.deferRank),
+                  priorityRank: assertRank(last.priorityRank),
                   submittedAt: assertIsoDate(last.submittedAt),
                   id: last.id,
                 })
