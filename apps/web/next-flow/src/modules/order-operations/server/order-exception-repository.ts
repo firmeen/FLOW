@@ -242,6 +242,14 @@ export class OperationalOrderExceptionRepository {
         status: "CANCELLED",
         customer_status: "CANCELLED",
         modified_by_staff: this.context.actorId,
+        priority_code: "NORMAL",
+        priority_reason: null,
+        prioritized_at: null,
+        prioritized_by_staff: null,
+        defer_reason: null,
+        deferred_at: null,
+        deferred_until: null,
+        deferred_by_staff: null,
       })
       .where("tenant_id", "=", this.context.tenantId)
       .where("branch_id", "=", this.context.branchId)
