@@ -13,10 +13,12 @@ import {
   OperationalOrderDecisionError,
   OperationalOrderExceptionError,
   OperationalOrderLifecycleError,
+  OperationalOrderProductionControlError,
   OperationalOrderReadError,
   isOperationalOrderDecisionError,
   isOperationalOrderExceptionError,
   isOperationalOrderLifecycleError,
+  isOperationalOrderProductionControlError,
   isOperationalOrderReadError,
 } from "./errors";
 
@@ -28,6 +30,7 @@ const NO_STORE_HEADERS = {
 export const MAX_OPERATIONAL_ORDER_DECISION_BODY_BYTES = 8 * 1024;
 export const MAX_OPERATIONAL_ORDER_LIFECYCLE_BODY_BYTES = 4 * 1024;
 export const MAX_OPERATIONAL_ORDER_EXCEPTION_BODY_BYTES = 8 * 1024;
+export const MAX_OPERATIONAL_ORDER_PRODUCTION_CONTROL_BODY_BYTES = 4 * 1024;
 
 export interface OperationalOrderApiErrorBody {
   readonly ok: false;
@@ -152,6 +155,24 @@ export async function readOperationalOrderExceptionJson(
   );
 }
 
+export function assertOperationalOrderProductionControlSameOrigin(request: Request): void {
+  assertSameOrigin(request, (cause?: unknown): never => {
+    throw new OperationalOrderProductionControlError("ORDER_CONTROL_INVALID_REQUEST", cause);
+  });
+}
+
+export async function readOperationalOrderProductionControlJson(
+  request: Request,
+): Promise<Record<string, unknown>> {
+  return readBoundedJsonObject(
+    request,
+    MAX_OPERATIONAL_ORDER_PRODUCTION_CONTROL_BODY_BYTES,
+    (cause?: unknown): never => {
+      throw new OperationalOrderProductionControlError("ORDER_CONTROL_INVALID_REQUEST", cause);
+    },
+  );
+}
+
 export async function authorizeOperationalOrderRouteContext(
   context: AccessContext,
 ): Promise<AccessContext> {
@@ -186,6 +207,23 @@ export async function requireOperationalOrderRouteContext(): Promise<AccessConte
 }
 
 export function operationalOrderApiFailure(error: unknown): Response {
+  if (isOperationalOrderProductionControlError(error)) {
+    switch (error.code) {
+      case "ORDER_CONTROL_INVALID_REQUEST":
+        return apiError(400, error.code, "The production control request is invalid.");
+      case "ORDER_CONTROL_FORBIDDEN":
+        return apiError(403, error.code, "Production control access is not permitted.");
+      case "ORDER_CONTROL_NOT_FOUND":
+        return apiError(404, error.code, "The order was not found.");
+      case "ORDER_CONTROL_CONFLICT":
+        return apiError(409, error.code, "The order is no longer eligible for that production control.");
+      case "ORDER_CONTROL_INVARIANT_VIOLATION":
+        return apiError(500, error.code, "The production control could not be applied safely.");
+      case "ORDER_CONTROL_UNAVAILABLE":
+        return apiError(503, error.code, "Production controls are temporarily unavailable.");
+    }
+  }
+
   if (isOperationalOrderExceptionError(error)) {
     switch (error.code) {
       case "ORDER_EXCEPTION_INVALID_REQUEST":
