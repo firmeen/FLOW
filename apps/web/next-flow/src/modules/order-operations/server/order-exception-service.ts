@@ -38,7 +38,8 @@ const SIGNED_INTEGER_PATTERN = /^-?\d+$/;
 const CANCELLATION_REASON_SET = new Set<string>(OPERATIONAL_ORDER_CANCELLATION_REASONS);
 const CANCELLABLE_STATUS_SET = new Set<string>(OPERATIONAL_ORDER_CANCELLABLE_STATUSES);
 const AMENDMENT_CATEGORY_SET = new Set<string>(OPERATIONAL_ORDER_AMENDMENT_CHANGE_CATEGORIES);
-const MAX_BIGINT = 9_223_372_036_854_775_807n;
+const ZERO_BIGINT = BigInt(0);
+const MAX_BIGINT = BigInt("9223372036854775807");
 
 export const MAX_OPERATIONAL_ORDER_AMENDMENT_ITEMS = 50;
 export const MAX_OPERATIONAL_ORDER_QUANTITY = 99;
@@ -213,11 +214,11 @@ function calculateLineTotal(
   const unitPrice = parseNonnegativeMinor(item.unitPriceMinor);
   const modifierDelta = modifiers
     .filter((modifier) => modifier.orderItemId === item.id)
-    .reduce((sum, modifier) => sum + parseSignedMinor(modifier.priceDeltaMinor), 0n);
+    .reduce((sum, modifier) => sum + parseSignedMinor(modifier.priceDeltaMinor), ZERO_BIGINT);
   const unitTotal = unitPrice + modifierDelta;
-  if (unitTotal < 0n) invariantViolation();
+  if (unitTotal < ZERO_BIGINT) invariantViolation();
   const lineTotal = unitTotal * BigInt(quantity);
-  if (lineTotal < 0n || lineTotal > MAX_BIGINT) invariantViolation();
+  if (lineTotal < ZERO_BIGINT || lineTotal > MAX_BIGINT) invariantViolation();
   return lineTotal;
 }
 
@@ -226,7 +227,7 @@ function assertExistingMoneyInvariant(
   items: readonly OperationalOrderExceptionItemRow[],
   modifiers: readonly OperationalOrderExceptionModifierRow[],
 ): void {
-  let subtotal = 0n;
+  let subtotal = ZERO_BIGINT;
   for (const item of items) {
     if (!Number.isInteger(item.quantity) || item.quantity < 1) invariantViolation();
     const expected = calculateLineTotal(item, modifiers, item.quantity);
@@ -341,7 +342,7 @@ async function executeAmendment(
 
   const changesById = new Map(command.itemChanges.map((change) => [change.itemId, change] as const));
   const removals = new Set<string>();
-  let subtotal = 0n;
+  let subtotal = ZERO_BIGINT;
 
   for (const item of items) {
     const change = changesById.get(item.id);
