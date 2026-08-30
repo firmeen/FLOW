@@ -98,15 +98,14 @@ alter table foodflow.orders
         and remake_requested_by_staff is not null)
     ),
   add constraint orders_prioritized_by_staff_fkey
-    foreign key (prioritized_by_staff) references app.users(id) on delete set null,
+    foreign key (prioritized_by_staff) references app.users(id) on delete restrict,
   add constraint orders_deferred_by_staff_fkey
-    foreign key (deferred_by_staff) references app.users(id) on delete set null,
+    foreign key (deferred_by_staff) references app.users(id) on delete restrict,
   add constraint orders_remake_requested_by_staff_fkey
-    foreign key (remake_requested_by_staff) references app.users(id) on delete set null;
+    foreign key (remake_requested_by_staff) references app.users(id) on delete restrict;
 
--- The queue now ranks non-deferred work before deferred work and urgent before
--- normal within that group. Keep the index focused on those exact server-owned
--- ordering dimensions plus the existing stable submitted_at/id tie-breaker.
+-- The queue ranks active work before deferred work and urgent before normal
+-- while retaining submitted_at/id as deterministic tie-breakers.
 create index orders_branch_production_rank_idx
   on foodflow.orders (
     tenant_id,
