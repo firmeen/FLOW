@@ -5,6 +5,7 @@ import { LoaderCircle, PencilLine, XCircle } from "lucide-react";
 
 import { Badge, Button } from "@/components/foodflow-ui";
 
+import { OperationalOrderProductionControls } from "./operational-order-production-controls";
 import type { OperationalOrderDetail } from "./operational-orders-ui";
 
 type CancellationReasonCode =
@@ -208,208 +209,223 @@ export function OperationalOrderExceptionControls({
     }
   }
 
-  if (!amendmentEligible && !cancellationEligible) return null;
+  const productionControls = (
+    <OperationalOrderProductionControls
+      detail={detail}
+      disabled={disabled || Boolean(busy)}
+      onBusyChange={onBusyChange}
+      onAuthFailure={onAuthFailure}
+      onNotice={onNotice}
+      onError={onError}
+      onReconcile={onReconcile}
+    />
+  );
+
+  if (!amendmentEligible && !cancellationEligible) return productionControls;
 
   return (
-    <section className="border border-border bg-card p-4" aria-labelledby="order-exception-heading">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 id="order-exception-heading" className="text-sm font-semibold text-foreground">
-            Controlled order exception
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Amendments are limited to accepted snapshot fields. Cancellation requires an explicit reason. All authority, prices, totals, statuses and timestamps are server-derived.
-          </p>
+    <>
+      {productionControls}
+      <section className="border border-border bg-card p-4" aria-labelledby="order-exception-heading">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 id="order-exception-heading" className="text-sm font-semibold text-foreground">
+              Controlled order exception
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Amendments are limited to accepted snapshot fields. Cancellation requires an explicit reason. All authority, prices, totals, statuses and timestamps are server-derived.
+            </p>
+          </div>
+          <Badge tone="neutral">order.manage</Badge>
         </div>
-        <Badge tone="neutral">order.manage</Badge>
-      </div>
 
-      {amendOpen && amendmentEligible ? (
-        <div className="mt-4 space-y-4 border-t border-border pt-4">
-          <label className="block text-xs font-semibold text-foreground">
-            Customer note
-            <textarea
-              className="mt-1.5 min-h-20 w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-normal text-foreground"
-              value={customerNote}
-              maxLength={2000}
-              disabled={disabled || Boolean(busy)}
-              onChange={(event) => setCustomerNote(event.target.value)}
-            />
-          </label>
+        {amendOpen && amendmentEligible ? (
+          <div className="mt-4 space-y-4 border-t border-border pt-4">
+            <label className="block text-xs font-semibold text-foreground">
+              Customer note
+              <textarea
+                className="mt-1.5 min-h-20 w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-normal text-foreground"
+                value={customerNote}
+                maxLength={2000}
+                disabled={disabled || Boolean(busy)}
+                onChange={(event) => setCustomerNote(event.target.value)}
+              />
+            </label>
 
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-foreground">Persisted order items</p>
-            {detail.items.map((item) => {
-              const draft = items.find((candidate) => candidate.id === item.id);
-              if (!draft) return null;
-              return (
-                <div key={item.id} className="rounded-md border border-border bg-muted/40 p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{item.menuItemName}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        Persisted price and modifiers stay read-only.
-                      </p>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-foreground">Persisted order items</p>
+              {detail.items.map((item) => {
+                const draft = items.find((candidate) => candidate.id === item.id);
+                if (!draft) return null;
+                return (
+                  <div key={item.id} className="rounded-md border border-border bg-muted/40 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.menuItemName}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Persisted price and modifiers stay read-only.
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-destructive">
+                        <input
+                          type="checkbox"
+                          checked={draft.removed}
+                          disabled={disabled || Boolean(busy)}
+                          onChange={(event) => patchItem(item.id, { removed: event.target.checked })}
+                        />
+                        Remove item
+                      </label>
                     </div>
-                    <label className="flex items-center gap-2 text-xs font-medium text-destructive">
-                      <input
-                        type="checkbox"
-                        checked={draft.removed}
-                        disabled={disabled || Boolean(busy)}
-                        onChange={(event) => patchItem(item.id, { removed: event.target.checked })}
-                      />
-                      Remove item
-                    </label>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-[7rem_1fr]">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                        Quantity
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          step={1}
+                          className="mt-1 block h-9 w-full rounded-md border border-border bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground"
+                          value={draft.quantity}
+                          disabled={draft.removed || disabled || Boolean(busy)}
+                          onChange={(event) => {
+                            const value = Number(event.target.value);
+                            patchItem(item.id, { quantity: value });
+                          }}
+                        />
+                      </label>
+                      <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                        Special request
+                        <input
+                          type="text"
+                          maxLength={1000}
+                          className="mt-1 block h-9 w-full rounded-md border border-border bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground"
+                          value={draft.specialRequest}
+                          disabled={draft.removed || disabled || Boolean(busy)}
+                          onChange={(event) => patchItem(item.id, { specialRequest: event.target.value })}
+                        />
+                      </label>
+                    </div>
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-[7rem_1fr]">
-                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                      Quantity
-                      <input
-                        type="number"
-                        min={1}
-                        max={99}
-                        step={1}
-                        className="mt-1 block h-9 w-full rounded-md border border-border bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground"
-                        value={draft.quantity}
-                        disabled={draft.removed || disabled || Boolean(busy)}
-                        onChange={(event) => {
-                          const value = Number(event.target.value);
-                          patchItem(item.id, { quantity: value });
-                        }}
-                      />
-                    </label>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                      Special request
-                      <input
-                        type="text"
-                        maxLength={1000}
-                        className="mt-1 block h-9 w-full rounded-md border border-border bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground"
-                        value={draft.specialRequest}
-                        disabled={draft.removed || disabled || Boolean(busy)}
-                        onChange={(event) => patchItem(item.id, { specialRequest: event.target.value })}
-                      />
-                    </label>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
 
-          {allItemsRemoved ? (
-            <p role="alert" className="text-xs text-destructive">
-              An amendment cannot remove every persisted item.
+            {allItemsRemoved ? (
+              <p role="alert" className="text-xs text-destructive">
+                An amendment cannot remove every persisted item.
+              </p>
+            ) : invalidQuantity ? (
+              <p role="alert" className="text-xs text-destructive">
+                Every retained item quantity must be a whole number from 1 through 99.
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={disabled || Boolean(busy)}
+                onClick={() => {
+                  setAmendOpen(false);
+                  setCustomerNote(detail.customerNote ?? "");
+                  setItems(initialItems(detail));
+                  onError(null);
+                }}
+              >
+                Discard amendment
+              </Button>
+              <Button
+                disabled={
+                  !amendmentPayload ||
+                  allItemsRemoved ||
+                  invalidQuantity ||
+                  disabled ||
+                  Boolean(busy)
+                }
+                leftIcon={busy === "AMEND" ? <LoaderCircle className="size-4 animate-spin" /> : undefined}
+                onClick={() => amendmentPayload && void submitException(amendmentPayload, "AMEND")}
+              >
+                Save amendment
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {cancelOpen && cancellationEligible ? (
+          <div className="mt-4 space-y-3 border-t border-border pt-4">
+            <p className="text-xs leading-5 text-muted-foreground">
+              Cancellation is terminal for the R04 operational workflow. Confirm a bounded reason before continuing.
             </p>
-          ) : invalidQuantity ? (
-            <p role="alert" className="text-xs text-destructive">
-              Every retained item quantity must be a whole number from 1 through 99.
-            </p>
-          ) : null}
-
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              disabled={disabled || Boolean(busy)}
-              onClick={() => {
-                setAmendOpen(false);
-                setCustomerNote(detail.customerNote ?? "");
-                setItems(initialItems(detail));
-                onError(null);
-              }}
-            >
-              Discard amendment
-            </Button>
-            <Button
-              disabled={
-                !amendmentPayload ||
-                allItemsRemoved ||
-                invalidQuantity ||
-                disabled ||
-                Boolean(busy)
-              }
-              leftIcon={busy === "AMEND" ? <LoaderCircle className="size-4 animate-spin" /> : undefined}
-              onClick={() => amendmentPayload && void submitException(amendmentPayload, "AMEND")}
-            >
-              Save amendment
-            </Button>
+            <label className="block text-xs font-semibold text-foreground">
+              Cancellation reason
+              <select
+                className="mt-1.5 block h-10 w-full rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground"
+                value={reasonCode}
+                disabled={disabled || Boolean(busy)}
+                onChange={(event) => setReasonCode(event.target.value as CancellationReasonCode | "")}
+              >
+                <option value="">Choose a reason</option>
+                {CANCELLATION_REASONS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={disabled || Boolean(busy)}
+                onClick={() => {
+                  setCancelOpen(false);
+                  setReasonCode("");
+                  onError(null);
+                }}
+              >
+                Keep order
+              </Button>
+              <Button
+                disabled={!reasonCode || disabled || Boolean(busy)}
+                leftIcon={busy === "CANCEL" ? <LoaderCircle className="size-4 animate-spin" /> : undefined}
+                onClick={() =>
+                  reasonCode &&
+                  void submitException({ action: "CANCEL", reasonCode }, "CANCEL")
+                }
+              >
+                Confirm cancellation
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {cancelOpen && cancellationEligible ? (
-        <div className="mt-4 space-y-3 border-t border-border pt-4">
-          <p className="text-xs leading-5 text-muted-foreground">
-            Cancellation is terminal for the R04 operational workflow. Confirm a bounded reason before continuing.
-          </p>
-          <label className="block text-xs font-semibold text-foreground">
-            Cancellation reason
-            <select
-              className="mt-1.5 block h-10 w-full rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground"
-              value={reasonCode}
-              disabled={disabled || Boolean(busy)}
-              onChange={(event) => setReasonCode(event.target.value as CancellationReasonCode | "")}
-            >
-              <option value="">Choose a reason</option>
-              {CANCELLATION_REASONS.map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </label>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              disabled={disabled || Boolean(busy)}
-              onClick={() => {
-                setCancelOpen(false);
-                setReasonCode("");
-                onError(null);
-              }}
-            >
-              Keep order
-            </Button>
-            <Button
-              disabled={!reasonCode || disabled || Boolean(busy)}
-              leftIcon={busy === "CANCEL" ? <LoaderCircle className="size-4 animate-spin" /> : undefined}
-              onClick={() =>
-                reasonCode &&
-                void submitException({ action: "CANCEL", reasonCode }, "CANCEL")
-              }
-            >
-              Confirm cancellation
-            </Button>
+        {!amendOpen && !cancelOpen ? (
+          <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+            {amendmentEligible ? (
+              <Button
+                variant="outline"
+                disabled={disabled || Boolean(busy)}
+                leftIcon={<PencilLine className="size-4" />}
+                onClick={() => {
+                  setAmendOpen(true);
+                  onError(null);
+                }}
+              >
+                Amend accepted order
+              </Button>
+            ) : null}
+            {cancellationEligible ? (
+              <Button
+                variant="outline"
+                disabled={disabled || Boolean(busy)}
+                leftIcon={<XCircle className="size-4" />}
+                onClick={() => {
+                  setCancelOpen(true);
+                  onError(null);
+                }}
+              >
+                Cancel order
+              </Button>
+            ) : null}
           </div>
-        </div>
-      ) : null}
-
-      {!amendOpen && !cancelOpen ? (
-        <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-          {amendmentEligible ? (
-            <Button
-              variant="outline"
-              disabled={disabled || Boolean(busy)}
-              leftIcon={<PencilLine className="size-4" />}
-              onClick={() => {
-                setAmendOpen(true);
-                onError(null);
-              }}
-            >
-              Amend accepted order
-            </Button>
-          ) : null}
-          {cancellationEligible ? (
-            <Button
-              variant="outline"
-              disabled={disabled || Boolean(busy)}
-              leftIcon={<XCircle className="size-4" />}
-              onClick={() => {
-                setCancelOpen(true);
-                onError(null);
-              }}
-            >
-              Cancel order
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
+        ) : null}
+      </section>
+    </>
   );
 }
