@@ -24,6 +24,17 @@ export interface OperationalOrderQueueRow {
   readonly lineCount: number;
   readonly unitCount: number;
   readonly customerNote: string | null;
+  readonly priorityCode: string;
+  readonly priorityReason: string | null;
+  readonly prioritizedAt: Date | null;
+  readonly deferReason: string | null;
+  readonly deferredAt: Date | null;
+  readonly deferredUntil: Date | null;
+  readonly remakeCount: number;
+  readonly lastRemakeReason: string | null;
+  readonly remakeRequestedAt: Date | null;
+  readonly deferRank: number;
+  readonly priorityRank: number;
 }
 
 export interface OperationalOrderDetailItemRow {
@@ -47,6 +58,9 @@ export interface OperationalOrderDetailModifierRow {
   readonly modifierChoiceName: string;
   readonly priceDeltaMinor: string;
 }
+
+const DEFER_RANK = sql<number>`case when "order".deferred_at is null then 0 else 1 end`;
+const PRIORITY_RANK = sql<number>`case when "order".priority_code = 'URGENT' then 0 else 1 end`;
 
 export class OperationalOrderQueueRepository {
   constructor(
@@ -85,6 +99,17 @@ export class OperationalOrderQueueRepository {
         "order.subtotal_minor as subtotalMinor",
         "order.currency as currency",
         "order.customer_note as customerNote",
+        "order.priority_code as priorityCode",
+        "order.priority_reason as priorityReason",
+        "order.prioritized_at as prioritizedAt",
+        "order.defer_reason as deferReason",
+        "order.deferred_at as deferredAt",
+        "order.deferred_until as deferredUntil",
+        "order.remake_count as remakeCount",
+        "order.last_remake_reason as lastRemakeReason",
+        "order.remake_requested_at as remakeRequestedAt",
+        DEFER_RANK.as("deferRank"),
+        PRIORITY_RANK.as("priorityRank"),
         sql<number>`count(item.id)::int`.as("lineCount"),
         sql<number>`coalesce(sum(item.quantity), 0)::int`.as("unitCount"),
       ])
@@ -104,6 +129,15 @@ export class OperationalOrderQueueRepository {
         "order.subtotal_minor",
         "order.currency",
         "order.customer_note",
+        "order.priority_code",
+        "order.priority_reason",
+        "order.prioritized_at",
+        "order.defer_reason",
+        "order.deferred_at",
+        "order.deferred_until",
+        "order.remake_count",
+        "order.last_remake_reason",
+        "order.remake_requested_at",
       ]);
 
     if (filter.source === "CUSTOMER_WEB") {
@@ -120,19 +154,20 @@ export class OperationalOrderQueueRepository {
     }
     if (filter.cursor) {
       const cursorTime = new Date(filter.cursor.submittedAt);
-      const cursorId = filter.cursor.id;
-      query = query.where((eb) =>
-        eb.or([
-          eb("order.submitted_at", ">", cursorTime),
-          eb.and([
-            eb("order.submitted_at", "=", cursorTime),
-            eb("order.id", ">", cursorId),
-          ]),
-        ]),
+      const cursor = filter.cursor;
+      query = query.where(
+        sql<boolean>`(
+          ${DEFER_RANK} > ${cursor.deferRank}
+          or (${DEFER_RANK} = ${cursor.deferRank} and ${PRIORITY_RANK} > ${cursor.priorityRank})
+          or (${DEFER_RANK} = ${cursor.deferRank} and ${PRIORITY_RANK} = ${cursor.priorityRank} and "order".submitted_at > ${cursorTime})
+          or (${DEFER_RANK} = ${cursor.deferRank} and ${PRIORITY_RANK} = ${cursor.priorityRank} and "order".submitted_at = ${cursorTime} and "order".id > ${cursor.id})
+        )`,
       );
     }
 
     return query
+      .orderBy(DEFER_RANK, "asc")
+      .orderBy(PRIORITY_RANK, "asc")
       .orderBy("order.submitted_at", "asc")
       .orderBy("order.id", "asc")
       .limit(filter.limit + 1)
@@ -178,6 +213,17 @@ export class OperationalOrderQueueRepository {
         "order.subtotal_minor as subtotalMinor",
         "order.currency as currency",
         "order.customer_note as customerNote",
+        "order.priority_code as priorityCode",
+        "order.priority_reason as priorityReason",
+        "order.prioritized_at as prioritizedAt",
+        "order.defer_reason as deferReason",
+        "order.deferred_at as deferredAt",
+        "order.deferred_until as deferredUntil",
+        "order.remake_count as remakeCount",
+        "order.last_remake_reason as lastRemakeReason",
+        "order.remake_requested_at as remakeRequestedAt",
+        DEFER_RANK.as("deferRank"),
+        PRIORITY_RANK.as("priorityRank"),
         sql<number>`count(item.id)::int`.as("lineCount"),
         sql<number>`coalesce(sum(item.quantity), 0)::int`.as("unitCount"),
       ])
@@ -197,6 +243,15 @@ export class OperationalOrderQueueRepository {
         "order.subtotal_minor",
         "order.currency",
         "order.customer_note",
+        "order.priority_code",
+        "order.priority_reason",
+        "order.prioritized_at",
+        "order.defer_reason",
+        "order.deferred_at",
+        "order.deferred_until",
+        "order.remake_count",
+        "order.last_remake_reason",
+        "order.remake_requested_at",
       ])
       .executeTakeFirst();
 
