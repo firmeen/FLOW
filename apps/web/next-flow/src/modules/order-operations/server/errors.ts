@@ -94,3 +94,27 @@ export function isOperationalOrderExceptionError(
 ): value is OperationalOrderExceptionError {
   return value instanceof OperationalOrderExceptionError;
 }
+
+export type OperationalOrderProductionControlErrorCode =
+  | "ORDER_CONTROL_INVALID_REQUEST"
+  | "ORDER_CONTROL_FORBIDDEN"
+  | "ORDER_CONTROL_NOT_FOUND"
+  | "ORDER_CONTROL_CONFLICT"
+  | "ORDER_CONTROL_INVARIANT_VIOLATION"
+  | "ORDER_CONTROL_UNAVAILABLE";
+
+export class OperationalOrderProductionControlError extends Error {
+  readonly code: OperationalOrderProductionControlErrorCode;
+
+  constructor(code: OperationalOrderProductionControlErrorCode, cause?: unknown) {
+    super(code, { cause });
+    this.name = "OperationalOrderProductionControlError";
+    this.code = code;
+  }
+}
+
+export function isOperationalOrderProductionControlError(
+  value: unknown,
+): value is OperationalOrderProductionControlError {
+  return value instanceof OperationalOrderProductionControlError;
+}
