@@ -37,13 +37,6 @@ select ok(
   'generic public roles cannot mutate production controls'
 );
 
-select throws_ok(
-  $$update foodflow.orders set priority_code = 'CRITICAL' where false$$,
-  '23514',
-  null,
-  'invalid priority code is rejected by the database contract'
-);
-
 insert into foodflow.orders (
   id, tenant_id, restaurant_id, branch_id, table_id, table_session_id,
   order_number, status, customer_status, subtotal_minor, currency,
@@ -72,6 +65,13 @@ values
     'p04-r05-db-a2', '2040-05-01T00:00:00Z'::timestamptz,
     '2040-05-01T00:00:01Z'::timestamptz
   );
+
+select throws_ok(
+  $$update foodflow.orders set priority_code = 'CRITICAL' where id = 'bc000000-0000-4000-8000-000000000001'$$,
+  '23514',
+  null,
+  'invalid priority code is rejected by the database contract'
+);
 
 grant usage on schema extensions to flow_runtime;
 set local role flow_runtime;
