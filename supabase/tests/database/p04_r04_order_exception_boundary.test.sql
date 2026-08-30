@@ -10,7 +10,9 @@ select ok(
     from pg_constraint constraint_row
     where constraint_row.conrelid = 'foodflow.orders'::regclass
       and constraint_row.contype = 'c'
-      and pg_get_constraintdef(constraint_row.oid) like '%status%CHANGED%CANCELLED%'
+      and pg_get_constraintdef(constraint_row.oid) like '%status%'
+      and position('CHANGED' in pg_get_constraintdef(constraint_row.oid)) > 0
+      and position('CANCELLED' in pg_get_constraintdef(constraint_row.oid)) > 0
   ),
   'orders persisted status constraint supports CHANGED and CANCELLED'
 );
