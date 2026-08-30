@@ -21,6 +21,31 @@ export type OperationalOrderStatus =
   | "REMAKE"
   | "VOIDED";
 
+export type OperationalOrderPriorityReasonCode =
+  | "CUSTOMER_ESCALATION"
+  | "SERVICE_RECOVERY"
+  | "WAIT_TIME"
+  | "MANAGER_OVERRIDE"
+  | "SAFETY_OR_QUALITY"
+  | "OTHER";
+export type OperationalOrderDeferReasonCode =
+  | "CAPACITY"
+  | "INGREDIENT_WAIT"
+  | "EQUIPMENT_ISSUE"
+  | "CUSTOMER_REQUEST"
+  | "STAFFING"
+  | "DEPENDENCY"
+  | "OTHER";
+export type OperationalOrderRemakeReasonCode =
+  | "QUALITY_ISSUE"
+  | "WRONG_ITEM"
+  | "MISSING_COMPONENT"
+  | "TEMPERATURE"
+  | "DAMAGED_OR_SPILLED"
+  | "CUSTOMER_REQUEST"
+  | "STAFF_ERROR"
+  | "OTHER";
+
 export interface OperationalOrderQueueItem {
   readonly id: string;
   readonly orderNumber: string;
@@ -36,6 +61,16 @@ export interface OperationalOrderQueueItem {
   readonly lineCount: number;
   readonly unitCount: number;
   readonly hasCustomerNote: boolean;
+  readonly priority: "NORMAL" | "URGENT";
+  readonly priorityReason: OperationalOrderPriorityReasonCode | null;
+  readonly prioritizedAt: string | null;
+  readonly deferred: boolean;
+  readonly deferReason: OperationalOrderDeferReasonCode | null;
+  readonly deferredAt: string | null;
+  readonly deferredUntil: string | null;
+  readonly remakeCount: number;
+  readonly lastRemakeReason: OperationalOrderRemakeReasonCode | null;
+  readonly remakeRequestedAt: string | null;
 }
 
 export interface OperationalOrderDetail extends OperationalOrderQueueItem {
@@ -96,7 +131,7 @@ export function OperationalOrderCard({
   onReview: () => void;
 }) {
   return (
-    <Card className="overflow-hidden border-t-4 border-t-amber-500">
+    <Card className={`overflow-hidden border-t-4 ${order.priority === "URGENT" ? "border-t-destructive" : "border-t-amber-500"}`}>
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -108,6 +143,9 @@ export function OperationalOrderCard({
             </h3>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Badge tone="warning">{statusLabel(order.status)}</Badge>
+              {order.priority === "URGENT" ? <Badge tone="danger">Urgent</Badge> : null}
+              {order.deferred ? <Badge tone="neutral">Deferred</Badge> : null}
+              {order.remakeCount > 0 ? <Badge tone="neutral">Remake {order.remakeCount}</Badge> : null}
               <Badge tone="neutral">
                 {order.source === "CUSTOMER_WEB" ? "Customer web" : "Other source"}
               </Badge>
@@ -166,6 +204,30 @@ export function OperationalOrderDetailView({
         <DetailMetric label="Waiting" value={formatElapsed(detail.submittedAt, now)} />
         <DetailMetric label="Subtotal" value={formatMinorMoney(detail.subtotalMinor, detail.currency)} />
       </div>
+
+      <section className="rounded-md border border-border bg-muted/40 p-3">
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={detail.priority === "URGENT" ? "danger" : "neutral"}>
+            Priority: {detail.priority === "URGENT" ? "Urgent" : "Normal"}
+          </Badge>
+          <Badge tone={detail.deferred ? "warning" : "neutral"}>
+            {detail.deferred ? "Deferred" : "Active"}
+          </Badge>
+          <Badge tone="neutral">Remakes: {detail.remakeCount}/3</Badge>
+        </div>
+        {detail.priorityReason || detail.deferReason || detail.lastRemakeReason ? (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            {detail.priorityReason ? `Priority reason: ${humanizeCode(detail.priorityReason)}. ` : ""}
+            {detail.deferReason ? `Defer reason: ${humanizeCode(detail.deferReason)}. ` : ""}
+            {detail.lastRemakeReason ? `Last remake: ${humanizeCode(detail.lastRemakeReason)}.` : ""}
+          </p>
+        ) : null}
+        {detail.deferredUntil ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Deferred until {formatBangkokTime(detail.deferredUntil)}
+          </p>
+        ) : null}
+      </section>
 
       <section>
         <div className="flex items-center justify-between gap-3">
@@ -226,7 +288,7 @@ export function OperationalOrderDetailView({
       ) : null}
 
       <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">
-        Item and modifier snapshots remain read-only. Initial accept/reject decisions are handled separately and never rewrite these submitted facts.
+        Item and modifier snapshots remain read-only. Priority, defer and remake controls are server-authorized operational metadata and never replace the durable lifecycle state.
       </p>
     </div>
   );
@@ -268,7 +330,11 @@ export function formatMinorMoney(minor: string, currency: string): string {
 }
 
 export function statusLabel(status: OperationalOrderStatus): string {
-  return status
+  return humanizeCode(status);
+}
+
+function humanizeCode(value: string): string {
+  return value
     .toLowerCase()
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
