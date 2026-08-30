@@ -19,7 +19,7 @@ function expectInvalidQuery(callback: () => unknown) {
   }
 }
 
-describe("P04/R01 operational order queue contracts", () => {
+describe("P04 operational order queue contracts", () => {
   it("uses bounded incoming defaults without client scope authority", () => {
     const parsed = parseOperationalOrderQueueSearchParams(new URLSearchParams());
 
@@ -76,16 +76,20 @@ describe("P04/R01 operational order queue contracts", () => {
     );
   });
 
-  it("encodes an opaque stable cursor without tenant or branch authority", () => {
+  it("encodes rank dimensions in cursor v2 without tenant or branch authority", () => {
     const encoded = encodeOperationalOrderCursor({
-      v: 1,
+      v: 2,
+      deferRank: 0,
+      priorityRank: 0,
       submittedAt: "2040-01-01T00:00:00.000Z",
       id: "10000000-0000-4000-8000-000000000001",
     });
     const decodedPayload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
 
     expect(decodedPayload).toEqual({
-      v: 1,
+      v: 2,
+      deferRank: 0,
+      priorityRank: 0,
       submittedAt: "2040-01-01T00:00:00.000Z",
       id: "10000000-0000-4000-8000-000000000001",
     });
@@ -94,20 +98,30 @@ describe("P04/R01 operational order queue contracts", () => {
     expect(decodeOperationalOrderCursor(encoded)).toEqual(decodedPayload);
   });
 
-  it("rejects malformed or authority-bearing cursors", () => {
+  it("rejects malformed, old-version or authority-bearing cursors", () => {
     expectInvalidQuery(() => decodeOperationalOrderCursor("not-json"));
-    const authorityBearing = Buffer.from(
-      JSON.stringify({
+    for (const payload of [
+      {
         v: 1,
         submittedAt: "2040-01-01T00:00:00.000Z",
         id: "10000000-0000-4000-8000-000000000001",
+      },
+      {
+        v: 2,
+        deferRank: 0,
+        priorityRank: 1,
+        submittedAt: "2040-01-01T00:00:00.000Z",
+        id: "10000000-0000-4000-8000-000000000001",
         branchId: "00000000-0000-0000-0000-0000000000ac",
-      }),
-    ).toString("base64url");
-    expectInvalidQuery(() => decodeOperationalOrderCursor(authorityBearing));
+      },
+    ]) {
+      expectInvalidQuery(() =>
+        decodeOperationalOrderCursor(Buffer.from(JSON.stringify(payload)).toString("base64url")),
+      );
+    }
   });
 
-  it("maps persisted snapshots without exposing customer capability identity", () => {
+  it("maps production control metadata without exposing customer or staff authority", () => {
     const row: OperationalOrderQueueRow = {
       id: "10000000-0000-4000-8000-000000000001",
       orderNumber: "A1-2040-001",
@@ -122,6 +136,17 @@ describe("P04/R01 operational order queue contracts", () => {
       lineCount: 1,
       unitCount: 2,
       customerNote: "private note",
+      priorityCode: "URGENT",
+      priorityReason: "WAIT_TIME",
+      prioritizedAt: new Date("2040-01-01T00:01:00Z"),
+      deferReason: null,
+      deferredAt: null,
+      deferredUntil: null,
+      remakeCount: 1,
+      lastRemakeReason: "QUALITY_ISSUE",
+      remakeRequestedAt: new Date("2040-01-01T00:02:00Z"),
+      deferRank: 0,
+      priorityRank: 0,
     };
 
     const mapped = mapOperationalOrderQueueRow(row);
@@ -131,11 +156,14 @@ describe("P04/R01 operational order queue contracts", () => {
       orderingMode: "DINE_IN",
       subtotalMinor: "12500",
       currency: "THB",
-      lineCount: 1,
-      unitCount: 2,
-      hasCustomerNote: true,
+      priority: "URGENT",
+      priorityReason: "WAIT_TIME",
+      deferred: false,
+      remakeCount: 1,
+      lastRemakeReason: "QUALITY_ISSUE",
     });
     expect(mapped).not.toHaveProperty("customerCapabilityId");
     expect(mapped).not.toHaveProperty("customerNote");
+    expect(mapped).not.toHaveProperty("prioritizedByStaff");
   });
 });
