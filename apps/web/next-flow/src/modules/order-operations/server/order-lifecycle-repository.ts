@@ -40,6 +40,15 @@ export class OperationalOrderLifecycleRepository {
         : spec.timestampColumn === "ready_at"
           ? { ready_at: timestamp }
           : { served_at: timestamp };
+    const terminalControlPatch =
+      spec.to === "SERVED"
+        ? {
+            priority_code: "NORMAL",
+            priority_reason: null,
+            prioritized_at: null,
+            prioritized_by_staff: null,
+          }
+        : {};
 
     const row = await this.trx
       .updateTable("foodflow.orders")
@@ -48,11 +57,13 @@ export class OperationalOrderLifecycleRepository {
         customer_status: spec.customerStatus,
         modified_by_staff: this.context.actorId,
         ...timestampPatch,
+        ...terminalControlPatch,
       })
       .where("tenant_id", "=", this.context.tenantId)
       .where("branch_id", "=", this.context.branchId)
       .where("id", "=", orderId)
       .where("status", "=", spec.from)
+      .where("defer_reason", "is", null)
       .returning([
         "id",
         "order_number as orderNumber",
