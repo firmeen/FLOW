@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { FLOW_BRAND_ASSETS } from "@/config/brand-assets";
-import { CustomerExperience } from "@/features/customer/customer-experience";
+import { DurableCustomerExperience } from "@/features/customer/durable-customer-experience";
 import { getCurrentCustomerContext } from "@/modules/customer-capability/server/current-context";
 import {
   buildCustomerExchangePath,
@@ -62,10 +62,11 @@ export default async function CustomerTablePage(props: {
   return (
     <div
       data-flow-customer-data-source="database"
+      data-flow-customer-runtime="durable"
       data-flow-restaurant={snapshot.data.storefront.restaurantId}
       data-flow-branch={snapshot.data.storefront.branchId}
     >
-      <CustomerExperience tableCode={resolution.context.tableCode} />
+      <DurableCustomerExperience snapshot={snapshot.data} />
     </div>
   );
 }
