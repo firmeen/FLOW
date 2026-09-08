@@ -1,5 +1,5 @@
-import { StaffOperations } from "@/features/staff/staff-operations";
+import { StaffOperationsRouter } from "@/features/staff/operational-orders-workspace";
 
 export default function StaffPage() {
-  return <StaffOperations />;
+  return <StaffOperationsRouter />;
 }

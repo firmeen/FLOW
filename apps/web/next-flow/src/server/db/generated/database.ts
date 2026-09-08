@@ -406,14 +406,35 @@ export interface FoodflowOrders {
   customer_capability_id: string | null;
   customer_note: string | null;
   customer_status: string | null;
+  defer_reason: string | null;
+  /**
+   * Current active operational defer start. Null means the order is not currently deferred.
+   */
+  deferred_at: Timestamp | null;
+  deferred_by_staff: string | null;
+  deferred_until: Timestamp | null;
   id: Generated<string>;
+  last_remake_reason: string | null;
   modified_by_staff: string | null;
   order_number: string;
   paid_at: Timestamp | null;
   preparing_at: Timestamp | null;
+  prioritized_at: Timestamp | null;
+  prioritized_by_staff: string | null;
+  /**
+   * Current internal operational priority. NORMAL/URGENT only; history is in order_events.
+   */
+  priority_code: Generated<string>;
+  priority_reason: string | null;
   ready_at: Timestamp | null;
   rejected_at: Timestamp | null;
   rejection_reason: string | null;
+  /**
+   * Bounded number of successful P04/R05 remake requests for this order (maximum 3).
+   */
+  remake_count: Generated<number>;
+  remake_requested_at: Timestamp | null;
+  remake_requested_by_staff: string | null;
   restaurant_id: string;
   served_at: Timestamp | null;
   /**
