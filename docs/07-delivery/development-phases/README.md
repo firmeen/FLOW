@@ -1,212 +1,73 @@
-# FLOW Development Phase Specifications
+# FLOW Historical Phase/Round Specifications
 
-This directory is the source of truth for phase/round implementation specifications used to control FLOW development progression.
+Status: `HISTORICAL`  
+Active progression authority: **NONE in this directory**
 
-## Location
+This directory preserves the former FLOW Phase/Round development model, its executable specifications, templates, acceptance records and implementation lineage as historical engineering evidence.
 
-```text
-docs/07-delivery/development-phases/
-```
+As of the post-R06 source-code rebaseline on 2026-09-08, **Phase/Round is no longer the active planning, scheduling, branching or implementation progression model.** Do not create P05 or later work from these documents and do not use a historical `Next:` field as permission to continue development.
 
-## File naming pattern
+## Current authority
 
-Every executable development round must have exactly one specification file using this pattern:
+Use the source-code rebaseline documents instead:
+
+- `../rebaseline/SYSTEM_CURRENT_STATE.md`
+- `../rebaseline/SYSTEM_GAP_MATRIX.md`
+- `../rebaseline/SYSTEM_DECISIONS.md`
+- `../rebaseline/PRODUCT_BEACHHEAD.md`
+- `../rebaseline/ARCHITECTURE_BASELINE.md`
+- `../rebaseline/DELIVERY_POLICY.md`
+- `../rebaseline/REBASELINE_BACKLOG.md`
+
+Current work is selected by capability dependency, risk and acceptance evidence. The active implementation branch normally starts from the current trusted `main` unless an approved capability explicitly declares another parent.
+
+## What remains valid here
+
+Historical specifications may still contain useful evidence about:
+
+- intended business invariants;
+- database constraints and RLS expectations;
+- authorization boundaries;
+- state transitions;
+- concurrency/idempotency requirements;
+- acceptance scenarios;
+- migration provenance;
+- branch/PR lineage and earlier implementation decisions.
+
+Those details are evidence to classify as `KEEP`, `SALVAGE`, `REWRITE`, `DROP` or `HISTORICAL`; they are **not automatically current implementation authority**.
+
+## Preservation rule
+
+Do not delete, rename or rewrite historical specifications and migrations merely to remove Phase/Round naming or old workflow language. A migration that may have been applied remains immutable; schema corrections use forward migrations.
+
+Historical branches and PRs may also remain available as evidence until an explicit cleanup decision says they can be retired.
+
+## Former naming pattern
+
+Files named like the following are historical records:
 
 ```text
 FLOW_P{PHASE}_R{ROUND}_IMPLEMENTATION_SPEC.md
 ```
 
-Examples:
+Templates, merge policy documents and prior acceptance records in this directory are likewise historical unless an active rebaseline document explicitly incorporates a technical invariant from them.
+
+## Delivery rule now
+
+For new implementation work:
 
 ```text
-FLOW_P01_R01_IMPLEMENTATION_SPEC.md
-FLOW_P01_R02_IMPLEMENTATION_SPEC.md
-FLOW_P01_R03_IMPLEMENTATION_SPEC.md
-FLOW_P01_R04_IMPLEMENTATION_SPEC.md
-FLOW_P01_R05_IMPLEMENTATION_SPEC.md
-FLOW_P01_R06_IMPLEMENTATION_SPEC.md
-FLOW_P02_R01_IMPLEMENTATION_SPEC.md
+READ CURRENT MAIN + REBASELINE AUTHORITY
+→ SELECT ONE CAPABILITY-SIZED BACKLOG ITEM
+→ CREATE A FOCUSED BRANCH
+→ IMPLEMENT DURABLE SOURCE AUTHORITY
+→ RUN ALL APPLICABLE REPOSITORY / APPLICATION / DATABASE / BROWSER GATES
+→ OPEN OR UPDATE PR
+→ OWNER MERGE DECISION
 ```
 
-Rules:
+No Phase/Round schedule, branch chain, six-round completion count, or `Previous`/`Next` metadata controls the successor workflow.
 
-- `P01`, `P02`, ... identify the phase.
-- `R01` through `R06` identify the development round inside that phase.
-- One phase contains 6 rounds.
-- The normal cadence is 2 days per phase and 3 rounds per day.
-- The normal round times are 04:00, 12:00, and 20:00 Asia/Bangkok.
-- One scheduled slot may execute at most one round.
-- Do not rename a specification after development for that round has started.
-- Do not reuse a phase/round filename for a different scope.
+## Safety
 
-## Authority and implementation lineage
-
-FLOW uses two separate sources for control and code lineage:
-
-```text
-MAIN
-= policy / specification authority
-
-LATEST ROUND BRANCH
-= implementation parent
-```
-
-Every scheduled round must read the controlling policy and exact executable specification from current `main` only. A round branch, previous round branch, PR body, remembered state, or unmerged documentation branch must never replace `main` as the authority source.
-
-Implementation branches follow a branch chain. Each new round creates a new dedicated short-lived round branch from the latest round implementation branch, not from `main`, unless there is no prior round branch in the active chain.
-
-Example:
-
-```text
-main                  (authority only)
-  \
-   p02-r01-core
-        \
-         p02-r02-auth
-              \
-               p02-r03-order
-```
-
-Recommended short branch pattern:
-
-```text
-p{phase}-r{round}-{short-description}
-```
-
-Examples:
-
-```text
-p02-r01-core
-p02-r02-auth
-p02-r03-order
-```
-
-The description should be short and specific.
-
-## Development gate
-
-FLOW development must follow these hard gates:
-
-```text
-NO SPEC ON MAIN = NO DEVELOPMENT
-FAILED REQUIRED CI = ROUND NOT READY
-NO ROUND BRANCH = NO NEXT ROUND BRANCH
-6 IMPLEMENTED ROUND BRANCHES = PHASE IMPLEMENTATION CHAIN COMPLETE
-NO NEXT PHASE SPEC ON MAIN = STOP
-```
-
-Before starting any round, verify all of the following:
-
-1. The exact current-round specification exists on `main`.
-2. The specification is `READY` and has valid Phase/Round/Previous/Next metadata.
-3. The planned execution slot is due when the specification declares one.
-4. The previous round branch exists and is the latest implementation parent, unless this is the first round in the active branch chain.
-5. Required validation for the previous round branch passed when the current specification depends on that validation.
-6. The current implementation scope is taken only from the specification on `main`; agents must not invent the next round when no specification exists.
-
-A previous round does not need to be merged into `main` before the next round branch is created. Branch progression is based on the latest round branch, while specification authority remains on `main`.
-
-If any required entry gate fails, stop before implementation and report the exact blocker.
-
-## Branch and PR policy
-
-For every implementation round:
-
-```text
-READ POLICY + EXACT SPEC FROM MAIN
-→ IDENTIFY LATEST ROUND BRANCH
-→ CREATE A NEW ROUND BRANCH FROM THAT BRANCH
-→ IMPLEMENT EXACT SPEC
-→ RUN REQUIRED VALIDATION ON THE NEW ROUND BRANCH
-→ OPEN OR UPDATE THE ROUND PR
-→ STOP
-```
-
-The development agent must not merge implementation PRs. PR merge timing and selection remain owner-controlled.
-
-Direct push to `main` remains prohibited.
-
-A round PR may target `main` or another owner-selected integration branch according to the current repository workflow, but creating the next round branch does not depend on that PR being merged.
-
-## Specification precedence
-
-Executable specifications remain authoritative for implementation scope, security boundaries, required validation, Phase/Round metadata, and non-merge prohibitions.
-
-If a historical specification contains merge-mechanics language such as:
-
-```text
-Automatic merge allowed: YES
-Automatic merge allowed: NO
-Owner/manual merge required
-Stop for owner review
-No successful merge = no next round
-```
-
-current `FLOW_MERGE_POLICY.md` and this README supersede those phrases only for branch progression, PR ownership, and merge mechanics. They do not broaden or reduce implementation scope.
-
-Historical completed-round specs do not need to be rewritten solely to modernize old workflow wording.
-
-## Required specification structure
-
-Each round specification should cover the complete implementation surface needed for that round, including at minimum:
-
-1. Metadata
-2. Phase objective
-3. Phase scope
-4. Current round objective
-5. Preconditions
-6. Architecture scope
-7. Existing files and current behavior
-8. Files to create
-9. Files to modify
-10. Files to move
-11. Files to remove
-12. Database changes
-13. Backend changes
-14. Frontend changes
-15. Authentication and authorization
-16. Security requirements
-17. Failure and recovery paths
-18. Dependencies
-19. Tests
-20. Validation commands
-21. PR requirements
-22. Definition of Done
-23. Handoff to the next round
-
-Use `FLOW_PHASE_ROUND_SPEC_TEMPLATE.md` in this directory as the starting template.
-
-## Required metadata and continuation marker
-
-Every executable specification must make progression deterministic. Include fields equivalent to:
-
-```text
-Phase: 01
-Round: 01
-Status: READY
-Previous: NONE
-Next: FLOW_P01_R02_IMPLEMENTATION_SPEC.md
-Planned execution: YYYY-MM-DD HH:mm Asia/Bangkok
-```
-
-The final round of a phase points to the first round of the next phase:
-
-```text
-Next: FLOW_P02_R01_IMPLEMENTATION_SPEC.md
-```
-
-If the referenced next file is not present on `main`, the development workflow must stop before starting the next phase branch.
-
-## Upload workflow
-
-For a new round specification:
-
-1. Copy `FLOW_PHASE_ROUND_SPEC_TEMPLATE.md`.
-2. Rename it using `FLOW_P{PHASE}_R{ROUND}_IMPLEMENTATION_SPEC.md`.
-3. Fill every section required by the scope.
-4. Confirm `Previous` and `Next` are correct.
-5. Confirm workflow metadata follows `FLOW_MERGE_POLICY.md`.
-6. Open a PR targeting `main`.
-7. Merge the specification to `main` before that development round is allowed to start.
-
-The repository state on `main` is the authoritative source for whether a specification exists and whether development may continue.
+If a historical Phase/Round document conflicts with verified current source, tests or active rebaseline decisions, record the drift and follow the active rebaseline authority. Do not weaken security, RLS, concurrency, idempotency or acceptance invariants merely because an older progression document says a round was complete.

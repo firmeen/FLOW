@@ -10,6 +10,10 @@ import { PERMISSIONS } from "@/modules/identity/server/permissions";
 
 import { OperationalOrderLifecycleError } from "./errors";
 import {
+  acquireOperationalOrderMutationLock,
+  OperationalOrderMutationBusyError,
+} from "./order-mutation-lock";
+import {
   OperationalOrderLifecycleRepository,
   type OperationalOrderLifecycleMutationRow,
 } from "./order-lifecycle-repository";
@@ -146,10 +150,17 @@ export async function transitionOperationalOrderLifecycle(
       PERMISSIONS.orderManage,
       "branch",
       async (trx, authorizedContext) => {
-        const repository = new OperationalOrderLifecycleRepository(
+        const scopedContext = trustedContext(authorizedContext);
+        const locked = await acquireOperationalOrderMutationLock(
           trx,
-          trustedContext(authorizedContext),
+          scopedContext,
+          normalizedCommand.orderId,
         );
+        if (!locked) {
+          throw new OperationalOrderLifecycleError("ORDER_LIFECYCLE_NOT_FOUND");
+        }
+
+        const repository = new OperationalOrderLifecycleRepository(trx, scopedContext);
         const row = await repository.transition(normalizedCommand.orderId, spec);
         if (!row) {
           const current = await repository.findScopedState(normalizedCommand.orderId);
@@ -166,6 +177,9 @@ export async function transitionOperationalOrderLifecycle(
     );
   } catch (error) {
     if (error instanceof OperationalOrderLifecycleError) throw error;
+    if (error instanceof OperationalOrderMutationBusyError) {
+      throw new OperationalOrderLifecycleError("ORDER_LIFECYCLE_CONFLICT", error);
+    }
     if (error instanceof AuthorizationDeniedError) {
       throw new OperationalOrderLifecycleError("ORDER_LIFECYCLE_FORBIDDEN", error);
     }

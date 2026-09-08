@@ -10,6 +10,10 @@ import { PERMISSIONS } from "@/modules/identity/server/permissions";
 
 import { OperationalOrderProductionControlError } from "./errors";
 import {
+  acquireOperationalOrderMutationLock,
+  OperationalOrderMutationBusyError,
+} from "./order-mutation-lock";
+import {
   OperationalOrderProductionControlRepository,
   type OperationalOrderProductionControlMutation,
   type OperationalOrderProductionControlRow,
@@ -305,16 +309,26 @@ export async function executeOperationalOrderProductionControl(
       PERMISSIONS.orderManage,
       "branch",
       async (trx, authorizedContext) => {
-        const repository = new OperationalOrderProductionControlRepository(
+        const scopedContext = trustedContext(authorizedContext);
+        const locked = await acquireOperationalOrderMutationLock(
           trx,
-          trustedContext(authorizedContext),
+          scopedContext,
+          normalizedCommand.orderId,
         );
+        if (!locked) {
+          throw new OperationalOrderProductionControlError("ORDER_CONTROL_NOT_FOUND");
+        }
+
+        const repository = new OperationalOrderProductionControlRepository(trx, scopedContext);
         const mutation = await executeLockedControl(repository, normalizedCommand);
         return mapOperationalOrderProductionControlResult(normalizedCommand.action, mutation);
       },
     );
   } catch (error) {
     if (error instanceof OperationalOrderProductionControlError) throw error;
+    if (error instanceof OperationalOrderMutationBusyError) {
+      throw new OperationalOrderProductionControlError("ORDER_CONTROL_CONFLICT", error);
+    }
     if (error instanceof AuthorizationDeniedError) {
       throw new OperationalOrderProductionControlError("ORDER_CONTROL_FORBIDDEN", error);
     }

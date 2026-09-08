@@ -10,6 +10,10 @@ import { PERMISSIONS } from "@/modules/identity/server/permissions";
 
 import { OperationalOrderExceptionError } from "./errors";
 import {
+  acquireOperationalOrderMutationLock,
+  OperationalOrderMutationBusyError,
+} from "./order-mutation-lock";
+import {
   OperationalOrderExceptionRepository,
   type OperationalOrderAmendmentMutationRow,
   type OperationalOrderCancellationMutationRow,
@@ -424,10 +428,17 @@ export async function executeOperationalOrderException(
       PERMISSIONS.orderManage,
       "branch",
       async (trx, authorizedContext) => {
-        const repository = new OperationalOrderExceptionRepository(
+        const scopedContext = trustedContext(authorizedContext);
+        const locked = await acquireOperationalOrderMutationLock(
           trx,
-          trustedContext(authorizedContext),
+          scopedContext,
+          normalizedOrderId,
         );
+        if (!locked) {
+          throw new OperationalOrderExceptionError("ORDER_EXCEPTION_NOT_FOUND");
+        }
+
+        const repository = new OperationalOrderExceptionRepository(trx, scopedContext);
         const normalizedCommand = Object.freeze({ ...command, orderId: normalizedOrderId });
         return normalizedCommand.action === "AMEND"
           ? executeAmendment(repository, normalizedCommand)
@@ -436,6 +447,9 @@ export async function executeOperationalOrderException(
     );
   } catch (error) {
     if (error instanceof OperationalOrderExceptionError) throw error;
+    if (error instanceof OperationalOrderMutationBusyError) {
+      throw new OperationalOrderExceptionError("ORDER_EXCEPTION_CONFLICT", error);
+    }
     if (error instanceof AuthorizationDeniedError) {
       throw new OperationalOrderExceptionError("ORDER_EXCEPTION_FORBIDDEN", error);
     }

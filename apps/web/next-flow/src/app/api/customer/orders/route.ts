@@ -1,4 +1,7 @@
-import { submitCustomerOrderIdempotent } from "@/modules/customer-data/server";
+import {
+  listCurrentCustomerOrders,
+  submitCustomerOrderIdempotent,
+} from "@/modules/customer-data/server";
 import {
   assertCustomerCommandSameOrigin,
   customerCommandFailure,
@@ -6,6 +9,15 @@ import {
   readCustomerCommandJson,
   readCustomerIdempotencyKey,
 } from "@/modules/customer-data/server/commands/http";
+
+export async function GET(): Promise<Response> {
+  try {
+    const orders = await listCurrentCustomerOrders();
+    return customerCommandSuccess(orders);
+  } catch (error) {
+    return customerCommandFailure(error);
+  }
+}
 
 export async function POST(request: Request): Promise<Response> {
   try {

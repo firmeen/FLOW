@@ -10,6 +10,10 @@ import { PERMISSIONS } from "@/modules/identity/server/permissions";
 
 import { OperationalOrderDecisionError } from "./errors";
 import {
+  acquireOperationalOrderMutationLock,
+  OperationalOrderMutationBusyError,
+} from "./order-mutation-lock";
+import {
   OperationalOrderDecisionRepository,
   type OperationalOrderDecisionMutationRow,
 } from "./order-decision-repository";
@@ -158,10 +162,17 @@ async function executeOperationalOrderDecision(
       PERMISSIONS.orderManage,
       "branch",
       async (trx, authorizedContext) => {
-        const repository = new OperationalOrderDecisionRepository(
+        const scopedContext = trustedContext(authorizedContext);
+        const locked = await acquireOperationalOrderMutationLock(
           trx,
-          trustedContext(authorizedContext),
+          scopedContext,
+          command.orderId,
         );
+        if (!locked) {
+          throw new OperationalOrderDecisionError("ORDER_DECISION_NOT_FOUND");
+        }
+
+        const repository = new OperationalOrderDecisionRepository(trx, scopedContext);
         const row =
           command.decision === "ACCEPT"
             ? await repository.accept(command.orderId, allowedSources)
@@ -180,6 +191,9 @@ async function executeOperationalOrderDecision(
     );
   } catch (error) {
     if (error instanceof OperationalOrderDecisionError) throw error;
+    if (error instanceof OperationalOrderMutationBusyError) {
+      throw new OperationalOrderDecisionError("ORDER_DECISION_CONFLICT", error);
+    }
     if (error instanceof AuthorizationDeniedError) {
       throw new OperationalOrderDecisionError("ORDER_DECISION_FORBIDDEN", error);
     }

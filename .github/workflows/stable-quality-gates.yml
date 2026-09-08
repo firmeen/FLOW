@@ -120,10 +120,10 @@ jobs:
         working-directory: apps/web/next-flow
         run: npm run test
 
-      - name: Build Next.js
+      - name: Build canonical Next.js production target
         if: steps.scope.outputs.run == 'true'
         working-directory: apps/web/next-flow
-        run: npm run build:next
+        run: npm run build
 
       - name: Report not applicable
         if: steps.scope.outputs.run != 'true'
@@ -153,7 +153,7 @@ jobs:
           fi
           CHANGED="$(git diff --name-only "$BASE...$HEAD" || true)"
           printf '%s\n' "$CHANGED"
-          if printf '%s\n' "$CHANGED" | grep -Eq '^(supabase/|apps/web/next-flow/src/server/db/|apps/web/next-flow/src/modules/customer-data/server/|apps/web/next-flow/tests/integration/database-runtime\.test\.ts$|apps/web/next-flow/tests/integration/identity-authorization-contract\.test\.ts$|apps/web/next-flow/tests/integration/customer-capability-contract\.test\.ts$|apps/web/next-flow/tests/integration/customer-data-access-contract\.test\.ts$|apps/web/next-flow/tests/unit/database-.*\.test\.ts$|apps/web/next-flow/scripts/.*database-types\.mjs$|apps/web/next-flow/package\.json$|apps/web/next-flow/package-lock\.json$|\.github/workflows/stable-quality-gates\.yml$)'; then
+          if printf '%s\n' "$CHANGED" | grep -Eq '^(supabase/|apps/web/next-flow/src/server/db/|apps/web/next-flow/src/modules/(customer-data|identity|order-operations)/server/|apps/web/next-flow/tests/integration/|apps/web/next-flow/tests/unit/database-.*\.test\.ts$|apps/web/next-flow/scripts/.*database-types\.mjs$|apps/web/next-flow/package\.json$|apps/web/next-flow/package-lock\.json$|\.github/workflows/stable-quality-gates\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "Supabase database scope: applicable"
           else
@@ -198,9 +198,12 @@ jobs:
 
       - name: Provision local database login roles
         if: steps.scope.outputs.run == 'true'
-        env:
-          PGPASSWORD: postgres
-        run: psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "grant flow_runtime, flow_identity, flow_authenticator, flow_customer_entry, flow_customer_runtime to postgres;"
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_URL="$(./apps/web/next-flow/node_modules/.bin/supabase status -o env | sed -n 's/^DB_URL="\(.*\)"$/\1/p')"
+          test -n "$DB_URL"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "grant flow_runtime, flow_identity, flow_authenticator, flow_customer_entry, flow_customer_runtime to postgres;"
 
       - name: Database SQL tests
         if: steps.scope.outputs.run == 'true'
@@ -212,10 +215,13 @@ jobs:
 
       - name: Generate Kysely database types
         if: steps.scope.outputs.run == 'true'
-        working-directory: apps/web/next-flow
-        env:
-          DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-        run: npm run db:generate
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_URL="$(./apps/web/next-flow/node_modules/.bin/supabase status -o env | sed -n 's/^DB_URL="\(.*\)"$/\1/p')"
+          test -n "$DB_URL"
+          cd apps/web/next-flow
+          DATABASE_DIRECT_URL="$DB_URL" npm run db:generate
 
       - name: Verify generated type drift
         if: steps.scope.outputs.run == 'true'
@@ -224,14 +230,110 @@ jobs:
 
       - name: Database runtime integration tests
         if: steps.scope.outputs.run == 'true'
-        working-directory: apps/web/next-flow
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-          DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-          DATABASE_POOL_MAX: 2
-        run: npm run test:db-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_URL="$(./apps/web/next-flow/node_modules/.bin/supabase status -o env | sed -n 's/^DB_URL="\(.*\)"$/\1/p')"
+          test -n "$DB_URL"
+          cd apps/web/next-flow
+          DATABASE_URL="$DB_URL" DATABASE_DIRECT_URL="$DB_URL" DATABASE_POOL_MAX=2 npm run test:db-runtime
 
       - name: Report not applicable
         if: steps.scope.outputs.run != 'true'
         run: |
           echo "Supabase Database Quality: PASS (not applicable)"
+
+  browser-acceptance:
+    name: Browser Acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify browser scope
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          CHANGED="$(git diff --name-only "$BASE...$HEAD" || true)"
+          printf '%s\n' "$CHANGED"
+          if printf '%s\n' "$CHANGED" | grep -Eq '^(apps/web/next-flow/src/(app|components|features|hooks|modules)/|apps/web/next-flow/tests/e2e/|apps/web/next-flow/playwright\.config\.ts$|apps/web/next-flow/package\.json$|apps/web/next-flow/package-lock\.json$|\.github/workflows/stable-quality-gates\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Browser acceptance scope: applicable"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Browser acceptance scope: not applicable"
+          fi
+
+      - name: Set up Node.js
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/next-flow/package-lock.json
+
+      - name: Install application dependencies
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npm ci
+
+      - name: Install Chromium
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/web/next-flow
+        run: npx playwright install --with-deps chromium
+
+      - name: Start local Supabase
+        if: steps.scope.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOG_FILE="$(mktemp)"
+          if ./apps/web/next-flow/node_modules/.bin/supabase start 2>&1 | tee "$LOG_FILE"; then
+            exit 0
+          fi
+          if grep -Eqi '(toomanyrequests|429|rate limit|connection reset|temporary failure|timeout|i/o timeout|TLS handshake timeout|unexpected EOF)' "$LOG_FILE"; then
+            echo "Transient Supabase infrastructure failure classified; retrying once."
+            sleep 20
+            ./apps/web/next-flow/node_modules/.bin/supabase start
+            exit $?
+          fi
+          echo "Deterministic Supabase startup/migration failure; not retrying."
+          exit 1
+
+      - name: Reset migrations and seed
+        if: steps.scope.outputs.run == 'true'
+        run: ./apps/web/next-flow/node_modules/.bin/supabase db reset --local
+
+      - name: Provision local database login roles
+        if: steps.scope.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_URL="$(./apps/web/next-flow/node_modules/.bin/supabase status -o env | sed -n 's/^DB_URL="\(.*\)"$/\1/p')"
+          test -n "$DB_URL"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "grant flow_runtime, flow_identity, flow_authenticator, flow_customer_entry, flow_customer_runtime to postgres;"
+
+      - name: Run Playwright acceptance
+        if: steps.scope.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_URL="$(./apps/web/next-flow/node_modules/.bin/supabase status -o env | sed -n 's/^DB_URL="\(.*\)"$/\1/p')"
+          test -n "$DB_URL"
+          cd apps/web/next-flow
+          DATABASE_URL="$DB_URL" DATABASE_DIRECT_URL="$DB_URL" DATABASE_POOL_MAX=2 npm run test:e2e
+
+      - name: Report not applicable
+        if: steps.scope.outputs.run != 'true'
+        run: |
+          echo "Browser Acceptance: PASS (not applicable)"
