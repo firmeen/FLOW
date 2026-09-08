@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(28);
+select plan(27);
 
 select ok(
   exists (
@@ -209,6 +209,7 @@ select throws_ok(
   'current production-control actor must reference a real internal user'
 );
 
+grant usage on schema extensions to flow_runtime;
 set local role flow_runtime;
 select set_config('app.tenant_id', '00000000-0000-0000-0000-0000000000a1', true);
 select set_config('app.branch_id', '00000000-0000-0000-0000-0000000000a3', true);
