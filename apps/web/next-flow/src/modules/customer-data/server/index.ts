@@ -59,6 +59,12 @@ export type {
   PersistDraftOrderItemInput,
   PersistDraftOrderModifierInput,
 } from "./persistence-types";
+export {
+  listCurrentCustomerOrders,
+} from "./customer-order-read-service";
+export type {
+  CustomerVisibleOrderSummary,
+} from "./customer-order-read-service";
 export { loadCustomerStorefrontSnapshot } from "./storefront-service";
 export { withCustomerDataTransaction } from "./transaction";
 export type { CustomerDataTransactionScope } from "./transaction";
