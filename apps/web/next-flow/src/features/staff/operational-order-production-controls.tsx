@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, ClockArrowDown, LoaderCircle, RotateCcw, Zap } from "lucide-react";
 
 import { Badge, Button } from "@/components/foodflow-ui";
@@ -101,14 +101,6 @@ export function OperationalOrderProductionControls({
   const [deferredUntil, setDeferredUntil] = useState("");
   const [remakeReason, setRemakeReason] = useState<OperationalOrderRemakeReasonCode | "">("");
   const [busy, setBusy] = useState<ControlAction | null>(null);
-
-  useEffect(() => {
-    setPriorityReason("");
-    setDeferReason("");
-    setDeferredUntil("");
-    setRemakeReason("");
-    setBusy(null);
-  }, [detail.id]);
 
   const priorityEligible = PRIORITY_ELIGIBLE.has(detail.status);
   const deferEligible = DEFER_ELIGIBLE.has(detail.status);
