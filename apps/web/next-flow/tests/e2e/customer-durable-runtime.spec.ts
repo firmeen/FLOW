@@ -43,6 +43,10 @@ test.describe("customer durable runtime", () => {
     const orderNumber = (await durableOrder.getByRole("heading").textContent())?.trim();
     expect(orderNumber).toBeTruthy();
 
+    await page.getByRole("button", { name: /Open cart with 0 items/ }).click();
+    await expect(page.getByText("Nothing here yet")).toBeVisible();
+    await page.getByRole("button", { name: "Close cart" }).click();
+
     await page.reload();
     await page.getByRole("button", { name: "View orders" }).click();
     await expect(page.locator('[data-flow-customer-orders="database"]')).toBeVisible();
