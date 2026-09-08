@@ -22,7 +22,38 @@ FLOW Platform
 └── JobFlow
 ```
 
+## Current delivery authority
+
+FLOW อยู่ในช่วง source-code rebaseline หลังการรวม operational order plane เข้าสู่ `main`. ระบบ Phase/Round เดิมเป็น historical evidence และไม่ใช่ progression authority สำหรับงานใหม่
+
+ลำดับงานปัจจุบันใช้ capability dependency และ acceptance evidence จากเอกสาร rebaseline ภายใต้ `docs/07-delivery/rebaseline/` โดยมี **FoodFlow dine-in table ordering** เป็น production beachhead แรก:
+
+```text
+Verified table entry
+→ Live storefront
+→ Durable cart
+→ Durable order
+→ Staff operational plane
+→ Kitchen / service
+→ Cashier / payment
+→ Session closure / receipt
+```
+
+Browser state ใช้สำหรับ interaction/cache เท่านั้น และต้องไม่เป็น authoritative business workflow state เมื่อ capability นั้นมี durable server/database plane แล้ว
+
 ## Documentation
+
+### Rebaseline source of truth
+
+- [System current state](docs/07-delivery/rebaseline/SYSTEM_CURRENT_STATE.md)
+- [System gap matrix](docs/07-delivery/rebaseline/SYSTEM_GAP_MATRIX.md)
+- [System decisions](docs/07-delivery/rebaseline/SYSTEM_DECISIONS.md)
+- [Product beachhead](docs/07-delivery/rebaseline/PRODUCT_BEACHHEAD.md)
+- [Architecture baseline](docs/07-delivery/rebaseline/ARCHITECTURE_BASELINE.md)
+- [Delivery policy](docs/07-delivery/rebaseline/DELIVERY_POLICY.md)
+- [Ordered rebaseline backlog](docs/07-delivery/rebaseline/REBASELINE_BACKLOG.md)
+
+### Product and architecture knowledge
 
 - [Architecture hub](docs/06-architecture/README.md)
 - [Technology and application architecture](docs/06-architecture/application-architecture.md)
@@ -42,9 +73,11 @@ FLOW Platform
 - [Contributing guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
+Historical Phase/Round specifications and migrations remain repository evidence. Do not rewrite them merely to remove historical naming.
+
 ## Target technology stack
 
-ตารางนี้เป็น **Target Architecture** ไม่ใช่คำยืนยันว่าทุกส่วนติดตั้งใน Production แล้ว สถานะการนำไปใช้และ Migration gate อยู่ใน [Application Architecture](docs/06-architecture/application-architecture.md)
+ตารางนี้เป็น **Target Architecture** ไม่ใช่คำยืนยันว่าทุกส่วนติดตั้งใน Production แล้ว สถานะจริงของ code/runtime/data authority ต้องอ่านร่วมกับ [System current state](docs/07-delivery/rebaseline/SYSTEM_CURRENT_STATE.md) และ [Architecture baseline](docs/07-delivery/rebaseline/ARCHITECTURE_BASELINE.md)
 
 | Layer | Technology | หน้าที่ |
 |---|---|---|
@@ -75,7 +108,7 @@ FLOW/
 │   ├── 04-product/        # Product catalogs, bundles, requirements and workflows
 │   ├── 05-design/         # UX/UI foundations and design specifications
 │   ├── 06-architecture/   # System, data and integration architecture
-│   ├── 07-delivery/       # Planning, release and delivery controls
+│   ├── 07-delivery/       # Rebaseline authority, backlog, release and delivery controls
 │   ├── 08-operations/     # Runbooks and operating procedures
 │   └── 09-meetings/       # Meeting records and decisions
 ├── CONTRIBUTING.md
@@ -85,6 +118,8 @@ FLOW/
 
 ## Current product status
 
-Feature Catalog เป็น **Product Universe และ Product Strategy Baseline** ไม่ใช่คำสัญญาว่าจะพัฒนาทุก Feature พร้อมกัน การพัฒนาต้องเลือก Beachhead Product และทำ Workflow ที่ขายจริงให้สมบูรณ์ตั้งแต่ Entry ถึง Completion ก่อน
+Feature Catalog เป็น **Product Universe และ Product Strategy Baseline** ไม่ใช่คำสัญญาว่าจะพัฒนาทุก Feature พร้อมกัน
 
-ลำดับถัดไปของ Product Definition คือ Feature Dependency Matrix → Role & Permission Matrix → Workflow/State Model → Page Inventory → PRD/API/Test Case
+FoodFlow เป็น beachhead ปัจจุบัน และงาน production ต้องปิด workflow แบบ end-to-end ตาม dependency ก่อนขยาย CareFlow หรือ JobFlow. Capability ใดที่ยังใช้ `useFoodFlow()` / demo state ต้องถือเป็น prototype หรือ partial implementation จนกว่าจะมี durable server authority และ acceptance evidence ครบ
+
+ลำดับ implementation ที่ active อยู่ใน [Rebaseline Backlog](docs/07-delivery/rebaseline/REBASELINE_BACKLOG.md) เท่านั้น
