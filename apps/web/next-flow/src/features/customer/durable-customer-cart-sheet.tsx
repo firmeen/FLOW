@@ -17,7 +17,7 @@ interface DurableCustomerCartSheetProps {
   readonly open: boolean;
   readonly tableLabel: string;
   readonly cart: DurableCartAggregate | null;
-  readonly menuItems: readonly DurableCustomerMenuItem[];
+  readonly menuItems?: readonly DurableCustomerMenuItem[];
   readonly busy: boolean;
   readonly error: string | null;
   readonly onClose: () => void;
@@ -64,7 +64,7 @@ export function DurableCustomerCartSheet({
   open,
   tableLabel,
   cart,
-  menuItems,
+  menuItems = [],
   busy,
   error,
   onClose,
