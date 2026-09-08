@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(22);
+select plan(23);
 
 select has_column('foodflow', 'orders', 'priority_code', 'orders persist bounded current priority');
 select has_column('foodflow', 'orders', 'priority_reason', 'orders persist current priority reason');
