@@ -1,9 +1,17 @@
 import Link from "next/link";
-import { Activity, CalendarClock, Plus, Settings2, Utensils } from "lucide-react";
+import {
+  Activity,
+  CalendarClock,
+  Layers3,
+  Plus,
+  Settings2,
+  Utensils,
+} from "lucide-react";
 
 const links = [
   { href: "/admin/menu", label: "Menu", icon: Utensils },
   { href: "/admin/menu/new", label: "New item", icon: Plus },
+  { href: "/admin/menu/categories", label: "Categories", icon: Layers3 },
   { href: "/admin/hours", label: "Hours", icon: CalendarClock },
   { href: "/admin/activity", label: "Activity", icon: Activity },
   { href: "/admin/settings", label: "Settings", icon: Settings2 },
@@ -13,7 +21,7 @@ export function OwnerStudioLauncher() {
   return (
     <nav
       aria-label="Owner studio shortcuts"
-      className="fixed bottom-5 right-5 z-50 hidden items-center gap-1.5 rounded-2xl border border-border/80 bg-background/92 p-2 shadow-[0_24px_80px_rgb(0_0_0/0.12)] backdrop-blur-xl 2xl:flex"
+      className="fixed inset-x-3 bottom-[calc(.75rem+env(safe-area-inset-bottom))] z-50 flex max-w-[calc(100vw-1.5rem)] items-center gap-1.5 overflow-x-auto rounded-2xl border border-border/80 bg-background/94 p-2 shadow-[0_24px_80px_rgb(0_0_0/0.14)] backdrop-blur-2xl sm:inset-x-auto sm:bottom-5 sm:right-5 sm:max-w-[calc(100vw-2.5rem)]"
     >
       {links.map((item) => {
         const Icon = item.icon;
@@ -21,7 +29,7 @@ export function OwnerStudioLauncher() {
           <Link
             key={item.href}
             href={item.href}
-            className="group flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Icon className="size-3.5" aria-hidden="true" />
             {item.label}
