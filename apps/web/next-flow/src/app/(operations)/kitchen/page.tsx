@@ -1,5 +1,5 @@
-import { KitchenBoard } from "@/features/kitchen/kitchen-board";
+import { DurableKitchenBoard } from "@/features/kitchen/durable-kitchen-board";
 
 export default function KitchenPage() {
-  return <KitchenBoard />;
+  return <DurableKitchenBoard />;
 }
