@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { FLOW_BRAND_ASSETS } from "@/config/brand-assets";
 import { DurableCustomerExperience } from "@/features/customer/durable-customer-experience";
+import { DurableCustomerServiceDock } from "@/features/customer/durable-customer-service-dock";
 import { getCurrentCustomerContext } from "@/modules/customer-capability/server/current-context";
 import {
   buildCustomerExchangePath,
@@ -67,6 +68,7 @@ export default async function CustomerTablePage(props: {
       data-flow-branch={snapshot.data.storefront.branchId}
     >
       <DurableCustomerExperience snapshot={snapshot.data} />
+      <DurableCustomerServiceDock />
     </div>
   );
 }

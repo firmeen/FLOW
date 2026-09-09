@@ -1,5 +1,5 @@
-import { AdminConsole } from "@/features/dashboard/admin-console";
+import { DurableAdminOverview } from "@/features/dashboard/durable-admin-overview";
 
 export default function AdminPage() {
-  return <AdminConsole />;
+  return <DurableAdminOverview />;
 }

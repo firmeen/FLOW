@@ -1,5 +1,5 @@
-import { CashierApp } from "@/features/billing/cashier-app";
+import { DurableCashierWorkspace } from "@/features/billing/durable-cashier-workspace";
 
 export default function CashierPage() {
-  return <CashierApp />;
+  return <DurableCashierWorkspace />;
 }

@@ -1,5 +1,5 @@
-import { DemoLauncher } from "@/features/launcher/demo-launcher";
+import { FlowEntryHub } from "@/features/launcher/flow-entry-hub";
 
 export default function HomePage() {
-  return <DemoLauncher />;
+  return <FlowEntryHub />;
 }

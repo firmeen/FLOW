@@ -1,0 +1,31 @@
+import {
+  ManagementActivityError,
+  loadManagementActivity,
+} from "@/modules/management-activity/server/management-activity-service";
+
+function failure(error: unknown): Response {
+  if (error instanceof ManagementActivityError) {
+    return Response.json(
+      { ok: false, error: { code: error.code } },
+      {
+        status: error.code === "MANAGEMENT_ACTIVITY_FORBIDDEN" ? 403 : 503,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
+  }
+  return Response.json(
+    { ok: false, error: { code: "MANAGEMENT_ACTIVITY_UNAVAILABLE" } },
+    { status: 503, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
+export async function GET(): Promise<Response> {
+  try {
+    return Response.json(
+      { ok: true, data: await loadManagementActivity() },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    return failure(error);
+  }
+}
