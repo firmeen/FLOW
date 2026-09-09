@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -90,9 +90,11 @@ export function InvitationAcceptanceCard({
           body: JSON.stringify({ password }),
         },
       );
-      setAccepted(await readApi<TeamInvitationAcceptanceResult>(response));
+      const result = await readApi<TeamInvitationAcceptanceResult>(response);
+      setAccepted(result);
       setPassword("");
       setConfirmPassword("");
+      window.history.replaceState(null, "", "/login?next=%2Fworkspace");
     } catch (acceptError) {
       setError(
         acceptError instanceof Error
@@ -140,14 +142,12 @@ export function InvitationAcceptanceCard({
                   </div>
                 </div>
               </div>
-              <Button
-                asChild
-                className="mt-7 w-full bg-white text-zinc-950 hover:bg-white/90"
-                size="lg"
-                rightIcon={<ArrowRight className="size-4" />}
+              <Link
+                href="/login?next=%2Fworkspace"
+                className="mt-7 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-semibold text-zinc-950 transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               >
-                <Link href="/login?next=%2Fworkspace">Continue to sign in</Link>
-              </Button>
+                Continue to sign in <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
             </div>
           </Card>
         </div>
@@ -281,9 +281,12 @@ export function InvitationAcceptanceCard({
                 </Button>
               </div>
             ) : (
-              <Button asChild className="mt-8 w-full" size="lg">
-                <Link href="/login">Back to sign in</Link>
-              </Button>
+              <Link
+                href="/login"
+                className="mt-8 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Back to sign in
+              </Link>
             )}
           </Card>
         </section>
