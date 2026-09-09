@@ -7,10 +7,13 @@ import {
 } from "@/modules/team-access/server/invitation-acceptance-service";
 import { InvitationAcceptanceCard } from "./invitation-acceptance-card";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Activate Team Access",
   description: "Activate a secure FLOW restaurant team invitation.",
   robots: { index: false, follow: false },
+  referrer: "no-referrer",
 };
 
 export default async function TeamInvitationPage({
