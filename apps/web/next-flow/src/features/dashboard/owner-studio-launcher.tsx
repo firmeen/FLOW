@@ -6,10 +6,12 @@ import {
   Layers3,
   Plus,
   Settings2,
+  UsersRound,
   Utensils,
 } from "lucide-react";
 
 const links = [
+  { href: "/admin/team", label: "Team", icon: UsersRound },
   { href: "/admin/menu", label: "Menu", icon: Utensils },
   { href: "/admin/menu/new", label: "New item", icon: Plus },
   { href: "/admin/menu/categories", label: "Categories", icon: Layers3 },
