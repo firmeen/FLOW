@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { StaffOperationsRouter } from "./operational-orders-workspace";
+import { DurableReadyHandoffWorkspace } from "./durable-ready-handoff-workspace";
 import { DurableServiceFloorWorkspace } from "./durable-service-floor-workspace";
+import { DurableStaffMenuWorkspace } from "./durable-staff-menu-workspace";
+import { StaffOperationsRouter } from "./operational-orders-workspace";
 
 type StaffTab = "orders" | "tables" | "service" | "ready" | "menu";
 const TABS: readonly StaffTab[] = ["orders", "tables", "service", "ready", "menu"];
@@ -28,8 +30,8 @@ export function DurableStaffWorkspaceRouter() {
     };
   }, []);
 
-  if (tab === "tables" || tab === "service") {
-    return <DurableServiceFloorWorkspace mode={tab} />;
-  }
+  if (tab === "tables" || tab === "service") return <DurableServiceFloorWorkspace mode={tab} />;
+  if (tab === "ready") return <DurableReadyHandoffWorkspace />;
+  if (tab === "menu") return <DurableStaffMenuWorkspace />;
   return <StaffOperationsRouter />;
 }
