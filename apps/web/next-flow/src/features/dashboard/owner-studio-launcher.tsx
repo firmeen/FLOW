@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Activity, Settings2, Utensils } from "lucide-react";
+import { Activity, CalendarClock, Settings2, Utensils } from "lucide-react";
 
 const links = [
   { href: "/admin/menu", label: "Menu studio", icon: Utensils },
+  { href: "/admin/hours", label: "Opening hours", icon: CalendarClock },
   { href: "/admin/activity", label: "Activity", icon: Activity },
   { href: "/admin/settings", label: "Operating settings", icon: Settings2 },
 ] as const;
@@ -11,7 +12,7 @@ export function OwnerStudioLauncher() {
   return (
     <nav
       aria-label="Owner studio shortcuts"
-      className="fixed bottom-5 right-5 z-50 hidden items-center gap-2 rounded-2xl border border-border/80 bg-background/92 p-2 shadow-[0_24px_80px_rgb(0_0_0/0.12)] backdrop-blur-xl lg:flex"
+      className="fixed bottom-5 right-5 z-50 hidden items-center gap-2 rounded-2xl border border-border/80 bg-background/92 p-2 shadow-[0_24px_80px_rgb(0_0_0/0.12)] backdrop-blur-xl xl:flex"
     >
       {links.map((item) => {
         const Icon = item.icon;
