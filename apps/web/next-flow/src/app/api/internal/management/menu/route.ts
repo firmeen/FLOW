@@ -1,7 +1,13 @@
 import {
+  createManagedMenuItem,
+  type CreateManagedMenuItemInput,
+} from "@/modules/menu-management/server/menu-create-service";
+import {
   MenuManagementError,
   loadMenuManagementSnapshot,
 } from "@/modules/menu-management/server/menu-management-service";
+
+const MAX_BODY_BYTES = 12 * 1024;
 
 function failure(error: unknown): Response {
   if (error instanceof MenuManagementError) {
@@ -26,12 +32,48 @@ function failure(error: unknown): Response {
   );
 }
 
+function assertSameOrigin(request: Request): void {
+  const origin = request.headers.get("origin");
+  if (origin && origin !== new URL(request.url).origin) {
+    throw new MenuManagementError("MENU_MANAGEMENT_INVALID_INPUT");
+  }
+}
+
+async function readBody(request: Request): Promise<CreateManagedMenuItemInput> {
+  const type = request.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!type.startsWith("application/json")) {
+    throw new MenuManagementError("MENU_MANAGEMENT_INVALID_INPUT");
+  }
+  const text = await request.text();
+  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) {
+    throw new MenuManagementError("MENU_MANAGEMENT_INVALID_INPUT");
+  }
+  const value = JSON.parse(text) as unknown;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new MenuManagementError("MENU_MANAGEMENT_INVALID_INPUT");
+  }
+  return value as CreateManagedMenuItemInput;
+}
+
 export async function GET(): Promise<Response> {
   try {
     const snapshot = await loadMenuManagementSnapshot();
     return Response.json(
       { ok: true, data: snapshot },
       { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  try {
+    assertSameOrigin(request);
+    const created = await createManagedMenuItem(await readBody(request));
+    return Response.json(
+      { ok: true, data: created },
+      { status: 201, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     return failure(error);
