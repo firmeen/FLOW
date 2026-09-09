@@ -4,7 +4,6 @@ import { IBM_Plex_Sans, Inter, Public_Sans } from "next/font/google";
 
 import { FLOW_BRAND_ASSETS } from "@/config/brand-assets";
 import { cn } from "@/lib/utils";
-import { FoodFlowProvider } from "@/store";
 
 import "./globals.css";
 
@@ -89,9 +88,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         inter.variable,
       )}
     >
-      <body className="min-h-full bg-background text-foreground">
-        <FoodFlowProvider>{children}</FoodFlowProvider>
-      </body>
+      <body className="min-h-full bg-background text-foreground">{children}</body>
     </html>
   );
 }
