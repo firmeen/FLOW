@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Settings2, Utensils } from "lucide-react";
+import { Activity, Settings2, Utensils } from "lucide-react";
 
 const links = [
   { href: "/admin/menu", label: "Menu studio", icon: Utensils },
+  { href: "/admin/activity", label: "Activity", icon: Activity },
   { href: "/admin/settings", label: "Operating settings", icon: Settings2 },
 ] as const;
 
