@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Activity,
+  Building2,
   CalendarClock,
   Layers3,
   Plus,
@@ -12,6 +13,7 @@ const links = [
   { href: "/admin/menu", label: "Menu", icon: Utensils },
   { href: "/admin/menu/new", label: "New item", icon: Plus },
   { href: "/admin/menu/categories", label: "Categories", icon: Layers3 },
+  { href: "/admin/branches", label: "Branches", icon: Building2 },
   { href: "/admin/hours", label: "Hours", icon: CalendarClock },
   { href: "/admin/activity", label: "Activity", icon: Activity },
   { href: "/admin/settings", label: "Settings", icon: Settings2 },
